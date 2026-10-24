@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stock Pulse</string>
+    <string name="widget_portfolio_name">STOCK PULSE</string>
+    <string name="widget_portfolio_desc">Portfolio value, daily change and next dividend</string>
+    <string name="widget_next_dividend_name">Next Dividend</string>
+    <string name="widget_next_dividend_title">NEXT DIVIDEND</string>
+    <string name="widget_next_dividend_desc">Your next upcoming dividend payment</string>
+</resources>

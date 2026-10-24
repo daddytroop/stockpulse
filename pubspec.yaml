@@ -1,0 +1,44 @@
+name: stock_pulse
+description: >-
+  Stock Pulse - a free, open-source portfolio & dividend tracker for
+  Android (APK + home-screen widgets) and Windows desktop.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.2
+
+  # Networking (Yahoo Finance - no API key required)
+  http: ^1.2.2
+
+  # Number/date formatting
+  intl: ^0.19.0
+
+  # Local persistence (JSON files)
+  path_provider: ^2.1.5
+
+  # Android home-screen widgets
+  home_widget: ^0.7.0
+
+  # Charts
+  fl_chart: ^0.69.2
+
+  # File import/export
+  file_selector: ^1.0.3
+  share_plus: ^10.1.2
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

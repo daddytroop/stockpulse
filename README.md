@@ -1,0 +1,133 @@
+# Stock Pulse
+
+**A free, open-source alternative to Stock Events** — a portfolio & dividend tracker for **Android (APK + home-screen widgets)** and **Windows**, with no subscription, no account, and no API keys.
+
+Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) endpoints, which work without an API key.
+
+<p align="center">
+  <em>Portfolio value · daily change · dividend calendar · yield on cost · earnings dates · CSV import · home-screen widgets</em>
+</p>
+
+## Features
+
+- 📈 **Multi-portfolio tracking** — stocks, ETFs, crypto (`BTC-USD`), foreign exchanges (`SHOP.TO`, `AIR.PA`, ...). Quantities and average cost merge automatically when you buy more of the same symbol.
+- 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
+- 📅 **Dividend calendar** — month view with ex-dividend/payout days. Exact upcoming dates when Yahoo publishes them, otherwise dates are **estimated from each payer's cadence** (marked `*`).
+- 📊 **Charts** — portfolio value history (1M–5Y) and per-holding price charts with dividend markers.
+- 📰 **Earnings + news** — upcoming earnings dates for your holdings and an aggregated news feed.
+- 🧾 **Bulk CSV import** — paste rows from your broker or open a `.csv` file. Column mapping is auto-detected and can be overridden. No more adding holdings one-by-one.
+- 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
+- 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget, updated by the app.
+- 🌓 Dark mode, adaptive desktop/phone navigation (navigation rail vs. bottom bar), offline-tolerant (shows last cached quotes).
+
+## Getting the app
+
+### Android APK (recommended: let GitHub build it)
+
+The included workflow builds a signed, sideloadable APK on every push:
+
+1. Push the repo to GitHub (or fork it).
+2. Open the **Actions** tab → latest **Build & Release** run → download the **StockPulse-android-apk** artifact.
+3. Rename `app-release.apk` to `StockPulse.apk`, enable "Install unknown apps" for your browser/file manager, and install.
+
+Tag a release (`git tag v1.0.0 && git push origin v1.0.0`) and the workflow also creates a GitHub Release with the APK and a Windows zip attached.
+
+On-device data is stored only in the app's private folder — no accounts, no telemetry.
+
+### Windows
+
+The same workflow produces a **StockPulse-windows** artifact (a zip of the Release build). Unzip and run `stock_pulse.exe`.
+
+## Importing your portfolio
+
+The **Import** tab accepts:
+
+| Format | Example |
+|---|---|
+| Comma / semicolon / tab CSV (file or pasted) | `AAPL,10,101.50` |
+| With headers | `Ticker,Quantity,Avg Cost` / `Symbol;Shares;Price` |
+| Broker-ish exports with extra columns | any columns — mapping is detected, and you can override it in the UI |
+| Quoted fields | `"MSFT","Company, Inc.",4,"1,234.50"` |
+| Decimal commas / currency labels | `1,5` → 1.5 · `USD 10.50` → 10.50 |
+| Duplicates | merged: quantities add, average cost re-weights |
+
+Minimum: a **symbol** and a **quantity** column (avg cost optional — yield-on-cost simply won't show for those rows).
+
+Sample:
+
+```csv
+Symbol,Quantity,AvgCost
+AAPL,10,101.50
+SCHD,55,
+MSFT,4,243.20
+SHOP.TO,15,
+BTC-USD,0.25,58000
+```
+
+You can also **export** any portfolio back to CSV, or take a full JSON backup (Settings → Data) to move devices.
+
+## Widgets (Android)
+
+After installing, add them from the home screen: **long-press wallpaper → Widgets → Stock Pulse**
+
+- **Stock Pulse** — total portfolio value, daily change (color-coded), next dividend.
+- **Next Dividend** — compact "symbol · amount · dates" widget.
+
+The app updates both widgets whenever quotes refresh (app open, pull-to-refresh, manual). Data lives in `HomeWidgetPlugin` SharedPreferences; no network access happens in the widget itself.
+
+## Building locally
+
+Install [Flutter](https://docs.flutter.dev/get-started/install) (3.27+), then:
+
+```bash
+# generate platform folders and apply the Android widget overlay
+./scripts/setup_platforms.sh          # or on Windows:
+powershell ./scripts/setup_platforms.ps1 [-Windows]
+
+flutter run -d windows                # desktop app
+flutter run                           # on a connected Android device
+flutter build apk --release           # APK -> build/app/outputs/flutter-apk/
+```
+
+> Platform folders (`android/`, `windows/`) are gitignored — `flutter create` regenerates them in CI, and `platform_overlay/android/` is copied over the generated `android/` folder to install the widget providers, app id (`app.stockpulse`), and manifest.
+
+Run tests: `flutter test`
+
+## How it works
+
+```
+lib/
+├── models/            Holding, Portfolio, Quote, DividendInfo/UpcomingDividend
+├── services/
+│   ├── yahoo_service.dart   unofficial Yahoo client (cookie+crumb handshake,
+│   │                        batched v7 quotes, v8 chart fallback, search, news,
+│   │                        quoteSummary calendarEvents)
+│   ├── store.dart           JSON file persistence (portfolios + cache)
+│   ├── csv_import.dart      pure-Dart CSV/TSV parser & column detection
+│   ├── export_service.dart  save dialog (desktop) / share sheet (Android)
+│   └── widget_service.dart  home_widget bridge (no-ops off Android)
+├── providers/portfolio_provider.dart  state, refresh pipeline, computations
+└── screens/           portfolio, detail, dividends/calendar, news, import, settings
+platform_overlay/android/            native widget providers (Kotlin) + layouts
+.github/workflows/build.yml          analyze+test, APK, Windows zip, tagged releases
+```
+
+**Dividend dates**: when Yahoo's `calendarEvents` module returns an upcoming ex-dividend/pay date it is used verbatim; otherwise the next dates are extrapolated from the median gap between the last payments (quarterly ≈ 91 days, monthly ≈ 30, ...). Amounts per share come from the payment history (or `trailingAnnualDividendRate`).
+
+**Caching**: quotes are written to disk on every refresh, so the app renders instantly next launch; dividend calendar data is cached 24h; charts 10 min; news 15 min. Requests are staggered to stay polite to Yahoo's free endpoints.
+
+## Roadmap
+
+- [ ] Custom launcher icon & adaptive icon
+- [ ] Background widget refresh via WorkManager
+- [ ] Optional: sync portfolios between devices via a private Gist/WebDAV
+- [ ] Split/adjust cost basis tracking (sells, DRIP shares)
+- [ ] Linux/macOS desktop targets
+
+## Disclaimer
+
+Prices and dividend/earnings dates are from Yahoo Finance's unofficial API and may be delayed, missing or wrong. Estimates are marked with `*` in-app. This tool tracks *your* numbers; it is **not** investment advice. Yahoo data use is subject to their terms; consider contributing to a paid alternative you like if you need guarantees.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

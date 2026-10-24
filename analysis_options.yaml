@@ -1,0 +1,13 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    unused_import: info
+    deprecated_member_use: info
+
+linter:
+  rules:
+    # Keep the codebase approachable for contributors.
+    prefer_single_quotes: true
+    always_declare_return_types: true
+    unawaited_futures: false

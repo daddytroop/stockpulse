@@ -1,0 +1,72 @@
+import 'package:intl/intl.dart';
+
+/// Number & date formatting helpers shared across screens.
+
+String fmtMoney(num? v, {required String? currency, int decimals = 2}) {
+  if (v == null) return '–';
+  final f = NumberFormat('#,##0.${'0' * decimals}#####');
+  final body = f.format(v);
+  final sym = currencySymbol(currency);
+  return sym.isEmpty ? body : '$sym$body';
+}
+
+String currencySymbol(String? code) {
+  if (code == null || code.isEmpty || code == 'XX') return '';
+  try {
+    return NumberFormat.simpleCurrency(locale: 'en_US', name: code).currencySymbol.isNotEmpty
+        ? NumberFormat.simpleCurrency(locale: 'en_US', name: code).currencySymbol
+        : '$code ';
+  } catch (_) {
+    return '$code ';
+  }
+}
+
+String fmtSignedMoney(num? v, {required String? currency}) {
+  if (v == null) return '–';
+  final sign = v > 0 ? '+' : '';
+  return '$sign${fmtMoney(v, currency: currency)}';
+}
+
+String fmtPct(num? v, {bool signed = true}) {
+  if (v == null) return '–';
+  final s = v.toStringAsFixed(2);
+  if (!signed) return '$s%';
+  return '${v > 0 ? '+' : ''}$s%';
+}
+
+String fmtQty(num v) {
+  if (v == v.roundToDouble()) {
+    return NumberFormat.decimalPattern().format(v.toInt());
+  }
+  return NumberFormat('#,##0.####').format(v);
+}
+
+String fmtDate(DateTime? d) {
+  if (d == null) return '–';
+  return DateFormat('d MMM yyyy').format(d);
+}
+
+String fmtShortDate(DateTime? d) {
+  if (d == null) return '–';
+  return DateFormat('d MMM').format(d);
+}
+
+String fmtMonthYear(DateTime d) => DateFormat('MMMM yyyy').format(d);
+
+String timeAgo(DateTime d) {
+  final diff = DateTime.now().difference(d);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  return fmtShortDate(d);
+}
+
+/// Deterministic accent color index for a symbol (used by the letter avatar).
+int colorIndexFor(String symbol) {
+  var h = 0;
+  for (final c in symbol.codeUnits) {
+    h = (h * 31 + c) & 0x7FFFFFFF;
+  }
+  return h % 16;
+}
