@@ -30,6 +30,7 @@ jobs:
       - name: Overlay custom Android widget code
         run: |
           rm -rf android/app/src/main/kotlin/com
+          rm -f android/app/build.gradle.kts
           cp -r platform_overlay/android/. android/
       - name: Install dependencies
         run: flutter pub get
@@ -58,6 +59,7 @@ jobs:
       - name: Overlay custom Android widget code
         run: |
           rm -rf android/app/src/main/kotlin/com
+          rm -f android/app/build.gradle.kts
           cp -r platform_overlay/android/. android/
       - name: Install dependencies
         run: flutter pub get
@@ -83,6 +85,23 @@ jobs:
           cache: true
       - name: Generate platform folder (windows)
         run: flutter create --platforms windows .
+      - name: Ensure Visual Studio C++ toolchain (2026 runner images ship VS 18+)
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $found = ''
+          if (Test-Path $vswhere) {
+            $found = & $vswhere -latest -all -products * `
+              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+              -property installationPath
+          }
+          if ($found) {
+            Write-Host "Visual Studio C++ toolchain found at: $found"
+          } else {
+            Write-Host 'No MSVC toolchain detected - installing VS2022 Build Tools via Chocolatey'
+            choco install visualstudio2022buildtools visualstudio2022-workload-vctools `
+              -y --no-progress --ignore-package-exit-codes
+          }
       - name: Install dependencies
         run: flutter pub get
       - name: Build Windows (release)

@@ -24,6 +24,9 @@ flutter create --platforms $platforms .
 if (Test-Path 'android/app/src/main/kotlin/com') {
     Remove-Item -Recurse -Force 'android/app/src/main/kotlin/com'
 }
+if (Test-Path 'android/app/build.gradle.kts') {
+    Remove-Item -Force 'android/app/build.gradle.kts'
+}
 Copy-Item -Recurse -Force 'platform_overlay/android/.' 'android/'
 
 flutter pub get

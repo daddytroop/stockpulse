@@ -13,6 +13,7 @@ fi
 flutter create --platforms android,web .
 
 rm -rf android/app/src/main/kotlin/com
+rm -f android/app/build.gradle.kts
 cp -r platform_overlay/android/. android/
 
 flutter pub get
