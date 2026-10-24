@@ -5,6 +5,7 @@
 ///  * Auto-detect delimiter (comma / semicolon / tab) and header row.
 ///  * Flexible column matching so broker exports "just work".
 ///  * Aggregate duplicate symbols into one weighted-average position.
+library;
 
 class ParsedHolding {
   final String symbol;
@@ -158,7 +159,8 @@ ImportResult parseImport(
 
   final holdings = [
     for (final m in merged.values)
-      ParsedHolding(symbol: m.symbol, name: m.name, quantity: m.quantity, avgCost: m.cost),
+      ParsedHolding(
+          symbol: m.symbol, name: m.name, quantity: m.quantity, avgCost: m.weightedCost),
   ]..sort((a, b) => a.symbol.compareTo(b.symbol));
 
   return ImportResult(

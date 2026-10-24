@@ -1,11 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
-import '../utils/formatters.dart';
 
 /// Modal bottom sheet to add or edit a holding. Features Yahoo symbol
 /// autocomplete while typing.

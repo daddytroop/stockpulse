@@ -39,7 +39,7 @@ class Portfolio {
       id: (m['id'] ?? '') as String,
       name: (m['name'] ?? 'Portfolio') as String,
       holdings: {
-        for (final h in list.whereType<Map>())
+        for (final h in list.whereType<Map<String, dynamic>>())
           ((h['symbol'] ?? '') as String).toUpperCase(): Holding.fromMap(h),
       },
     );
