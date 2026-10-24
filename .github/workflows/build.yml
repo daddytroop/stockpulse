@@ -89,16 +89,22 @@ jobs:
         shell: pwsh
         run: |
           $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-          $found = ''
+          $matched = ''
           if (Test-Path $vswhere) {
-            $found = & $vswhere -latest -all -products * `
+            $versions = & $vswhere -latest -all -products * `
               -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-              -property installationPath
+              -format value -property installationVersion
+            foreach ($v in $versions) {
+              try {
+                $major = ([version]"$v").Major
+                if ($major -ge 14 -and $major -le 17) { $matched = $v; break }
+              } catch { }
+            }
           }
-          if ($found) {
-            Write-Host "Visual Studio C++ toolchain found at: $found"
+          if ($matched) {
+            Write-Host "MSVC toolchain supported by Flutter 3.27 found (version $matched)"
           } else {
-            Write-Host 'No MSVC toolchain detected - installing VS2022 Build Tools via Chocolatey'
+            Write-Host 'No Visual Studio 16/17 with C++ tools detected - installing VS 2022 Build Tools via Chocolatey'
             choco install visualstudio2022buildtools visualstudio2022-workload-vctools `
               -y --no-progress --ignore-package-exit-codes
           }
