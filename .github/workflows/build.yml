@@ -63,6 +63,10 @@ jobs:
           cp -r platform_overlay/android/. android/
       - name: Install dependencies
         run: flutter pub get
+      - name: Generate launcher icons & splash
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
       - name: Build APK (release)
         run: flutter build apk --release
       - name: Upload APK artifact

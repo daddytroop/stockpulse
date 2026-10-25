@@ -878,6 +878,134 @@ class PortfolioProvider extends ChangeNotifier {
     );
   }
 
+  /// Fills in-memory state with realistic demo data. Used by integration
+  /// tests to capture deterministic screenshots without the network.
+  @visibleForTesting
+  void seedDemoData() {
+    DateTime inDays(int d) => DateTime.now().add(Duration(days: d));
+    DividendInfo hist(
+      List<double> amounts, {
+      int gap = 91,
+      DateTime? exactEx,
+      DateTime? exactPay,
+    }) {
+      final now = DateTime.now();
+      return DividendInfo(
+        symbol: 'seed',
+        payments: [
+          for (var i = 1; i <= amounts.length; i++)
+            DividendPayment(
+              exDate: now.subtract(Duration(days: gap * i)),
+              amount: amounts[amounts.length - i],
+            ),
+        ],
+        exDividendDate: exactEx,
+        payDate: exactPay,
+        cachedAt: DateTime.now(),
+      );
+    }
+
+    _portfolios = [
+      Portfolio(id: 'demo-long', name: 'Long-term', holdings: {
+        'AAPL': Holding(
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            currency: 'USD',
+            quantity: 12,
+            avgCost: 187.50),
+        'SCHD': Holding(
+            symbol: 'SCHD',
+            name: 'Schwab US Dividend Equity ETF',
+            currency: 'USD',
+            quantity: 55,
+            avgCost: 26.80),
+        'MSFT': Holding(
+            symbol: 'MSFT',
+            name: 'Microsoft Corporation',
+            currency: 'USD',
+            quantity: 4,
+            avgCost: 243.20),
+        'O': Holding(
+            symbol: 'O',
+            name: 'Realty Income Corp',
+            currency: 'USD',
+            quantity: 40,
+            avgCost: 57.75),
+        'BTC-USD': Holding(
+            symbol: 'BTC-USD',
+            name: 'Bitcoin USD',
+            currency: 'USD',
+            quantity: 0.35,
+            avgCost: 61200),
+      }),
+      Portfolio(id: 'demo-tsx', name: 'Canada', holdings: {
+        'RY.TO': Holding(
+            symbol: 'RY.TO',
+            name: 'Royal Bank of Canada',
+            currency: 'CAD',
+            quantity: 30,
+            avgCost: 148.20),
+        'SHOP.TO': Holding(
+            symbol: 'SHOP.TO',
+            name: 'Shopify Inc',
+            currency: 'CAD',
+            quantity: 15,
+            avgCost: 96.40),
+      }),
+    ];
+    _activeIndex = 0;
+
+    Quote q(String symbol, String name, String currency, double price,
+        double pct, double? divRate,
+        {String? type, String? exchange}) {
+      return Quote(
+        symbol: symbol,
+        name: name,
+        currency: currency,
+        quoteType: type ?? 'EQUITY',
+        exchange: exchange,
+        marketState: 'REGULAR',
+        price: price,
+        previousClose: price - price * pct / 100,
+        dayChange: price * pct / 100,
+        dayChangePercent: pct,
+        fiftyTwoWeekHigh: price * 1.08,
+        fiftyTwoWeekLow: price * 0.74,
+        dividendRate: divRate,
+        dividendYield: divRate == null ? null : divRate / price,
+        updatedAt: DateTime.now(),
+      );
+    }
+
+    _quotes = {
+      'AAPL': q('AAPL', 'Apple Inc.', 'USD', 261.48, 0.62, 1.08, exchange: 'NASDAQ'),
+      'SCHD': q('SCHD', 'Schwab US Dividend Equity ETF', 'USD', 29.15, 0.35, 0.62,
+          type: 'ETF', exchange: 'NYSEARCA'),
+      'MSFT': q('MSFT', 'Microsoft Corporation', 'USD', 508.20, -0.41, 3.32, exchange: 'NASDAQ'),
+      'O': q('O', 'Realty Income Corp', 'USD', 61.20, 0.24, 3.10, exchange: 'NYSE'),
+      'BTC-USD': q('BTC-USD', 'Bitcoin USD', 'USD', 98450.00, 1.10, null,
+          type: 'CRYPTOCURRENCY', exchange: 'CCC'),
+      'RY.TO': q('RY.TO', 'Royal Bank of Canada', 'CAD', 172.40, 0.31, 5.96, exchange: 'TSX'),
+      'SHOP.TO': q('SHOP.TO', 'Shopify Inc', 'CAD', 310.20, -0.55, null, exchange: 'TSX'),
+    };
+
+    _dividendInfo = {
+      'AAPL': hist([1.04, 1.04, 1.06, 1.08],
+          exactEx: inDays(6), exactPay: inDays(16)),
+      'SCHD': hist([0.63, 0.65, 0.70, 0.74],
+          exactEx: inDays(12), exactPay: inDays(21)),
+      'MSFT': hist([0.75, 0.79, 0.83, 0.83]),
+      'O': hist(
+        List.filled(24, 0.2565),
+        gap: 30,
+      ),
+      'RY.TO': hist([1.32, 1.36, 1.40, 1.42]),
+    };
+
+    _loaded = true;
+    notifyListeners();
+  }
+
   String _dominantCurrency() {
     final counts = <String, int>{};
     for (final p in _portfolios) {
