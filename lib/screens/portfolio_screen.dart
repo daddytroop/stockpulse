@@ -86,9 +86,11 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                final results = snap.data ?? const [];
-                final points = results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
-                final benchmark = results.length > 1 ? results[1] as List<ChartPoint>? : null;
+                final results = snap.data as List? ?? const [];
+                final points =
+                    results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
+                final benchmark =
+                    results.length > 1 ? results[1] as List<ChartPoint>? : null;
                 return PortfolioChart(
                   points: points,
                   benchmark: benchmark,
