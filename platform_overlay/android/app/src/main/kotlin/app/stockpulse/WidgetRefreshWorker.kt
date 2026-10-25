@@ -1,6 +1,7 @@
 package app.stockpulse
 
 import android.content.Context
+import android.app.NotificationManager
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import org.json.JSONArray
