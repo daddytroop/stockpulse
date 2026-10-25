@@ -1,29 +1,37 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tiny JSON-file persistence helper with atomic-ish writes.
+import 'store_impl_web.dart'
+    if (dart.library.io) 'store_impl_io.dart';
+
+/// Tiny persistence helper. Local JSON files (atomic-ish) on Android/desktop;
+/// SharedPreferences (localStorage) on Flutter web where `dart:io` can't be
+/// imported. Callers only ever deal with JSON maps.
 class StockPulseStore {
-  final Future<Directory> Function() _resolveDir;
+  static const String _tmpSuffix = '.tmp';
 
-  StockPulseStore({Future<Directory> Function()? resolver})
-      : _resolveDir = resolver ?? _defaultDir;
-
-  static Future<Directory> _defaultDir() async => getApplicationSupportDirectory();
-
-  Future<File> _file(String name) async {
-    final dir = await _resolveDir();
-    return File('${dir.path}${Platform.pathSeparator}$name');
-  }
+  Future<String?> _nativeDir() => resolveAppSupportDir();
 
   Future<Map<String, dynamic>?> load(String name) async {
+    if (kIsWeb) {
+      try {
+        final sp = await SharedPreferences.getInstance();
+        final raw = sp.getString('stockpulse_$name');
+        if (raw == null || raw.isEmpty) return null;
+        final decoded = jsonDecode(raw);
+        return decoded is Map<String, dynamic> ? decoded : null;
+      } catch (_) {
+        return null;
+      }
+    }
     try {
-      final f = await _file(name);
-      if (!await f.exists()) return null;
-      final text = await f.readAsString();
-      if (text.trim().isEmpty) return null;
-      final decoded = jsonDecode(text);
+      final dir = await _nativeDir();
+      if (dir == null) return null;
+      final raw = await readTextFile('$dir/$name');
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
       return decoded is Map<String, dynamic> ? decoded : null;
     } catch (_) {
       return null;
@@ -31,22 +39,28 @@ class StockPulseStore {
   }
 
   Future<void> save(String name, Map<String, dynamic> data) async {
+    final content = const JsonEncoder.withIndent('  ').convert(data);
+    if (kIsWeb) {
+      try {
+        final sp = await SharedPreferences.getInstance();
+        await sp.setString('stockpulse_$name', content);
+      } catch (_) {}
+      return;
+    }
     try {
-      final f = await _file(name);
-      final dir = f.parent;
-      if (!await dir.exists()) await dir.create(recursive: true);
-      final tmp = File('${f.path}.tmp');
-      await tmp.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
-      if (await f.exists()) await f.delete();
-      await tmp.rename(f.path);
+      final dir = await _nativeDir();
+      if (dir == null) return;
+      // write to a tmp file, then swap, so a crash mid-write can't corrupt
+      // data. (Windows cannot rename over an existing file - finalizeAtom
+      // deletes it first.)
+      final tmpPath = '${dir}$sep$name$_tmpSuffix';
+      final finalPath = '${dir}$sep$name';
+      await writeTextFileAtomic(tmpPath, content);
+      await finalizeAtom(tmpPath, finalPath);
     } catch (_) {
       // persistence failures should never crash the app
     }
   }
 
-  /// Directory used for manual exports (documents folder).
-  Future<String> documentsPath() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return dir.path;
-  }
+  static const String sep = '/';
 }

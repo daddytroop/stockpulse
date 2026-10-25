@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/dividends.dart';
@@ -62,6 +63,20 @@ class YahooService {
   String? _crumb;
   DateTime _crumbAt = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// Base URL of a CORS proxy used ONLY on Flutter web (Yahoo does not send
+  /// CORS headers). Format e.g. 'https://yahoo-proxy.<account>.workers.dev'.
+  static String? webProxyBase;
+
+  /// Routes [targetUrl] through the web proxy when running in a browser.
+  static String _route(String targetUrl) {
+    final proxy = webProxyBase;
+    if (kIsWeb && proxy != null && proxy.trim().isNotEmpty) {
+      final base = proxy.trim().replaceAll(RegExp(r'/+$'), '');
+      return '$base/?url=${Uri.encodeQueryComponent(targetUrl)}';
+    }
+    return targetUrl;
+  }
+
   final Map<String, _Cached<ChartHistory>> _chartCache = {};
   final Map<String, _Cached<CalendarData?>> _calendarCache = {};
   final Map<String, _Cached<List<NewsItem>>> _newsCache = {};
@@ -86,7 +101,7 @@ class YahooService {
     final query = Uri(queryParameters: params).query;
     for (final host in _hosts) {
       try {
-        final uri = Uri.parse('https://$host$path?$query');
+        final uri = Uri.parse(_route('https://$host$path?$query'));
         final r = await _client
             .get(uri, headers: _headers(withCookie: withCookie))
             .timeout(const Duration(seconds: 12));
@@ -111,10 +126,14 @@ class YahooService {
     // 1. Obtain the A3 cookie (fc.yahoo.com answers 404 but sets it).
     try {
       final r = await _client
-          .get(Uri.parse('https://fc.yahoo.com/'), headers: _headers())
+          .get(Uri.parse(_route('https://fc.yahoo.com/')), headers: _headers())
           .timeout(const Duration(seconds: 10));
-      final sc = r.headers['set-cookie'];
-      if (sc != null && sc.isNotEmpty) {
+      // On web the browser hides Set-Cookie; the proxy re-exposes it as a
+      // custom x-set-cookie header.
+      final sc = kIsWeb
+          ? (r.headers['x-set-cookie'] ?? r.headers['set-cookie'] ?? '')
+          : (r.headers['set-cookie'] ?? '');
+      if (sc.isNotEmpty) {
         _cookie = sc.split(';').first;
       }
     } catch (_) {
@@ -126,7 +145,7 @@ class YahooService {
     if (_cookie != null) {
       try {
         final r = await _client
-            .get(Uri.parse('https://${_hosts[0]}/v1/test/getcrumb'),
+            .get(Uri.parse(_route('https://${_hosts[0]}/v1/test/getcrumb')),
                 headers: _headers(withCookie: true))
             .timeout(const Duration(seconds: 10));
         final body = r.body.trim();

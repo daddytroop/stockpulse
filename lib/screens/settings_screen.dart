@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
@@ -192,6 +193,68 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: (v) => provider.setAutoRefreshOnStart(v),
                 ),
               ],
+            ),
+          ),
+
+          _section(context, 'Web build (browser)'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    kIsWeb
+                        ? 'Yahoo blocks direct browser calls (no CORS), so the web build '
+                            'needs the small Cloudflare Worker proxy included in the repo '
+                            '(cloudflare/). Deploy it with `npx wrangler deploy` and enter '
+                            'its URL here.'
+                        : 'This section matters only for the Flutter web build; on this '
+                            'platform Yahoo is contacted directly.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  if (provider.webProxyUrl.isNotEmpty)
+                    Text('Current: ${provider.webProxyUrl}',
+                        style: theme.textTheme.labelSmall),
+                  const SizedBox(height: 6),
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.link, size: 18),
+                    label: Text(provider.webProxyUrl.isEmpty
+                        ? 'Enter proxy URL'
+                        : 'Change proxy URL'),
+                    onPressed: () async {
+                      final url = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) {
+                          final ctl =
+                              TextEditingController(text: provider.webProxyUrl);
+                          return AlertDialog(
+                            title: const Text('Yahoo proxy URL'),
+                            content: TextField(
+                              controller: ctl,
+                              decoration: const InputDecoration(
+                                hintText: 'https://yahoo-proxy.yourname.workers.dev',
+                                border: OutlineInputBorder(),
+                              ),
+                              onSubmitted: (v) => Navigator.of(ctx).pop(v),
+                            ),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancel')),
+                              FilledButton(
+                                  onPressed: () => Navigator.of(ctx).pop(ctl.text),
+                                  child: const Text('Save')),
+                            ],
+                          );
+                        },
+                      );
+                      if (url != null) await provider.setWebProxyUrl(url);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
 

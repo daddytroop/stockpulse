@@ -1,20 +1,20 @@
 import 'dart:convert';
-import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:home_widget/home_widget.dart';
+
+import 'platform_check.dart' show isAndroidPlatform;
 
 /// Bridges portfolio data into the Android home-screen widgets.
 ///
 /// The widget layouts live in `platform_overlay/android/` and are applied by
-/// the CI build (or scripts/setup_platforms). On non-Android platforms every
-/// call here is a no-op.
+/// the CI build (or scripts/setup_platforms). Outside Android this is a no-op.
 class StockPulseWidgetService {
   StockPulseWidgetService._();
 
   static const String _appId = 'app.stockpulse';
 
   /// True when this device can display the home-screen widgets.
-  static bool get supported => Platform.isAndroid;
+  static bool get supported => isAndroidPlatform && !kIsWeb;
 
   /// Pushes the latest portfolio numbers to both widgets.
   ///

@@ -90,6 +90,7 @@ class PortfolioProvider extends ChangeNotifier {
   String _gistId = '';
   String _gistToken = '';
   DateTime? _lastSyncAt;
+  String _webProxyUrl = '';
 
   bool _loaded = false;
   bool _quotesLoading = false;
@@ -134,6 +135,16 @@ class PortfolioProvider extends ChangeNotifier {
   DateTime? get lastSyncAt => _lastSyncAt;
 
   bool get hasSyncConfig => _gistId.isNotEmpty && _gistToken.isNotEmpty;
+
+  String get webProxyUrl => _webProxyUrl;
+
+  Future<void> setWebProxyUrl(String url) async {
+    _webProxyUrl = url.trim();
+    YahooService.webProxyBase = _webProxyUrl;
+    notifyListeners();
+    await _persistData();
+    await refreshQuotes();
+  }
 
   Future<void> configureSync({required String token, String? gistId}) async {
     _gistToken = token.trim();
@@ -205,6 +216,7 @@ class PortfolioProvider extends ChangeNotifier {
       _gistId = data['gistId']?.toString() ?? '';
       _gistToken = data['gistToken']?.toString() ?? '';
       _lastSyncAt = _ms(data['lastSyncMs']);
+      _webProxyUrl = data['webProxyUrl']?.toString() ?? '';
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -231,6 +243,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     _loaded = true;
+    YahooService.webProxyBase = _webProxyUrl;
     notifyListeners();
   }
 
@@ -249,6 +262,7 @@ class PortfolioProvider extends ChangeNotifier {
       'gistId': _gistId,
       'gistToken': _gistToken,
       'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
+      'webProxyUrl': _webProxyUrl,
     });
   }
 

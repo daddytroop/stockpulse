@@ -124,6 +124,21 @@ platform_overlay/android/            native widget providers (Kotlin) + layouts
 
 **Caching**: quotes are written to disk on every refresh, so the app renders instantly next launch; dividend calendar data is cached 24h; charts 10 min; news 15 min. Requests are staggered to stay polite to Yahoo's free endpoints.
 
+## Web version (bonus)
+
+Every push also builds a **Flutter web** release (`StockPulse-web` artifact). Browsers can't call Yahoo directly (no CORS), and the cookie/crumb handshake needs reading `Set-Cookie`, which JavaScript is never allowed to read — so the repo ships a tiny **Cloudflare Worker** proxy (`cloudflare/`) that:
+
+- forwards requests to an allow-list of Yahoo hosts,
+- re-exposes Yahoo's `Set-Cookie` as a readable `x-set-cookie` header,
+- forwards your `Cookie` header for the crumb handshake,
+- answers CORS preflights.
+
+To use it:
+1. Deploy from the repo:  `cd cloudflare && npx wrangler deploy` (needs a free Cloudflare account; you already deploy via Wrangler for other sites).
+2. Open the web app (serve the artifact or a Pages deployment) → Settings → **Web build** → paste your proxy URL (`https://yahoo-proxy.<yoursubdomain>.workers.dev`).
+
+Data on web lives in your browser's localStorage; export/backup still works (saved to clipboard on web).
+
 ## Roadmap
 
 Shipped recently:
@@ -136,12 +151,9 @@ Shipped recently:
 - ✅ Portfolio chart vs SPY benchmark (% change, same window)
 
 Next:
-- [ ] Background widget refresh via WorkManager + local notifications (dividend paid today, earnings tomorrow, price moves)
 - [ ] Configurable widgets (portfolio picker, light/dark)
-- [ ] Optional cross-device sync via a private Gist
-- [ ] Biometric/PIN app lock
-- [ ] Flutter web build through a Yahoo CORS proxy (Cloudflare Worker)
 - [ ] Sector-level allocation, splits/transactions in portfolio history charts
+- [ ] Linux/macOS desktop targets
 
 ## Disclaimer
 

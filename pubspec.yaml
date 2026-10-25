@@ -18,6 +18,9 @@ dependencies:
   # Biometric lock (fingerprint / Windows Hello)
   local_auth: ^2.3.0
 
+  # Web persistence (localStorage)
+  shared_preferences: ^2.3.3
+
   # Networking (Yahoo Finance - no API key required)
   http: ^1.2.2
 
