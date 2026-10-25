@@ -21,12 +21,13 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 📈 **Multi-portfolio tracking** — stocks, ETFs, crypto (`BTC-USD`), foreign exchanges (`SHOP.TO`, `AIR.PA`, ...). Quantities and average cost merge automatically when you buy more of the same symbol.
 - 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
 - 📅 **Dividend calendar** — month view with ex-dividend/payout days. Exact upcoming dates when Yahoo publishes them, otherwise dates are **estimated from each payer's cadence** (marked `*`).
-- 📊 **Charts** — portfolio value history (1M–5Y) and per-holding price charts with dividend markers.
+- 📊 **Charts** — portfolio value history (1M–5Y) and per-holding price charts with dividend markers, plus a **SPY benchmark overlay**.
 - 📰 **Earnings + news** — upcoming earnings dates for your holdings and an aggregated news feed.
 - 🧾 **Bulk CSV import** — paste rows from your broker or open a `.csv` file. Column mapping is auto-detected and can be overridden. No more adding holdings one-by-one.
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
-- 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget, updated by the app.
-- 🌓 Dark mode, adaptive desktop/phone navigation (navigation rail vs. bottom bar), offline-tolerant (shows last cached quotes).
+- 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget, updated hourly by a native WorkManager worker even when the app is closed.
+- 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
+- 💱 **FX display currency**, 🔒 **biometric lock**, ☁️ **private Gist sync**, 🔔 **local notifications** for dividends/earnings/price moves.
 
 ## Getting the app
 
@@ -38,7 +39,7 @@ The included workflow builds a signed, sideloadable APK on every push:
 2. Open the **Actions** tab → latest **Build & Release** run → download the **StockPulse-android-apk** artifact.
 3. Rename `app-release.apk` to `StockPulse.apk`, enable "Install unknown apps" for your browser/file manager, and install.
 
-Tag a release (`git tag v1.0.0 && git push origin v1.0.0`) and the workflow also creates a GitHub Release with the APK and a Windows zip attached.
+Tag a release (`git tag v1.2.0 && git push origin v1.2.0`) and the workflow also creates a GitHub Release with the APK, Windows zip, and web build attached.
 
 On-device data is stored only in the app's private folder — no accounts, no telemetry.
 
@@ -151,6 +152,7 @@ Shipped recently:
 - ✅ Portfolio chart vs SPY benchmark (% change, same window)
 
 Next:
+- [x] Visual / animation polish pass
 - [ ] Configurable widgets (portfolio picker, light/dark)
 - [ ] Sector-level allocation, splits/transactions in portfolio history charts
 - [ ] Linux/macOS desktop targets
