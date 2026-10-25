@@ -160,6 +160,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Zip web build
+        shell: bash
+        run: |
+          (cd artifacts/StockPulse-web && zip -qr ../StockPulse-web.zip .)
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -167,4 +171,4 @@ jobs:
           files: |
             artifacts/StockPulse-android-apk/*
             artifacts/StockPulse-windows/*
-            artifacts/StockPulse-web/*
+            artifacts/StockPulse-web.zip
