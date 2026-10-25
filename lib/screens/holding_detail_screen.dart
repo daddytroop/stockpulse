@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/dividends.dart';
 import '../models/holding.dart';
+import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../utils/formatters.dart';
@@ -11,6 +12,7 @@ import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/symbol_avatar.dart';
 import 'add_edit_holding_sheet.dart';
+import 'sell_holding_dialog.dart';
 
 class HoldingDetailScreen extends StatefulWidget {
   final String portfolioId;
@@ -55,6 +57,13 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         title: Text(widget.symbol),
         actions: [
           IconButton(
+            tooltip: 'Sell / reduce position',
+            icon: const Icon(Icons.sell_outlined),
+            onPressed: holding == null
+                ? null
+                : () => showSellDialog(context, provider, widget.portfolioId, holding),
+          ),
+          IconButton(
             tooltip: 'Edit holding',
             icon: const Icon(Icons.edit_outlined),
             onPressed: holding == null
@@ -74,6 +83,11 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
               children: [
+                if (provider.splitSuggestionFor(holding) != null) ...[
+                  _splitBanner(
+                      context, provider, provider.splitSuggestionFor(holding)!, holding),
+                  const SizedBox(height: 12),
+                ],
                 _header(context, holding, quote, currency),
                 const SizedBox(height: 12),
                 _rangeChips(context),
@@ -92,10 +106,24 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                 const SizedBox(height: 12),
                 _statsGrid(context, provider, holding, quote, info, currency),
                 const SizedBox(height: 12),
+                if ((portfolio?.txnsFor(holding.symbol) ?? const []).isNotEmpty)
+                  _transactionsSection(context, provider, portfolio!, holding, currency),
                 if (info != null && info.payments.isNotEmpty) ...[
                   Text('Dividend history',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Received so far: '
+                    '${fmtMoney(provider.dividendsReceivedFor(portfolio!, holding), currency: currency)}'
+                    '${(provider.realizedPnlFor(portfolio, holding.symbol) != null)
+                        ? ' · realized P/L: ${fmtSignedMoney(provider.realizedPnlFor(portfolio, holding.symbol)!, currency: currency)}'
+                        : ''}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
                   const SizedBox(height: 6),
                   ...[
                     for (final p in info.payments.reversed.take(24))
@@ -119,6 +147,100 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                 _newsSection(context, provider),
               ],
             ),
+    );
+  }
+
+  Widget _splitBanner(
+      BuildContext context, PortfolioProvider provider, Split split, Holding holding) {
+    final theme = Theme.of(context);
+    final newQty = holding.quantity * split.multiplier;
+    return Card(
+      color: theme.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.swap_horiz, color: theme.colorScheme.onTertiaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${split.numerator}:${split.denominator} split on ${fmtDate(split.date)}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onTertiaryContainer),
+                  ),
+                  Text(
+                    'Adjust ${fmtQty(holding.quantity)} units to ${fmtQty(newQty)} '
+                    '(avg cost ${holding.avgCost > 0 ? fmtMoney(holding.avgCost / split.multiplier, currency: holding.currency) : '-'})?',
+                    style: TextStyle(
+                        fontSize: 12, color: theme.colorScheme.onTertiaryContainer),
+                  ),
+                ],
+              ),
+            ),
+            FilledButton.tonal(
+              onPressed: () => provider.applySplit(
+                  portfolioId: widget.portfolioId, symbol: holding.symbol),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _transactionsSection(BuildContext context, PortfolioProvider provider,
+      Portfolio portfolio, Holding holding, String currency) {
+    final theme = Theme.of(context);
+    final txns = portfolio.txnsFor(holding.symbol).reversed.take(12).toList(growable: false);
+    final realized = provider.realizedPnlFor(portfolio, holding.symbol);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Transactions',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            if (realized != null) ...[
+              Text('Realized: ', style: Theme.of(context).textTheme.labelSmall),
+              Text(
+                fmtSignedMoney(realized, currency: currency),
+                style: TextStyle(
+                    color: pnlColor(realized), fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        ...[
+          for (final t in txns)
+            ListTile(
+              dense: true,
+              leading: Icon(
+                t.isBuy ? Icons.add_shopping_cart_outlined : Icons.sell_outlined,
+                color: t.isBuy ? const Color(0xFF1565C0) : const Color(0xFFC62828),
+              ),
+              title: Text(
+                '${t.isBuy ? 'Buy' : 'Sell'} ${fmtQty(t.quantity)} @ ${fmtMoney(t.unitPrice, currency: currency)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                '${fmtDate(t.date)}${t.fee > 0 ? ' · fee ${fmtMoney(t.fee, currency: currency)}' : ''}'
+                '${t.note.isNotEmpty ? ' · ${t.note}' : ''}',
+                style: theme.textTheme.bodySmall,
+              ),
+              trailing: Text(
+                fmtMoney(t.quantity * t.unitPrice + (t.isBuy ? t.fee : -t.fee),
+                    currency: currency),
+              ),
+            ),
+        ],
+        const SizedBox(height: 10),
+      ],
     );
   }
 

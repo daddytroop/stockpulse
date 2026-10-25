@@ -31,8 +31,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final provider = context.watch<PortfolioProvider>();
     final portfolio = provider.active;
     final totals = provider.totalsFor(portfolio);
-    final currency =
-        portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency;
+    final currency = totals.displayCurrency ??
+        (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 90).take(5).toList();
 
     return Scaffold(
@@ -200,7 +200,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             Icon(Icons.playlist_add, size: 20), SizedBox(width: 10), Text('New portfolio')])),
         PopupMenuItem(value: 'import', child: Row(children: [
             Icon(Icons.upload_file_outlined, size: 20), SizedBox(width: 10), Text('Import holdings')])),
-        const PopupMenuDivider(),
+        PopupMenuDivider(),
         PopupMenuItem(value: 'delete', child: Row(children: [
             Icon(Icons.delete_outline, size: 20), SizedBox(width: 10), Text('Delete portfolio')])),
       ],
@@ -253,6 +253,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 ),
               ],
             ),
+            if (t.converted && t.displayCurrency != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'FX-converted to ${t.displayCurrency}',
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+                ),
+              ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 18,

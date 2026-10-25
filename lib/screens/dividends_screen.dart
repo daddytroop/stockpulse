@@ -30,8 +30,8 @@ class _DividendsScreenState extends State<DividendsScreen> {
     final provider = context.watch<PortfolioProvider>();
     final portfolio = provider.active;
     final totals = provider.totalsFor(portfolio);
-    final currency =
-        portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency;
+    final currency = totals.displayCurrency ??
+        (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 120);
     final next30 = provider.incomeWithinDays(30);
 
@@ -75,45 +75,31 @@ class _DividendsScreenState extends State<DividendsScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: LinearProgressIndicator(value: provider.dividendsProgress, minHeight: 3),
                 ),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      label: 'Annual income (est.)',
-                      value: fmtMoney(totals.annualIncome, currency: currency),
-                      valueColor: const Color(0xFF2E7D32),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: StatCard(
-                      label: 'Next 30 days',
-                      value: fmtMoney(next30, currency: currency),
-                      sub: upcoming.isNotEmpty
-                          ? 'next: ${upcoming.first.symbol}'
-                          : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      label: 'Portfolio yield',
-                      value: fmtPct(totals.incomeYield, signed: false),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: StatCard(
-                      label: 'Yield on cost',
-                      value: fmtPct(totals.yieldOnCost, signed: false),
-                    ),
-                  ),
-                ],
-              ),
+              StatGrid(cards: [
+                StatCard(
+                  label: 'Annual income (est.)',
+                  value: fmtMoney(totals.annualIncome, currency: currency),
+                  valueColor: const Color(0xFF2E7D32),
+                ),
+                StatCard(
+                  label: 'Next 30 days',
+                  value: fmtMoney(next30, currency: currency),
+                  sub: upcoming.isNotEmpty ? 'next: ${upcoming.first.symbol}' : null,
+                ),
+                StatCard(
+                  label: 'Portfolio yield',
+                  value: fmtPct(totals.incomeYield, signed: false),
+                ),
+                StatCard(
+                  label: 'Yield on cost',
+                  value: fmtPct(totals.yieldOnCost, signed: false),
+                ),
+                StatCard(
+                  label: '5-yr income (DRIP est.)',
+                  value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency),
+                  sub: 'if payments are reinvested',
+                ),
+              ]),
               const SizedBox(height: 12),
               Card(
                 child: Padding(

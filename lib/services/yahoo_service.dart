@@ -17,7 +17,13 @@ class ChartHistory {
   final Map<String, dynamic> meta;
   final List<ChartPoint> points;
   final List<DividendPayment> dividends;
-  const ChartHistory({required this.meta, required this.points, required this.dividends});
+  final List<Split> splits;
+  const ChartHistory({
+    required this.meta,
+    required this.points,
+    required this.dividends,
+    this.splits = const [],
+  });
 }
 
 class _Cached<T> {
@@ -251,7 +257,23 @@ class YahooService {
         dividends.sort((a, b) => a.exDate.compareTo(b.exDate));
       }
 
-      final hist = ChartHistory(meta: meta, points: points, dividends: dividends);
+      final splits = <Split>[];
+      final splitsMap = events?['splits'] as Map<String, dynamic>?;
+      if (splitsMap != null) {
+        for (final e in splitsMap.values.whereType<Map<String, dynamic>>()) {
+          try {
+            splits.add(Split.fromEventJson(e));
+          } catch (_) {}
+        }
+        splits.sort((a, b) => a.date.compareTo(b.date));
+      }
+
+      final hist = ChartHistory(
+        meta: meta,
+        points: points,
+        dividends: dividends,
+        splits: splits,
+      );
       _chartCache[key] = _Cached(hist, DateTime.now());
       return hist;
     } catch (_) {

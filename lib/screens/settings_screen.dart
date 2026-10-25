@@ -10,6 +10,29 @@ import '../services/widget_service.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  static const List<String> _currencyOptions = [
+    'USD', 'CAD', 'EUR', 'GBP', 'AUD', 'NZD', 'CHF', 'JPY',
+    'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'TRY', 'ZAR',
+    'MXN', 'BRL', 'SGD', 'HKD', 'INR', 'MYR',
+  ];
+
+  static String _currencyLabel(String code) {
+    if (code.isEmpty) return 'None (native currencies)';
+    const names = {
+      'USD': 'US Dollar (USD)', 'CAD': 'Canadian Dollar (CAD)', 'EUR': 'Euro (EUR)',
+      'GBP': 'British Pound (GBP)', 'AUD': 'Australian Dollar (AUD)',
+      'NZD': 'NZ Dollar (NZD)', 'CHF': 'Swiss Franc (CHF)', 'JPY': 'Japanese Yen (JPY)',
+      'SEK': 'Swedish Krona (SEK)', 'NOK': 'Norwegian Krone (NOK)',
+      'DKK': 'Danish Krone (DKK)', 'PLN': 'Polish Zloty (PLN)',
+      'CZK': 'Czech Koruna (CZK)', 'HUF': 'Hungarian Forint (HUF)',
+      'TRY': 'Turkish Lira (TRY)', 'ZAR': 'SA Rand (ZAR)', 'MXN': 'Mexican Peso (MXN)',
+      'BRL': 'Brazilian Real (BRL)', 'SGD': 'Singapore Dollar (SGD)',
+      'HKD': 'Hong Kong Dollar (HKD)', 'INR': 'Indian Rupee (INR)',
+      'MYR': 'Malaysian Ringgit (MYR)',
+    };
+    return names[code] ?? code;
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PortfolioProvider>();
@@ -73,6 +96,51 @@ class SettingsScreen extends StatelessWidget {
                     provider.addPortfolio(name);
                   }
                 },
+              ),
+            ),
+          ),
+
+          _section(context, 'Display currency'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Convert all totals into one currency (FX rates from Yahoo, '
+                    'fetched hourly). Leave as "None" to show each holding in '
+                    'its native currency.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: provider.displayCurrency,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                          value: '', child: Text('None (native currencies)')),
+                      for (final c in _currencyOptions)
+                        DropdownMenuItem(value: c, child: Text(_currencyLabel(c))),
+                    ],
+                    onChanged: (v) => provider.setDisplayCurrency(v ?? ''),
+                  ),
+                  if (provider.fxLoading) ...[
+                    const SizedBox(height: 8),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
+                  if (provider.converting && !provider.fxLoading) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Totals shown in ${_currencyLabel(provider.displayCurrency)}',
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

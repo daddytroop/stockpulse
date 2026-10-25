@@ -29,7 +29,7 @@ void main() {
     }
     await shot('01_portfolio');
 
-    Future<void> go(String icon, String file) async {
+    Future<void> go(IconData icon, String file) async {
       await tester.tap(find.byIcon(icon).last);
       for (var i = 0; i < 8; i++) {
         await tester.pump(const Duration(milliseconds: 400));
@@ -37,10 +37,10 @@ void main() {
       await shot(file);
     }
 
-    await go(Icons.event_outlined, '02_dividends');
-    await go(Icons.newspaper_outlined, '03_news');
     // News + import tabs are empty-state on demo data unless network ran;
     // still capture them for completeness.
+    await go(Icons.event_outlined, '02_dividends');
+    await go(Icons.newspaper_outlined, '03_news');
     await go(Icons.upload_file_outlined, '04_import');
     await go(Icons.settings_outlined, '05_settings');
   });

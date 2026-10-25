@@ -7,7 +7,9 @@ import '../models/dividends.dart';
 import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
+import '../models/transaction.dart';
 import '../services/csv_import.dart';
+import '../services/ledger.dart' as ledger;
 import '../services/store.dart';
 import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
@@ -21,12 +23,16 @@ class PortfolioTotals {
   final double dayChange;
   final bool hasDayChange;
   final double annualIncome;
+  final bool converted;
+  final String? displayCurrency;
   const PortfolioTotals({
     required this.marketValue,
     required this.costBasis,
     required this.dayChange,
     required this.hasDayChange,
     required this.annualIncome,
+    this.converted = false,
+    this.displayCurrency,
   });
 
   double get pnl => marketValue - costBasis;
@@ -74,6 +80,9 @@ class PortfolioProvider extends ChangeNotifier {
   int _activeIndex = 0;
   Map<String, Quote> _quotes = {};
   Map<String, DividendInfo> _dividendInfo = {};
+  String _displayCurrency = '';
+  Map<String, double> _fxRates = {}; // 'CADUSD' -> rate
+  bool _fxLoading = false;
 
   bool _loaded = false;
   bool _quotesLoading = false;
@@ -106,6 +115,9 @@ class PortfolioProvider extends ChangeNotifier {
   DateTime? get lastRefreshAt => _lastRefreshAt;
   ThemeMode get themeMode => _themeMode;
   bool get autoRefreshOnStart => _autoRefreshOnStart;
+  String get displayCurrency => _displayCurrency;
+  bool get fxLoading => _fxLoading;
+  bool get converting => _displayCurrency.isNotEmpty;
 
   /// Portfolio shown in the UI - always resolves to a portfolio.
   Portfolio get active {
@@ -144,6 +156,7 @@ class PortfolioProvider extends ChangeNotifier {
       _themeMode =
           ThemeMode.values[min(((data['themeMode'] as num?) ?? 0).toInt(), 2)];
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
+      _displayCurrency = data['displayCurrency']?.toString() ?? '';
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -180,6 +193,7 @@ class PortfolioProvider extends ChangeNotifier {
       'activeIndex': _activeIndex,
       'themeMode': _themeMode.index,
       'autoRefreshOnStart': _autoRefreshOnStart,
+      'displayCurrency': _displayCurrency,
     });
   }
 
@@ -195,6 +209,10 @@ class PortfolioProvider extends ChangeNotifier {
 
   Map<String, dynamic> _dividendInfoToMap(DividendInfo i) => {
         'payments': [for (final p in i.payments) p.toMap()],
+        'splits': [
+          for (final s in i.splits)
+            {'dateMs': s.date.millisecondsSinceEpoch, 'n': s.numerator, 'd': s.denominator},
+        ],
         'exDividendDateMs': i.exDividendDate?.millisecondsSinceEpoch,
         'payDateMs': i.payDate?.millisecondsSinceEpoch,
         'cachedAt': i.cachedAt.toIso8601String(),
@@ -207,6 +225,15 @@ class PortfolioProvider extends ChangeNotifier {
         for (final p in ((m['payments'] as List?) ?? const []).whereType<Map<String, dynamic>>())
           DividendPayment.fromMap(p)
       ]..sort((a, b) => a.exDate.compareTo(b.exDate)),
+      splits: [
+        for (final s in ((m['splits'] as List?) ?? const []))
+          if (s is Map<String, dynamic>)
+            Split(
+              date: DateTime.fromMillisecondsSinceEpoch(((s['dateMs'] as num?) ?? 0).toInt()),
+              numerator: ((s['n'] as num?) ?? 1).toInt(),
+              denominator: ((s['d'] as num?) ?? 1).toInt(),
+            ),
+      ]..sort((a, b) => a.date.compareTo(b.date)),
       exDividendDate: _ms(m['exDividendDateMs']),
       payDate: _ms(m['payDateMs']),
       cachedAt: m['cachedAt'] == null
@@ -308,7 +335,18 @@ class PortfolioProvider extends ChangeNotifier {
     }
     final holdings = Map.of(p.holdings);
     holdings[symbol] = updated;
-    _replaceAt(index, p.copyWith(holdings: holdings));
+    final transactions = Map.of(p.transactions);
+    transactions[symbol] = [
+      ...p.txnsFor(symbol),
+      Txn(
+        kind: 'buy',
+        quantity: quantity,
+        unitPrice: avgCost > 0 ? avgCost : quote.price,
+        date: DateTime.now(),
+        note: existing == null ? 'Added holding' : 'Added units',
+      ),
+    ];
+    _replaceAt(index, p.copyWith(holdings: holdings, transactions: transactions));
     notifyListeners();
     await _persistData();
     await _pushWidget();
@@ -348,6 +386,52 @@ class PortfolioProvider extends ChangeNotifier {
     await _pushWidget();
   }
 
+  /// Sells (part or all of) a position and records the trade. Returns an
+  /// error string, or null on success.
+  Future<String?> sellHolding({
+    required String portfolioId,
+    required String symbol,
+    required double quantity,
+    required double unitPrice,
+    double fee = 0,
+  }) async {
+    final index = _portfolios.indexWhere((p) => p.id == portfolioId);
+    if (index < 0) return null;
+    final p = _portfolios[index];
+    final s = symbol.toUpperCase();
+    final h = p.holdings[s];
+    if (h == null) return 'Position not found.';
+    if (quantity <= 0) return 'Quantity must be greater than zero.';
+    if (quantity > h.quantity + 0.0000001) {
+      return 'You only own ${fmtQty(h.quantity)} ${h.symbol}.';
+    }
+
+    final newQty = h.quantity - quantity;
+    final holdings = Map.of(p.holdings);
+    if (newQty <= 0.0000001) {
+      holdings.remove(s);
+    } else {
+      holdings[s] = h.copyWith(quantity: newQty);
+    }
+    final transactions = Map.of(p.transactions);
+    transactions[s] = [
+      ...p.txnsFor(s),
+      Txn(
+        kind: 'sell',
+        quantity: quantity,
+        unitPrice: unitPrice,
+        fee: fee,
+        date: DateTime.now(),
+        note: newQty <= 0.0000001 ? 'Closed position' : 'Partial sale',
+      ),
+    ];
+    _replaceAt(index, p.copyWith(holdings: holdings, transactions: transactions));
+    notifyListeners();
+    await _persistData();
+    await _pushWidget();
+    return null;
+  }
+
   /// Applies a parsed CSV import to a portfolio. Returns the number of rows
   /// merged, or -1 when the portfolio was not found.
   Future<int> importHoldings({
@@ -373,6 +457,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     final holdings = Map.of(_portfolios[index].holdings);
+    final transactions = Map.of(_portfolios[index].transactions);
     var count = 0;
     for (final h in parsed) {
       final symbol = h.symbol.toUpperCase();
@@ -392,9 +477,22 @@ class PortfolioProvider extends ChangeNotifier {
       } else {
         holdings[symbol] = existing.mergeWith(h.quantity, h.avgCost ?? 0);
       }
+      transactions[symbol] = [
+        ...transactions[symbol] ?? const <Txn>[],
+        Txn(
+          kind: 'buy',
+          quantity: h.quantity,
+          unitPrice: (h.avgCost != null && h.avgCost! > 0)
+              ? h.avgCost!
+              : (quote?.price ?? 0),
+          date: DateTime.now(),
+          note: 'CSV import${(h.avgCost != null && h.avgCost! <= 0) ? ' (cost from market price)' : ''}',
+        ),
+      ];
       count++;
     }
-    _replaceAt(index, _portfolios[index].copyWith(holdings: holdings));
+    _replaceAt(index,
+        _portfolios[index].copyWith(holdings: holdings, transactions: transactions));
     notifyListeners();
     await _persistData();
     await _persistCache();
@@ -443,6 +541,7 @@ class PortfolioProvider extends ChangeNotifier {
     _quotesLoading = false;
     notifyListeners();
     await _persistCache();
+    await ensureFxRates();
     await _pushWidget();
   }
 
@@ -469,6 +568,13 @@ class PortfolioProvider extends ChangeNotifier {
         } catch (_) {
           payments = const [];
         }
+        List<Split> splits;
+        try {
+          final hist = await _yahoo.chartHistory(s, range: '2y', interval: '1d');
+          splits = hist?.splits ?? const [];
+        } catch (_) {
+          splits = const [];
+        }
         try {
           cal = await _yahoo.calendarEvents(s);
         } catch (_) {
@@ -477,6 +583,7 @@ class PortfolioProvider extends ChangeNotifier {
         _dividendInfo[s] = DividendInfo(
           symbol: s,
           payments: payments,
+          splits: splits,
           exDividendDate: cal?.exDividendDate,
           payDate: cal?.payDate,
           cachedAt: DateTime.now(),
@@ -506,6 +613,19 @@ class PortfolioProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   PortfolioTotals totalsFor(Portfolio p) {
+    final display = _displayCurrency;
+    final converting = display.isNotEmpty;
+
+    double rateOf(String currency) {
+      if (currency.isEmpty || !converting || currency == display) return 1;
+      return _fxRates['${currency.toUpperCase()}$display'] ?? 0;
+    }
+
+    // Conversion only kicks in once every needed FX rate has arrived.
+    final needed = p.holdings.values.map((h) => h.currency).toSet().toList();
+    final allReady = !converting || needed.every((c) => rateOf(c) > 0);
+    final effectiveConvert = converting && allReady;
+
     var value = 0.0;
     var cost = 0.0;
     var day = 0.0;
@@ -514,26 +634,70 @@ class PortfolioProvider extends ChangeNotifier {
     for (final h in p.holdings.values) {
       final q = _quotes[h.symbol];
       final price = q?.price ?? 0;
-      value += price * h.quantity;
-      cost += h.costBasis;
+      final fx = effectiveConvert ? rateOf(h.currency) : 1.0;
+      value += price * h.quantity * fx;
+      cost += h.costBasis * fx;
       final dc = q?.dayChange;
       if (dc != null) {
-        day += dc * h.quantity;
+        day += dc * h.quantity * fx;
         hasDay = true;
       }
       final info = _dividendInfo[h.symbol];
       final rate = info != null
           ? (info.ttmPerShare > 0 ? info.ttmPerShare : (q?.dividendRate ?? 0))
           : (q?.dividendRate ?? 0);
-      income += rate * h.quantity;
+      income += rate * h.quantity * fx;
     }
+
+    // Kick off the FX fetch so the next frame can show converted values.
+    if (converting && !allReady) ensureFxRates();
+
     return PortfolioTotals(
       marketValue: value,
       costBasis: cost,
       dayChange: day,
       hasDayChange: hasDay,
       annualIncome: income,
+      converted: effectiveConvert,
+      displayCurrency: effectiveConvert ? display : null,
     );
+  }
+
+  /// Fetches FX conversion rates (Yahoo `[FROM][TO]=X` pairs) for every
+  /// currency in the portfolios into the chosen display currency. 1 cache.
+  Future<void> ensureFxRates({bool force = false}) async {
+    if (_displayCurrency.isEmpty || _fxLoading) return;
+    final froms = {
+      for (final p in _portfolios) ...[
+        for (final h in p.holdings.values) h.currency,
+      ]
+    }..removeWhere((c) => c.isEmpty || c == _displayCurrency);
+
+    final need = [
+      for (final f in froms)
+        if (force || !_fxRates.containsKey('$f$_displayCurrency')) f,
+    ];
+    if (need.isEmpty) return;
+
+    _fxLoading = true;
+    notifyListeners();
+    try {
+      final pairs = {
+        for (final f in need) '$f$_displayCurrency=X',
+      };
+      final quotes = await _yahoo.quotes(pairs);
+      for (final f in need) {
+        final q = quotes['$f$_displayCurrency=X'] ?? quotes['${f.toUpperCase()}${_displayCurrency}=X'];
+        if (q != null && q.price > 0) {
+          _fxRates['$f$_displayCurrency'] = q.price;
+        }
+      }
+    } catch (_) {
+      // rates stay missing; totals fall back to native currencies
+    } finally {
+      _fxLoading = false;
+      notifyListeners();
+    }
   }
 
   PortfolioTotals totalsForAll() {
@@ -767,6 +931,59 @@ class PortfolioProvider extends ChangeNotifier {
     return out;
   }
 
+  /// Latest split that happened after the position was created, if any.
+  /// Returns null when up-to-date (nothing to fix).
+  Split? splitSuggestionFor(Holding h) {
+    final info = _dividendInfo[h.symbol];
+    if (info == null || info.splits.isEmpty) return null;
+    final start = h.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    Split? latest;
+    for (final s in info.splits) {
+      if (s.date.isAfter(start) && (latest == null || s.date.isAfter(latest.date))) {
+        latest = s;
+      }
+    }
+    return latest;
+  }
+
+  /// Applies the suggested split to quantity (multiplied) and average cost
+  /// (divided).
+  Future<void> applySplit({required String portfolioId, required String symbol}) async {
+    final p = byId(portfolioId);
+    final h = p?.holdings[symbol.toUpperCase()];
+    if (p == null || h == null) return;
+    final split = splitSuggestionFor(h);
+    if (split == null) return;
+    await updateHolding(
+      portfolioId: portfolioId,
+      symbol: h.symbol,
+      quantity: h.quantity * split.multiplier,
+      avgCost: h.avgCost / split.multiplier,
+    );
+  }
+
+  /// Recorded transaction list for a symbol (newest handled by caller).
+  List<Txn> transactionsFor(Portfolio p, String symbol) => p.txnsFor(symbol);
+
+  /// Dividend cash actually collected for a holding (uses txn timeline).
+  double dividendsReceivedFor(Portfolio p, Holding h) => ledger.dividendsReceived(
+        txns: p.txnsFor(h.symbol),
+        payments: _dividendInfo[h.symbol]?.payments ?? const [],
+        currentQty: h.quantity,
+        holdingStart: h.addedAt,
+      );
+
+  /// Realized P/L from the transaction history, or null when the history is
+  /// incomplete (no recorded buys).
+  double? realizedPnlFor(Portfolio p, String symbol) =>
+      ledger.replayRealizedPnl(p.txnsFor(symbol));
+
+  /// 5-year projected dividend income with reinvested payments (DRIP).
+  double dripProjectionFor(Portfolio p) {
+    final t = totalsFor(p);
+    return ledger.dripProjection(t.annualIncome, t.incomeYield);
+  }
+
   /// Upcoming earnings across all held symbols (sorted).
   List<UpcomingEarnings> upcomingEarnings({int horizonDays = 180}) {
     final out = <UpcomingEarnings>[];
@@ -796,6 +1013,14 @@ class PortfolioProvider extends ChangeNotifier {
     _autoRefreshOnStart = v;
     notifyListeners();
     await _persistData();
+  }
+
+  Future<void> setDisplayCurrency(String code) async {
+    _displayCurrency = code.trim().toUpperCase();
+    if (_displayCurrency == 'NONE') _displayCurrency = '';
+    notifyListeners();
+    await _persistData();
+    await ensureFxRates();
   }
 
   Map<String, dynamic> exportBackup() {
@@ -850,7 +1075,8 @@ class PortfolioProvider extends ChangeNotifier {
   Future<void> _pushWidget() async {
     if (!StockPulseWidgetService.supported) return;
     final t = totalsForAll();
-    final currency = _dominantCurrency();
+    final currency =
+        (t.converted && t.displayCurrency != null) ? t.displayCurrency! : _dominantCurrency();
     final total = fmtMoney(t.marketValue, currency: currency);
     final change = t.hasDayChange
         ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)})'
@@ -1031,6 +1257,7 @@ class PortfolioProvider extends ChangeNotifier {
     if (_autoRefreshOnStart || _quotes.isEmpty) {
       await refreshQuotes(manual: false);
     }
+    await ensureFxRates();
   }
 
   // ---------------------------------------------------------------------------
