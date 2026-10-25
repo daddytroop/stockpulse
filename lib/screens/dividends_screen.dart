@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
+import '../widgets/ui/section_header.dart';
+import '../widgets/ui/sp_card.dart';
 
 class DividendsScreen extends StatefulWidget {
   const DividendsScreen({super.key});
@@ -37,6 +41,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
         (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 120);
     final next30 = provider.incomeWithinDays(30);
+    final colors = AppColors.of(context);
 
     // Aggregate events per day of the CURRENT calendar month.
     final now = DateTime.now();
@@ -82,7 +87,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
                 StatCard(
                   label: 'Annual income (est.)',
                   value: fmtMoney(totals.annualIncome, currency: currency),
-                  valueColor: const Color(0xFF2E7D32),
+                  valueColor: colors.dividend,
                 ),
                 StatCard(
                   label: 'Next 30 days',
@@ -101,18 +106,17 @@ class _DividendsScreenState extends State<DividendsScreen> {
                   label: '5-yr income (DRIP est.)',
                   value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency),
                   sub: 'if payments are reinvested',
+                  valueColor: colors.dividend,
                 ),
               ]),
               const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-                  child: MonthCalendar(
-                    eventsByDay: eventsByDay,
-                    formatAmount: (a) => fmtMoney(a, currency: currency),
-                    selectedDay: _selectedDay,
-                    onSelectDay: (d) => setState(() => _selectedDay = d),
-                  ),
+              SpCard(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+                child: MonthCalendar(
+                  eventsByDay: eventsByDay,
+                  formatAmount: (a) => fmtMoney(a, currency: currency),
+                  selectedDay: _selectedDay,
+                  onSelectDay: (d) => setState(() => _selectedDay = d),
                 ),
               ),
               const SizedBox(height: 12),
@@ -121,14 +125,14 @@ class _DividendsScreenState extends State<DividendsScreen> {
               _incomeByYear(context, provider, portfolio, currency),
               if (_selectedDay != null) ...[
                 const SizedBox(height: 10),
-                _sectionTitle(context, 'Events on ${fmtDate(_selectedDay)}'),
-                ..._eventsOn(events, _selectedDay!, currency),
+                SectionHeader(title: 'Events on ${fmtDate(_selectedDay)}'),
+                ..._eventsOn(events, _selectedDay!, currency, colors),
               ],
               if (_selectedDay == null) ...[
                 const SizedBox(height: 10),
-                _sectionTitle(context, 'Upcoming dividends'),
+                SectionHeader(title: 'Upcoming dividends', subtitle: 'Next 120 days'),
               ],
-              ..._upcomingTiles(context, upcoming, currency),
+              ..._upcomingTiles(context, upcoming, currency, colors),
               if (!provider.dividendsLoading && upcoming.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -165,7 +169,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
     );
   }
 
-  List<Widget> _eventsOn(List<UpcomingEvent> events, DateTime day, String? currency) {
+  List<Widget> _eventsOn(List<UpcomingEvent> events, DateTime day, String? currency, AppColors colors) {
     final list = [
       for (final e in events)
         if (e.date.year == day.year && e.date.month == day.month && e.date.day == day.day) e
@@ -185,42 +189,45 @@ class _DividendsScreenState extends State<DividendsScreen> {
     }
     return [
       for (final e in list)
-        ListTile(
-          dense: true,
-          leading: Icon(
-            e.kind == 'dividend' ? Icons.payments_outlined : Icons.query_stats_outlined,
-            color: e.kind == 'dividend' ? const Color(0xFF2E7D32) : const Color(0xFFF57C00),
+        SpCard(
+          margin: const EdgeInsets.only(bottom: 6),
+          child: ListTile(
+            dense: true,
+            leading: Icon(
+              e.kind == 'dividend' ? Icons.payments_outlined : Icons.query_stats_outlined,
+              color: e.kind == 'dividend' ? colors.dividend : colors.earnings,
+            ),
+            title: Text(
+              e.symbol,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              e.kind == 'dividend'
+                  ? '${e.isPayDate ? 'Payment date' : 'Ex-dividend'}${e.estimated ? ' (est.)' : ''} · ${fmtMoney(e.amountPerShare ?? 0, currency: currency)}/unit'
+                  : 'Quarterly earnings report',
+            ),
+            trailing: e.kind == 'dividend' && (e.total ?? 0) > 0
+                ? Text(
+                    fmtMoney(e.total, currency: currency),
+                    style: TextStyle(
+                        color: colors.dividend, fontWeight: FontWeight.w700),
+                  )
+                : null,
           ),
-          title: Text(
-            e.symbol,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: Text(
-            e.kind == 'dividend'
-                ? '${e.isPayDate ? 'Payment date' : 'Ex-dividend'}${e.estimated ? ' (est.)' : ''} · ${fmtMoney(e.amountPerShare ?? 0, currency: currency)}/unit'
-                : 'Quarterly earnings report',
-          ),
-          trailing: e.kind == 'dividend' && (e.total ?? 0) > 0
-              ? Text(
-                  fmtMoney(e.total, currency: currency),
-                  style: const TextStyle(
-                      color: Color(0xFF2E7D32), fontWeight: FontWeight.w700),
-                )
-              : null,
         ),
     ];
   }
 
   List<Widget> _upcomingTiles(
-      BuildContext context, List<dynamic> upcoming, String? currency) {
+      BuildContext context, List<dynamic> upcoming, String? currency, AppColors colors) {
     final theme = Theme.of(context);
     return [
       for (final up in upcoming.take(10))
-        Card(
+        SpCard(
           margin: const EdgeInsets.only(bottom: 6),
           child: ListTile(
             dense: true,
-            leading: const Icon(Icons.event_available_outlined, color: Color(0xFF2E7D32)),
+            leading: Icon(Icons.event_available_outlined, color: colors.dividend),
             title: Row(
               children: [
                 Text(up.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -237,11 +244,14 @@ class _DividendsScreenState extends State<DividendsScreen> {
             ),
             trailing: Text(
               fmtMoney(up.total, currency: currency),
-              style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w700),
+              style: TextStyle(color: colors.dividend, fontWeight: FontWeight.w700),
             ),
           ),
         ),
-    ];
+    ].animate(
+      interval: 30.ms,
+      effects: [FadeEffect(duration: 250.ms), SlideEffect(begin: const Offset(0, 0.05), end: Offset.zero, duration: 250.ms)],
+    );
   }
 
   Widget _growthCard(
@@ -249,15 +259,12 @@ class _DividendsScreenState extends State<DividendsScreen> {
     final theme = Theme.of(context);
     final rows = provider.dividendGrowthRows(portfolio);
     if (rows.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Dividend growth (per share, YoY)',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
+    return SpCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Dividend growth (per share, YoY)', padding: const EdgeInsets.only(bottom: 8)),
+          const SizedBox(height: 4),
             for (final r in rows.take(6))
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -283,7 +290,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
                           fontSize: 12,
                           color: r.growthPct == null
                               ? theme.hintColor
-                              : pnlColor(r.growthPct!),
+                              : pnlColor(r.growthPct!, context),
                         ),
                       ),
                     ),
@@ -292,7 +299,6 @@ class _DividendsScreenState extends State<DividendsScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 
@@ -300,25 +306,12 @@ class _DividendsScreenState extends State<DividendsScreen> {
       String? currency) {
     final byYear = provider.annualIncomeByYearFor(portfolio);
     if (byYear.length < 2) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: PortfolioChart(
-          points: [
-            for (final e in byYear.entries) ChartPoint(DateTime(e.key), e.value),
-          ],
-          title: 'Dividend income by year (est. · current holdings)',
-        ),
-      ),
-    );
-  }
-
-  Widget _sectionTitle(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 6),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+    return SpCard(
+      child: PortfolioChart(
+        points: [
+          for (final e in byYear.entries) ChartPoint(DateTime(e.key), e.value),
+        ],
+        title: 'Dividend income by year (est. · current holdings)',
       ),
     );
   }

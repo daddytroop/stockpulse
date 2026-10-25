@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/allocation_donut.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
+import '../widgets/ui/empty_state.dart';
+import '../widgets/ui/page_transitions.dart';
+import '../widgets/ui/pulse_indicator.dart';
+import '../widgets/ui/section_header.dart';
+import '../widgets/ui/shimmer_skeleton.dart';
+import '../widgets/ui/sp_card.dart';
+import '../widgets/ui/text_prompt.dart';
 import 'add_edit_holding_sheet.dart';
 import 'holding_detail_screen.dart';
 import 'import_screen.dart';
@@ -37,6 +46,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final currency = totals.displayCurrency ??
         (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 90).take(5).toList();
+    final colors = AppColors.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,60 +78,35 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 padding: EdgeInsets.only(bottom: 12),
                 child: LinearProgressIndicator(minHeight: 2),
               ),
-            _totalsCard(context, totals, currency),
+            _totalsCard(context, totals, currency, colors),
             const SizedBox(height: 12),
             _rangeChips(context),
-            FutureBuilder(
-              key: ValueKey('${portfolio.id}|$_range|${portfolio.symbols.length}'
-                  '|${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
-              future: Future.wait([
-                provider.portfolioHistory(portfolio.id, _range),
-                provider.benchmarkHistory(_range),
-              ]),
-              builder: (context, snap) {
-                if (!snap.hasData &&
-                    snap.connectionState != ConnectionState.done) {
-                  return const SizedBox(
-                    height: 180,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final results = snap.data as List? ?? const [];
-                final points =
-                    results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
-                final benchmark =
-                    results.length > 1 ? results[1] as List<ChartPoint>? : null;
-                return PortfolioChart(
-                  points: points,
-                  benchmark: benchmark,
-                  title: 'Portfolio value vs SPY',
-                );
-              },
-            ),
+            _chart(context, portfolio, provider),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
             const SizedBox(height: 12),
             if (events.isNotEmpty) ...[
-              _sectionTitle(context, 'Upcoming'),
-              ...[for (final e in events) _eventTile(context, e)],
+              SectionHeader(title: 'Upcoming', subtitle: '${events.length} events in the next 90 days'),
+              ...events.map((e) => _eventTile(context, e, colors)).animate(
+                interval: 40.ms,
+                effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.08), end: Offset.zero, duration: 300.ms)],
+              ),
               const SizedBox(height: 12),
             ],
             if (portfolio.holdings.isEmpty)
-              _emptyState(context, provider)
+              _emptyState(context)
             else ...[
-              _sectionTitle(context, 'Holdings (${portfolio.holdings.length})'),
-              ...[
-                for (final h in portfolio.holdings.values)
-                  _holdingTile(context, provider, portfolio.id, h),
-              ],
+              SectionHeader(title: 'Holdings (${portfolio.holdings.length})'),
+              ...portfolio.holdings.values.map((h) => _holdingTile(context, provider, portfolio.id, h)).animate(
+                interval: 30.ms,
+                effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.05), end: Offset.zero, duration: 300.ms)],
+              ),
               const SizedBox(height: 20),
               Center(
                 child: Text(
                   'Prices from Yahoo Finance (unofficial). Values are estimates,\nnot investment advice.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor),
                 ),
               ),
             ],
@@ -188,12 +173,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       onSelected: (v) async {
         switch (v) {
           case 'rename':
-            final name = await _askText(context, 'Rename portfolio', portfolio.name);
+            final name = await promptText(context, title: 'Rename portfolio', initial: portfolio.name);
             if (name != null && name.trim().isNotEmpty) {
               provider.renamePortfolio(portfolio.id, name);
             }
           case 'add':
-            final name = await _askText(context, 'New portfolio', '');
+            final name = await promptText(context, title: 'New portfolio', hint: 'e.g. Retirement');
             if (name != null && name.trim().isNotEmpty) provider.addPortfolio(name);
           case 'delete':
             if (provider.portfolioCount > 1) {
@@ -205,9 +190,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             }
           case 'import':
             if (context.mounted) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ImportScreen()),
-              );
+              pushSharedAxis(context, const ImportScreen());
             }
         }
       },
@@ -229,133 +212,133 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       Portfolio portfolio, String? currency) {
     if (portfolio.holdings.isEmpty) return const SizedBox.shrink();
     final slices = provider.allocationFor(portfolio, by: _allocBy);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('Allocation',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-                const Spacer(),
-                SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                  segments: const [
-                    ButtonSegment(value: 'type', label: Text('Type')),
-                    ButtonSegment(value: 'currency', label: Text('Currency')),
-                  ],
-                  selected: {_allocBy},
-                  onSelectionChanged: (s) => setState(() => _allocBy = s.first),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            AllocationDonut(slices: slices, currency: currency),
-          ],
-        ),
+    return SpCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Allocation', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              const Spacer(),
+              SegmentedButton<String>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                segments: const [
+                  ButtonSegment(value: 'type', label: Text('Type')),
+                  ButtonSegment(value: 'currency', label: Text('Currency')),
+                ],
+                selected: {_allocBy},
+                onSelectionChanged: (s) => setState(() => _allocBy = s.first),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AllocationDonut(slices: slices, currency: currency),
+        ],
       ),
     );
   }
 
   Widget _errorBanner(BuildContext context, String message) {
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(Icons.cloud_off_outlined, color: theme.colorScheme.onErrorContainer),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: theme.colorScheme.onErrorContainer),
-              ),
+    return SpCard(
+      gradient: [theme.colorScheme.errorContainer, theme.colorScheme.errorContainer],
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, color: theme.colorScheme.onErrorContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: theme.colorScheme.onErrorContainer),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency) {
+  Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency, AppColors colors) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  fmtMoney(t.marketValue, currency: currency),
-                  style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(width: 10),
-                ChangeChip(
-                  percent: t.hasDayChange ? t.dayChangePercent : null,
-                  label: t.hasDayChange
-                      ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)})'
-                      : '–',
-                ),
-              ],
-            ),
-            if (t.converted && t.displayCurrency != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  'FX-converted to ${t.displayCurrency}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-                ),
+    final scheme = theme.colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+
+    return SpCard(
+      padding: const EdgeInsets.all(18),
+      gradient: isDark
+          ? [const Color(0xFF142B2E), const Color(0xFF0F2224)]
+          : [const Color(0xFFE0F2F1), const Color(0xFFF5F7F8)],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Portfolio value',
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
               ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 18,
-              runSpacing: 6,
-              children: [
-                _inlineStat('Total P/L', fmtSignedMoney(t.pnl, currency: currency),
-                    '(${fmtPct(t.pnlPercent)})', pnlColor(t.pnl)),
-                _inlineStat('Annual dividends', fmtMoney(t.annualIncome, currency: currency),
-                    null, null),
-                _inlineStat('Yield', fmtPct(t.incomeYield, signed: false), 'on value', null),
-                _inlineStat('Yield on cost', fmtPct(t.yieldOnCost, signed: false), 'on cost', null),
-              ],
+              const Spacer(),
+              if (t.hasDayChange) const PulseIndicator(size: 6),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              AnimatedNumber(
+                value: t.marketValue,
+                formatter: (v) => fmtMoney(v, currency: currency),
+                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(width: 10),
+              ChangeChip(
+                percent: t.hasDayChange ? t.dayChangePercent : null,
+                label: t.hasDayChange
+                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)})'
+                    : '–',
+              ),
+            ],
+          ),
+          if (t.converted && t.displayCurrency != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'FX-converted to ${t.displayCurrency}',
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+              ),
             ),
-          ],
-        ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
+            children: [
+              _inlineStat('Total P/L', fmtSignedMoney(t.pnl, currency: currency),
+                  '(${fmtPct(t.pnlPercent)})', pnlColor(t.pnl, context)),
+              _inlineStat('Annual dividends', fmtMoney(t.annualIncome, currency: currency),
+                  null, colors.dividend),
+              _inlineStat('Yield', fmtPct(t.incomeYield, signed: false), 'on value', null),
+              _inlineStat('Yield on cost', fmtPct(t.yieldOnCost, signed: false), 'on cost', null),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _inlineStat(String label, String value, String? sub, Color? color) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
         Text(
           sub == null ? value : '$value  $sub',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
         ),
       ],
-    );
-  }
-
-  Widget _sectionTitle(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 4, bottom: 6),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-      ),
     );
   }
 
@@ -377,6 +360,30 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
+  Widget _chart(BuildContext context, Portfolio portfolio, PortfolioProvider provider) {
+    return FutureBuilder(
+      key: ValueKey('${portfolio.id}|$_range|${portfolio.symbols.length}'
+          '|${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
+      future: Future.wait([
+        provider.portfolioHistory(portfolio.id, _range),
+        provider.benchmarkHistory(_range),
+      ]),
+      builder: (context, snap) {
+        if (!snap.hasData && snap.connectionState != ConnectionState.done) {
+          return const ShimmerSkeleton.chart(height: 180);
+        }
+        final results = snap.data as List? ?? const [];
+        final points = results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
+        final benchmark = results.length > 1 ? results[1] as List<ChartPoint>? : null;
+        return PortfolioChart(
+          points: points,
+          benchmark: benchmark,
+          title: 'Portfolio value vs SPY',
+        );
+      },
+    );
+  }
+
   Widget _holdingTile(
       BuildContext context, PortfolioProvider provider, String portfolioId, Holding h) {
     final q = provider.quoteOf(h.symbol);
@@ -386,100 +393,82 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final dayPct = q?.dayChangePercent;
     final currency = q?.currency ?? h.currency;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => HoldingDetailScreen(portfolioId: portfolioId, symbol: h.symbol),
-          ));
-        },
-        onLongPress: () => showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              SymbolAvatar(symbol: h.symbol),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(h.symbol,
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    if (h.name.isNotEmpty)
-                      Text(
-                        h.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Theme.of(context).hintColor),
-                      ),
-                    Text(
-                      '${fmtQty(h.quantity)} ${h.avgCost > 0 ? '× ${fmtMoney(h.avgCost, currency: currency)}' : ''}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Theme.of(context).hintColor),
-                    ),
-                  ],
+    return GestureDetector(
+      onLongPress: () => showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
+      child: SpCard(
+        margin: const EdgeInsets.only(bottom: 8),
+        onTap: () => pushSharedAxis(
+          context,
+          HoldingDetailScreen(portfolioId: portfolioId, symbol: h.symbol),
+        ),
+        child: Row(
+        children: [
+          Hero(
+            tag: 'avatar_$portfolioId_${h.symbol}',
+            child: SymbolAvatar(symbol: h.symbol),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(h.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
+                if (h.name.isNotEmpty)
+                  Text(
+                    h.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
+                  ),
+                Text(
+                  '${fmtQty(h.quantity)} ${h.avgCost > 0 ? '× ${fmtMoney(h.avgCost, currency: currency)}' : ''}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
                 ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                fmtMoney(value, currency: currency),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    fmtMoney(value, currency: currency),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    q == null ? ' ' : '${fmtMoney(q.price, currency: currency)} ',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        q == null
-                            ? ' '
-                            : '${fmtMoney(q.price, currency: currency)} ',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Theme.of(context).hintColor),
-                      ),
-                      if (dayPct != null)
-                        ChangeChip(percent: dayPct, label: fmtPct(dayPct)),
-                    ],
-                  ),
-                  Text(
-                    h.avgCost > 0 ? '${fmtSignedMoney(pnl, currency: currency)} P/L' : ' ',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: h.avgCost > 0 ? pnlColor(pnl) : null,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
+                  if (dayPct != null) ChangeChip(percent: dayPct, label: fmtPct(dayPct)),
                 ],
+              ),
+              Text(
+                h.avgCost > 0 ? '${fmtSignedMoney(pnl, currency: currency)} P/L' : ' ',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: h.avgCost > 0 ? pnlColor(pnl, context) : null,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
             ],
           ),
-        ),
+        ],
       ),
+    ),
     );
   }
 
-  Widget _eventTile(BuildContext context, UpcomingEvent e) {
+  Widget _eventTile(BuildContext context, UpcomingEvent e, AppColors colors) {
     final theme = Theme.of(context);
     final isDiv = e.kind == 'dividend';
-    final color = isDiv ? const Color(0xFF2E7D32) : const Color(0xFFF57C00);
-    return Card(
+    final color = isDiv ? colors.dividend : colors.earnings;
+    return SpCard(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         dense: true,
         leading: Icon(isDiv ? Icons.payments_outlined : Icons.query_stats_outlined, color: color),
-        title: Text(
-          e.symbol,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
+        title: Text(e.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(
           isDiv
               ? '${e.isPayDate ? 'Pays' : 'Ex-dividend'} ${fmtDate(e.date)}${e.estimated ? ' (est.)' : ''}'
@@ -496,56 +485,16 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
-  Widget _emptyState(BuildContext context, PortfolioProvider provider) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(Icons.wallet_outlined, size: 44, color: theme.hintColor),
-            const SizedBox(height: 10),
-            Text('No holdings yet', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              'Add a symbol one-by-one, or import a full portfolio from a CSV file in seconds.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Import CSV / paste'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ImportScreen()),
-                );
-              },
-            ),
-          ],
-        ),
+  Widget _emptyState(BuildContext context) {
+    return EmptyState(
+      icon: Icons.wallet_outlined,
+      title: 'No holdings yet',
+      subtitle: 'Add a symbol one-by-one, or import a full portfolio from a CSV file in seconds.',
+      action: FilledButton.tonalIcon(
+        icon: const Icon(Icons.upload_file_outlined),
+        label: const Text('Import CSV / paste'),
+        onPressed: () => pushSharedAxis(context, const ImportScreen()),
       ),
     );
   }
-}
-
-Future<String?> _askText(BuildContext context, String title, String initial) async {
-  final ctl = TextEditingController(text: initial);
-  final value = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: ctl,
-        autofocus: true,
-        decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Name'),
-        onSubmitted: (v) => Navigator.of(ctx).pop(v),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.of(ctx).pop(ctl.text), child: const Text('OK')),
-      ],
-    ),
-  );
-  return value;
 }

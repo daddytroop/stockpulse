@@ -7,10 +7,14 @@ import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/symbol_avatar.dart';
+import '../widgets/ui/section_header.dart';
+import '../widgets/ui/shimmer_skeleton.dart';
+import '../widgets/ui/sp_card.dart';
 import 'add_edit_holding_sheet.dart';
 import 'sell_holding_dialog.dart';
 
@@ -97,8 +101,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                   future: _history(provider, quote),
                   builder: (context, snap) {
                     if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-                      return const SizedBox(
-                          height: 180, child: Center(child: CircularProgressIndicator()));
+                      return const ShimmerSkeleton.chart(height: 180);
                     }
                     return PortfolioChart(points: snap.data ?? const []);
                   },
@@ -109,39 +112,37 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                 if ((portfolio?.txnsFor(holding.symbol) ?? const []).isNotEmpty)
                   _transactionsSection(context, provider, portfolio!, holding, currency),
                 if (info != null && info.payments.isNotEmpty) ...[
-                  Text('Dividend history',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Received so far: '
-                    '${fmtMoney(provider.dividendsReceivedFor(portfolio!, holding), currency: currency)}'
-                    '${(provider.realizedPnlFor(portfolio, holding.symbol) != null)
-                        ? ' · realized P/L: ${fmtSignedMoney(provider.realizedPnlFor(portfolio, holding.symbol)!, currency: currency)}'
-                        : ''}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w600,
-                        ),
+                  SectionHeader(
+                    title: 'Dividend history',
+                    subtitle: 'Received so far: '
+                        '${fmtMoney(provider.dividendsReceivedFor(portfolio!, holding), currency: currency)}'
+                        '${(provider.realizedPnlFor(portfolio, holding.symbol) != null)
+                            ? ' · realized P/L: ${fmtSignedMoney(provider.realizedPnlFor(portfolio, holding.symbol)!, currency: currency)}'
+                            : ''}',
                   ),
-                  const SizedBox(height: 6),
-                  ...[
-                    for (final p in info.payments.reversed.take(24))
-                      ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.payments_outlined,
-                            color: Color(0xFF2E7D32)),
-                        title: Text(fmtDate(p.exDate)),
-                        subtitle: Text(p.exDate.isAfter(
-                                DateTime.now().subtract(const Duration(days: 366)))
-                            ? 'Paid ${fmtMoney(p.amount * holding.quantity, currency: currency)} total (for ${fmtQty(holding.quantity)} units)'
-                            : 'Per share ${fmtMoney(p.amount, currency: currency)}'),
-                        trailing: Text(
-                          fmtMoney(p.amount, currency: currency),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                  ],
+                  SpCard(
+                    child: Column(
+                      children: [
+                        for (final p in info.payments.reversed.take(24))
+                          ListTile(
+                            dense: true,
+                            leading: Icon(Icons.payments_outlined, color: AppColors.of(context).dividend),
+                            title: Text(fmtDate(p.exDate)),
+                            subtitle: Text(p.exDate.isAfter(
+                                    DateTime.now().subtract(const Duration(days: 366)))
+                                ? 'Paid ${fmtMoney(p.amount * holding.quantity, currency: currency)} total (for ${fmtQty(holding.quantity)} units)'
+                                : 'Per share ${fmtMoney(p.amount, currency: currency)}'),
+                            trailing: Text(
+                              fmtMoney(p.amount, currency: currency),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.of(context).dividend,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 _newsSection(context, provider),
@@ -154,11 +155,9 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
       BuildContext context, PortfolioProvider provider, StockSplit split, Holding holding) {
     final theme = Theme.of(context);
     final newQty = holding.quantity * split.multiplier;
-    return Card(
-      color: theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+    return SpCard(
+      gradient: [theme.colorScheme.tertiaryContainer, theme.colorScheme.tertiaryContainer],
+      child: Row(
           children: [
             Icon(Icons.swap_horiz, color: theme.colorScheme.onTertiaryContainer),
             const SizedBox(width: 10),
@@ -188,13 +187,13 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
   Widget _transactionsSection(BuildContext context, PortfolioProvider provider,
       Portfolio portfolio, Holding holding, String currency) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final txns = portfolio.txnsFor(holding.symbol).reversed.take(12).toList(growable: false);
     final realized = provider.realizedPnlFor(portfolio, holding.symbol);
     return Column(
@@ -203,42 +202,46 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         Row(
           children: [
             Text('Transactions',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
             const Spacer(),
             if (realized != null) ...[
               Text('Realized: ', style: Theme.of(context).textTheme.labelSmall),
               Text(
                 fmtSignedMoney(realized, currency: currency),
                 style: TextStyle(
-                    color: pnlColor(realized), fontWeight: FontWeight.w700, fontSize: 13),
+                    color: pnlColor(realized, context), fontWeight: FontWeight.w700, fontSize: 13),
               ),
             ],
           ],
         ),
         const SizedBox(height: 6),
-        ...[
-          for (final t in txns)
-            ListTile(
-              dense: true,
-              leading: Icon(
-                t.isBuy ? Icons.add_shopping_cart_outlined : Icons.sell_outlined,
-                color: t.isBuy ? const Color(0xFF1565C0) : const Color(0xFFC62828),
-              ),
-              title: Text(
-                '${t.isBuy ? 'Buy' : 'Sell'} ${fmtQty(t.quantity)} @ ${fmtMoney(t.unitPrice, currency: currency)}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                '${fmtDate(t.date)}${t.fee > 0 ? ' · fee ${fmtMoney(t.fee, currency: currency)}' : ''}'
-                '${t.note.isNotEmpty ? ' · ${t.note}' : ''}',
-                style: theme.textTheme.bodySmall,
-              ),
-              trailing: Text(
-                fmtMoney(t.quantity * t.unitPrice + (t.isBuy ? t.fee : -t.fee),
-                    currency: currency),
-              ),
-            ),
-        ],
+        SpCard(
+          child: Column(
+            children: [
+              for (final t in txns)
+                ListTile(
+                  dense: true,
+                  leading: Icon(
+                    t.isBuy ? Icons.add_shopping_cart_outlined : Icons.sell_outlined,
+                    color: t.isBuy ? colors.stock : colors.loss,
+                  ),
+                  title: Text(
+                    '${t.isBuy ? 'Buy' : 'Sell'} ${fmtQty(t.quantity)} @ ${fmtMoney(t.unitPrice, currency: currency)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '${fmtDate(t.date)}${t.fee > 0 ? ' · fee ${fmtMoney(t.fee, currency: currency)}' : ''}'
+                    '${t.note.isNotEmpty ? ' · ${t.note}' : ''}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  trailing: Text(
+                    fmtMoney(t.quantity * t.unitPrice + (t.isBuy ? t.fee : -t.fee),
+                        currency: currency),
+                  ),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 10),
       ],
     );
@@ -250,15 +253,22 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
 
   Widget _header(BuildContext context, Holding holding, Quote? quote, String currency) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     final value = (quote?.price ?? 0) * holding.quantity;
     final pnl = value - holding.costBasis;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            SymbolAvatar(symbol: holding.symbol, radius: 24),
-            const SizedBox(width: 12),
+    return SpCard(
+      padding: const EdgeInsets.all(16),
+      gradient: isDark
+          ? [const Color(0xFF1A2C30), const Color(0xFF0F1E21)]
+          : [const Color(0xFFE0F2F1), const Color(0xFFF5F7F8)],
+      child: Row(
+        children: [
+          Hero(
+            tag: 'avatar_${widget.portfolioId}_${holding.symbol}',
+            child: SymbolAvatar(symbol: holding.symbol, radius: 24),
+          ),
+          const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +307,6 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -349,7 +358,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         label: 'Annual income',
         value: ttm > 0 ? fmtMoney(annual, currency: currency) : '–',
         sub: yoc > 0 ? '${fmtPct(yoc, signed: false)} on cost' : null,
-        valueColor: ttm > 0 ? const Color(0xFF2E7D32) : null,
+        valueColor: ttm > 0 ? AppColors.of(context).dividend : null,
       ),
       StatCard(
         label: 'Next ex-dividend',
@@ -400,20 +409,19 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 4),
-        Text('Recent news',
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
+        SectionHeader(title: 'Recent news'),
         FutureBuilder(
           future: provider.newsFor(widget.symbol),
           builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+              return Column(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: ShimmerSkeleton.card(height: 72),
+                    ),
+                ],
               );
             }
             final items = snap.data ?? const <NewsItem>[];
@@ -431,8 +439,9 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             return Column(
               children: [
                 for (final n in items.take(8))
-                  Card(
+                  SpCard(
                     margin: const EdgeInsets.only(bottom: 6),
+                    onTap: () => _open(n.link),
                     child: ListTile(
                       dense: true,
                       title: Text(
@@ -445,7 +454,6 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                       trailing: const Icon(Icons.open_in_new, size: 16),
-                      onTap: () => _open(n.link),
                     ),
                   ),
               ],

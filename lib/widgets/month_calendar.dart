@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 
 /// Data for one calendar day: aggregated dividends/earnings markers.
@@ -50,6 +51,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final first = DateTime(_month.year, _month.month, 1);
@@ -136,12 +138,12 @@ class _MonthCalendarState extends State<MonthCalendar> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (data.dividendTotal > 0)
-                            _dot(const Color(0xFF2E7D32))
+                            _dot(colors.dividend)
                           else if (data.eventCount > 0)
-                            _dot(const Color(0xFFF57C00))
+                            _dot(colors.earnings)
                           else
                             _dot(theme.hintColor),
-                          if (data.earningsCount > 0) _dot(const Color(0xFFF57C00)),
+                          if (data.earningsCount > 0) _dot(colors.earnings),
                         ],
                       ),
                       if (data.dividendTotal > 0)
@@ -151,7 +153,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontSize: 9,
-                            color: const Color(0xFF2E7D32),
+                            color: colors.dividend,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -166,9 +168,9 @@ class _MonthCalendarState extends State<MonthCalendar> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _dot(const Color(0xFF2E7D32)),
+            _dot(colors.dividend),
             Text(' dividend  ', style: theme.textTheme.labelSmall),
-            _dot(const Color(0xFFF57C00)),
+            _dot(colors.earnings),
             Text(' earnings', style: theme.textTheme.labelSmall),
           ],
         ),

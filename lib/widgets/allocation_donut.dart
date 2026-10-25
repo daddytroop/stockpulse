@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../providers/portfolio_provider.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 
 /// Donut of portfolio value grouped by asset type or currency (Phase 3:
@@ -32,7 +33,7 @@ class AllocationDonut extends StatelessWidget {
     final shown = slices.take(6).toList();
     if (slices.length > 6) {
       final rest = slices.skip(6).fold<double>(0, (s, x) => s + x.value);
-      shown.add(AllocationSlice(label: 'Other', value: rest, color: const Color(0xFF90A4AE)));
+      shown.add(AllocationSlice(label: 'Other', value: rest, color: AppColors.of(context).other));
     }
 
     return Column(

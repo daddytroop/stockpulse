@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../models/quote.dart';
+import '../theme/app_colors.dart';
 
 /// A smooth line chart of value points with 4 date labels on the x-axis.
 ///
@@ -30,7 +31,8 @@ class PortfolioChart extends StatelessWidget {
       );
     }
 
-    final color = ColorScheme.fromSeed(seedColor: const Color(0xFF009688)).primary;
+    final colors = AppColors.of(context);
+    final color = Theme.of(context).colorScheme.primary;
     final bench = benchmark;
     final normalized = bench != null && bench.length >= 2;
 
@@ -83,7 +85,7 @@ class PortfolioChart extends StatelessWidget {
     }
 
     final fillColor = color.withValues(alpha: 0.14);
-    final benchColor = theme.hintColor;
+    final benchColor = colors.benchmark;
 
     final bars = <LineChartBarData>[
       LineChartBarData(

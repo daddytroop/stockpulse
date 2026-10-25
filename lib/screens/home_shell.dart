@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -58,9 +59,19 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
-    final stack = IndexedStack(index: _index, children: [
-      for (var i = 0; i < _labels.length; i++) _screen(i),
-    ]);
+    final content = PageTransitionSwitcher(
+      duration: const Duration(milliseconds: 220),
+      transitionBuilder: (child, primary, secondary) => FadeThroughTransition(
+        animation: primary,
+        secondaryAnimation: secondary,
+        child: child,
+      ),
+      child: IndexedStack(
+        key: ValueKey(_index),
+        index: _index,
+        children: [for (var i = 0; i < _labels.length; i++) _screen(i)],
+      ),
+    );
 
     if (wide) {
       return Scaffold(
@@ -84,14 +95,14 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ),
             const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: stack),
+            Expanded(child: content),
           ],
         ),
       );
     }
 
     return Scaffold(
-      body: stack,
+      body: content,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

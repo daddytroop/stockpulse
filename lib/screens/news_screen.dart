@@ -6,6 +6,9 @@ import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../utils/formatters.dart';
 import '../widgets/symbol_avatar.dart';
+import '../widgets/ui/empty_state.dart';
+import '../widgets/ui/shimmer_skeleton.dart';
+import '../widgets/ui/sp_card.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -62,28 +65,16 @@ class _NewsScreenState extends State<NewsScreen> {
         ],
       ),
       body: portfolio.holdings.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Add holdings to see news about them here.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(context).hintColor),
-                ),
-              ),
+          ? const EmptyState(
+              icon: Icons.newspaper_outlined,
+              title: 'No holdings yet',
+              subtitle: 'Add holdings to see news about them here.',
             )
           : (_future == null)
-              ? SizedBox(
+              ? const SizedBox(
                   height: 64,
                   child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                    child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
                   ),
                 )
               : FutureBuilder<List<NewsItem>>(
@@ -92,26 +83,24 @@ class _NewsScreenState extends State<NewsScreen> {
                   builder: (context, snap) {
                     if (!snap.hasData) {
                       return ListView(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                         children: const [
-                          SizedBox(height: 80),
-                          Center(child: CircularProgressIndicator()),
+                          ShimmerSkeleton.card(height: 96),
+                          SizedBox(height: 8),
+                          ShimmerSkeleton.card(height: 96),
+                          SizedBox(height: 8),
+                          ShimmerSkeleton.card(height: 96),
+                          SizedBox(height: 8),
+                          ShimmerSkeleton.card(height: 96),
                         ],
                       );
                     }
                     final items = snap.data!;
                     if (items.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'No recent stories for your holdings.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: Theme.of(context).hintColor),
-                          ),
-                        ),
+                      return const EmptyState(
+                        icon: Icons.search_off_outlined,
+                        title: 'No recent stories',
+                        subtitle: 'No recent news for your holdings. Pull to refresh.',
                       );
                     }
                     return RefreshIndicator(
@@ -132,8 +121,9 @@ class _NewsScreenState extends State<NewsScreen> {
                         itemCount: items.length,
                         itemBuilder: (context, i) {
                           final n = items[i];
-                          return Card(
+                          return SpCard(
                             margin: const EdgeInsets.only(bottom: 6),
+                            onTap: () => _open(n.link),
                             child: ListTile(
                               title: Text(
                                 n.title,
@@ -167,7 +157,6 @@ class _NewsScreenState extends State<NewsScreen> {
                                     ),
                                 ],
                               ),
-                              onTap: () => _open(n.link),
                             ),
                           );
                         },

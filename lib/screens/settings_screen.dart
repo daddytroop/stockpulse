@@ -10,6 +10,7 @@ import '../services/export_service.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/ui/section_header.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -439,15 +440,9 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _section(BuildContext context, String title) {
-    return Padding(
+    return SectionHeader(
+      title: title,
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-      ),
     );
   }
 

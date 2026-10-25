@@ -74,7 +74,3 @@ class StatGrid extends StatelessWidget {
     );
   }
 }
-
-/// Color for profit/loss numbers.
-Color pnlColor(double v) =>
-    v > 0 ? const Color(0xFF2E7D32) : v < 0 ? const Color(0xFFC62828) : Colors.grey;

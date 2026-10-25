@@ -1,4 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import '../theme/app_colors.dart';
 
 /// Number & date formatting helpers shared across screens.
 
@@ -60,6 +63,14 @@ String timeAgo(DateTime d) {
   if (diff.inHours < 24) return '${diff.inHours}h ago';
   if (diff.inDays < 7) return '${diff.inDays}d ago';
   return fmtShortDate(d);
+}
+
+/// Color for profit/loss numbers, using the app's semantic theme colors.
+Color pnlColor(double v, BuildContext context) {
+  final colors = AppColors.of(context);
+  if (v > 0) return colors.gain;
+  if (v < 0) return colors.loss;
+  return Theme.of(context).hintColor;
 }
 
 /// Deterministic accent color index for a symbol (used by the letter avatar).

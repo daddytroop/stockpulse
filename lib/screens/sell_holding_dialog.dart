@@ -176,7 +176,7 @@ class _SellDialogState extends State<_SellDialog> {
               '${fmtSignedMoney(_estimatedRealized, currency: widget.holding.currency)}',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: pnlColor(_estimatedRealized),
+                color: pnlColor(_estimatedRealized, context),
               ),
             ),
             if (_error != null) ...[

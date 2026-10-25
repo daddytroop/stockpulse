@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
@@ -58,7 +59,10 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 52, color: theme.colorScheme.primary),
+            Icon(Icons.lock_outline, size: 52, color: theme.colorScheme.primary)
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scaleXY(begin: 0.92, end: 1.08, duration: 1800.ms, curve: Curves.easeInOut)
+                .shimmer(duration: 1800.ms, color: theme.colorScheme.primaryContainer),
             const SizedBox(height: 14),
             Text('Stock Pulse is locked', style: theme.textTheme.titleLarge),
             const SizedBox(height: 6),
