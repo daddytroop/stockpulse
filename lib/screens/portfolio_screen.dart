@@ -12,6 +12,7 @@ import '../widgets/allocation_donut.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
+import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/page_transitions.dart';
 import '../widgets/ui/pulse_indicator.dart';
@@ -87,7 +88,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             const SizedBox(height: 12),
             if (events.isNotEmpty) ...[
               SectionHeader(title: 'Upcoming', subtitle: '${events.length} events in the next 90 days'),
-              ...events.map((e) => _eventTile(context, e, colors)).animate(
+              ...events.map((e) => _eventTile(context, e, colors)).toList().animate(
                 interval: 40.ms,
                 effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.08), end: Offset.zero, duration: 300.ms)],
               ),
@@ -97,7 +98,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               _emptyState(context)
             else ...[
               SectionHeader(title: 'Holdings (${portfolio.holdings.length})'),
-              ...portfolio.holdings.values.map((h) => _holdingTile(context, provider, portfolio.id, h)).animate(
+              ...portfolio.holdings.values.map((h) => _holdingTile(context, provider, portfolio.id, h)).toList().animate(
                 interval: 30.ms,
                 effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.05), end: Offset.zero, duration: 300.ms)],
               ),
@@ -404,7 +405,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         child: Row(
         children: [
           Hero(
-            tag: 'avatar_$portfolioId_${h.symbol}',
+            tag: 'avatar_${portfolioId}_${h.symbol}',
             child: SymbolAvatar(symbol: h.symbol),
           ),
           const SizedBox(width: 12),

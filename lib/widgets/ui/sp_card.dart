@@ -63,7 +63,7 @@ class SpCard extends StatelessWidget {
 
     if (onTap != null) {
       content = _PressScale(
-        onTap: onTap,
+        onTap: onTap!,
         child: content,
       );
     }
