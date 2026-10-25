@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../models/holding.dart';
 import '../models/portfolio.dart';
+import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../utils/formatters.dart';
+import '../widgets/allocation_donut.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
@@ -21,6 +23,7 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   String _range = '3mo';
+  String _allocBy = 'type';
 
   static const _rangeLabels = {
     '1mo': '1M', '3mo': '3M', '6mo': '6M', '1y': '1Y', '2y': '2Y', '5y': '5Y',
@@ -71,17 +74,30 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             FutureBuilder(
               key: ValueKey('${portfolio.id}|$_range|${portfolio.symbols.length}'
                   '|${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
-              future: provider.portfolioHistory(portfolio.id, _range),
+              future: Future.wait([
+                provider.portfolioHistory(portfolio.id, _range),
+                provider.benchmarkHistory(_range),
+              ]),
               builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done && !snap.hasData) {
+                if (!snap.hasData &&
+                    snap.connectionState != ConnectionState.done) {
                   return const SizedBox(
                     height: 180,
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                return PortfolioChart(points: snap.data ?? const [], title: 'Portfolio value');
+                final results = snap.data ?? const [];
+                final points = results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
+                final benchmark = results.length > 1 ? results[1] as List<ChartPoint>? : null;
+                return PortfolioChart(
+                  points: points,
+                  benchmark: benchmark,
+                  title: 'Portfolio value vs SPY',
+                );
               },
             ),
+            const SizedBox(height: 12),
+            _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
             const SizedBox(height: 12),
             if (events.isNotEmpty) ...[
               _sectionTitle(context, 'Upcoming'),
@@ -204,6 +220,44 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         PopupMenuItem(value: 'delete', child: Row(children: [
             Icon(Icons.delete_outline, size: 20), SizedBox(width: 10), Text('Delete portfolio')])),
       ],
+    );
+  }
+
+  Widget _allocationCard(BuildContext context, PortfolioProvider provider,
+      Portfolio portfolio, String? currency) {
+    if (portfolio.holdings.isEmpty) return const SizedBox.shrink();
+    final slices = provider.allocationFor(portfolio, by: _allocBy);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Allocation',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                  segments: const [
+                    ButtonSegment(value: 'type', label: Text('Type')),
+                    ButtonSegment(value: 'currency', label: Text('Currency')),
+                  ],
+                  selected: {_allocBy},
+                  onSelectionChanged: (s) => setState(() => _allocBy = s.first),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AllocationDonut(slices: slices, currency: currency),
+          ],
+        ),
+      ),
     );
   }
 

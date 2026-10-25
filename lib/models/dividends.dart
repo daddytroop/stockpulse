@@ -2,19 +2,19 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-/// A stock split event (e.g. 4:1 -> multiply quantity by 4 / divide cost).
+/// A company stock split event (e.g. 4:1 -> multiply quantity by 4 / divide cost).
 @immutable
-class Split {
+class StockSplit {
   final DateTime date;
   final int numerator;
   final int denominator;
-  const Split({required this.date, required this.numerator, this.denominator = 1});
+  const StockSplit({required this.date, required this.numerator, this.denominator = 1});
 
   double get multiplier => numerator / max(denominator, 1);
 
-  factory Split.fromEventJson(Map<String, dynamic> j) {
+  factory StockSplit.fromEventJson(Map<String, dynamic> j) {
     final ts = (j['date'] as num?)?.toInt() ?? 0;
-    return Split(
+    return StockSplit(
       date: DateTime.fromMillisecondsSinceEpoch(ts * 1000),
       numerator: ((j['numerator'] as num?) ?? 1).toInt(),
       denominator: max(((j['denominator'] as num?) ?? 1).toInt(), 1),
@@ -43,7 +43,7 @@ class DividendPayment {
 class DividendInfo {
   final String symbol;
   final List<DividendPayment> payments; // ascending by exDate
-  final List<Split> splits; // ascending by date
+  final List<StockSplit> splits; // ascending by date
   final DateTime? exDividendDate; // exact upcoming ex-date (if known)
   final DateTime? payDate; // exact upcoming pay date (if known)
   final DateTime cachedAt;

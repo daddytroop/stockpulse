@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show Color, ThemeMode;
 
 import '../models/dividends.dart';
 import '../models/holding.dart';
@@ -81,7 +81,7 @@ class PortfolioProvider extends ChangeNotifier {
   Map<String, Quote> _quotes = {};
   Map<String, DividendInfo> _dividendInfo = {};
   String _displayCurrency = '';
-  Map<String, double> _fxRates = {}; // 'CADUSD' -> rate
+  final Map<String, double> _fxRates = {}; // 'CADUSD' -> rate
   bool _fxLoading = false;
 
   bool _loaded = false;
@@ -228,7 +228,7 @@ class PortfolioProvider extends ChangeNotifier {
       splits: [
         for (final s in ((m['splits'] as List?) ?? const []))
           if (s is Map<String, dynamic>)
-            Split(
+            StockSplit(
               date: DateTime.fromMillisecondsSinceEpoch(((s['dateMs'] as num?) ?? 0).toInt()),
               numerator: ((s['n'] as num?) ?? 1).toInt(),
               denominator: ((s['d'] as num?) ?? 1).toInt(),
@@ -568,7 +568,7 @@ class PortfolioProvider extends ChangeNotifier {
         } catch (_) {
           payments = const [];
         }
-        List<Split> splits;
+        List<StockSplit> splits;
         try {
           final hist = await _yahoo.chartHistory(s, range: '2y', interval: '1d');
           splits = hist?.splits ?? const [];
@@ -664,7 +664,8 @@ class PortfolioProvider extends ChangeNotifier {
   }
 
   /// Fetches FX conversion rates (Yahoo `[FROM][TO]=X` pairs) for every
-  /// currency in the portfolios into the chosen display currency. 1 cache.
+  /// portfolio currency into the chosen display currency (one cached quote
+  /// per pair).
   Future<void> ensureFxRates({bool force = false}) async {
     if (_displayCurrency.isEmpty || _fxLoading) return;
     final froms = {
@@ -687,7 +688,8 @@ class PortfolioProvider extends ChangeNotifier {
       };
       final quotes = await _yahoo.quotes(pairs);
       for (final f in need) {
-        final q = quotes['$f$_displayCurrency=X'] ?? quotes['${f.toUpperCase()}${_displayCurrency}=X'];
+        final q =
+            quotes['$f$_displayCurrency=X'] ?? quotes['${f.toUpperCase()}$_displayCurrency=X'];
         if (q != null && q.price > 0) {
           _fxRates['$f$_displayCurrency'] = q.price;
         }
@@ -931,13 +933,13 @@ class PortfolioProvider extends ChangeNotifier {
     return out;
   }
 
-  /// Latest split that happened after the position was created, if any.
+  /// Latest StockSplit that happened after the position was created, if any.
   /// Returns null when up-to-date (nothing to fix).
-  Split? splitSuggestionFor(Holding h) {
+  StockSplit? splitSuggestionFor(Holding h) {
     final info = _dividendInfo[h.symbol];
     if (info == null || info.splits.isEmpty) return null;
     final start = h.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    Split? latest;
+    StockSplit? latest;
     for (final s in info.splits) {
       if (s.date.isAfter(start) && (latest == null || s.date.isAfter(latest.date))) {
         latest = s;
@@ -982,6 +984,150 @@ class PortfolioProvider extends ChangeNotifier {
   double dripProjectionFor(Portfolio p) {
     final t = totalsFor(p);
     return ledger.dripProjection(t.annualIncome, t.incomeYield);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Analysis (allocation, growth, benchmark)
+  // ---------------------------------------------------------------------------
+
+  static const String benchmarkSymbol = 'SPY';
+
+  /// FX rate into the display currency (1.0 when not converting).
+  double _fxRateFor(String currency) {
+    if (_displayCurrency.isEmpty) return 1;
+    if (currency.isEmpty || currency == _displayCurrency) return 1;
+    return _fxRates['${currency.toUpperCase()}$_displayCurrency'] ?? 0;
+  }
+
+  /// SPY closes for the same range (for the benchmark overlay).
+  Future<List<ChartPoint>?> benchmarkHistory(String range) async {
+    try {
+      final h = await _yahoo.chartHistory(benchmarkSymbol,
+          range: range, interval: range == '5y' ? '1wk' : '1d');
+      if (h == null || h.points.length < 2) return null;
+      final pts = h.points;
+      return pts.sublist(0, pts.length - 1); // drop the live bar
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Per-share YoY dividend growth in percent (null if not computable).
+  double? dividendGrowthFor(String symbol) {
+    final info = _dividendInfo[symbol];
+    if (info == null || info.payments.isEmpty) return null;
+    return ledger.dividendGrowthPct(info.payments);
+  }
+
+  /// Growth rows for the dividends screen: symbol, growth %, TTM income total.
+  List<({String symbol, double? growthPct, double ttmIncome})> dividendGrowthRows(Portfolio p) {
+    final out = <({String symbol, double? growthPct, double ttmIncome})>[];
+    for (final h in p.holdings.values) {
+      final info = _dividendInfo[h.symbol];
+      if (info == null || info.payments.isEmpty) continue;
+      out.add((
+        symbol: h.symbol,
+        growthPct: ledger.dividendGrowthPct(info.payments),
+        ttmIncome: info.ttmPerShare * h.quantity,
+      ));
+    }
+    out.sort((a, b) {
+      final ga = a.growthPct ?? -999999;
+      final gb = b.growthPct ?? -999999;
+      return gb.compareTo(ga);
+    });
+    return out;
+  }
+
+  /// Portfolio dividend income per calendar year (current quantities,
+  /// FX-converted when available - approximate).
+  Map<int, double> annualIncomeByYearFor(Portfolio p) {
+    final byYear = <int, double>{};
+    for (final h in p.holdings.values) {
+      final info = _dividendInfo[h.symbol];
+      if (info == null) continue;
+      final fx = _fxRateFor(h.currency);
+      if (fx == 0) continue;
+      ledger.dividendYearTotals(info.payments).forEach((year, perShare) {
+        byYear[year] = (byYear[year] ?? 0) + perShare * h.quantity * fx;
+      });
+    }
+    return byYear;
+  }
+
+  /// Allocation slices for the donut chart: [by] is 'type' or 'currency'.
+  List<AllocationSlice> allocationFor(Portfolio p, {required String by}) {
+    final display = _displayCurrency;
+    final converting = display.isNotEmpty;
+    final currencies = p.holdings.values.map((h) => h.currency).toSet();
+    final ready = !converting ||
+        currencies
+            .every((c) => c == display || (_fxRates['${c.toUpperCase()}$display'] ?? 0) > 0);
+
+    final groups = <String, double>{};
+    for (final h in p.holdings.values) {
+      final q = _quotes[h.symbol];
+      final fx = converting && ready ? (_fxRateFor(h.currency) == 0 ? 1 : _fxRateFor(h.currency)) : 1.0;
+      final value = (q?.price ?? 0) * h.quantity * fx;
+      final key = by == 'type' ? typeLabelOf(h.symbol) : h.currency;
+      groups[key] = (groups[key] ?? 0) + value;
+    }
+    final entries = groups.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return [
+      for (final e in entries)
+        AllocationSlice(
+          label: e.key,
+          value: e.value,
+          color: by == 'type' ? typeColorOf(e.key) : _paletteColorFor(e.key),
+        ),
+    ];
+  }
+
+  Color _paletteColorFor(String key) {
+    const palette = <Color>[
+      Color(0xFF1E88E5), Color(0xFF00897B), Color(0xFF8E24AA), Color(0xFFF4511E),
+      Color(0xFF3949AB), Color(0xFF43A047), Color(0xFFD81B60), Color(0xFF6D4C41),
+      Color(0xFF5E35B1), Color(0xFF00ACC1), Color(0xFF7CB342), Color(0xFFFB8C00),
+      Color(0xFFC0CA33), Color(0xFF039BE5), Color(0xFFE53935), Color(0xFF546E7A),
+    ];
+    return palette[colorIndexFor(key) % palette.length];
+  }
+
+  String typeLabelOf(String symbol) {
+    final type = _quotes[symbol]?.quoteType;
+    switch (type) {
+      case 'ETF':
+      case 'MUTUALFUND':
+        return 'ETFs & funds';
+      case 'CRYPTOCURRENCY':
+        return 'Crypto';
+      case 'INDEX':
+        return 'Indexes';
+      case 'CURRENCY':
+        return 'Cash / FX';
+      case 'EQUITY':
+        return 'Stocks';
+      default:
+        return 'Other';
+    }
+  }
+
+  Color typeColorOf(String label) {
+    switch (label) {
+      case 'Stocks':
+        return const Color(0xFF1E88E5);
+      case 'ETFs & funds':
+        return const Color(0xFF00897B);
+      case 'Crypto':
+        return const Color(0xFFF7931A);
+      case 'Indexes':
+        return const Color(0xFF8E24AA);
+      case 'Cash / FX':
+        return const Color(0xFF43A047);
+      default:
+        return const Color(0xFF546E7A);
+    }
   }
 
   /// Upcoming earnings across all held symbols (sorted).
@@ -1290,6 +1436,15 @@ class PortfolioProvider extends ChangeNotifier {
     out.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
     return out;
   }
+}
+
+/// One slice of the allocation donut.
+@immutable
+class AllocationSlice {
+  final String label;
+  final double value;
+  final Color color;
+  const AllocationSlice({required this.label, required this.value, required this.color});
 }
 
 /// One row in the upcoming earnings strip.

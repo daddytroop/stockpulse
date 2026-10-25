@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stock_pulse/models/dividends.dart';
+import 'package:stock_pulse/models/quote.dart';
 import 'package:stock_pulse/models/transaction.dart';
 import 'package:stock_pulse/services/ledger.dart';
 
@@ -114,9 +115,53 @@ void main() {
     });
   });
 
-  group('Split', () {
+  group('dividend growth', () {
+    test('year totals and YoY growth percent', () {
+      final payments = [
+        DividendPayment(exDate: DateTime(2024, 3, 15), amount: 0.25),
+        DividendPayment(exDate: DateTime(2024, 6, 15), amount: 0.25),
+        DividendPayment(exDate: DateTime(2024, 9, 15), amount: 0.25),
+        DividendPayment(exDate: DateTime(2024, 12, 15), amount: 0.25),
+        DividendPayment(exDate: DateTime(2025, 3, 15), amount: 0.26),
+        DividendPayment(exDate: DateTime(2025, 6, 15), amount: 0.26),
+        DividendPayment(exDate: DateTime(2025, 9, 15), amount: 0.26),
+        DividendPayment(exDate: DateTime(2025, 12, 15), amount: 0.26),
+      ];
+      final totals = dividendYearTotals(payments);
+      expect(totals[2024], closeTo(1.0, 0.0001));
+      expect(totals[2025], closeTo(1.04, 0.0001));
+      expect(dividendGrowthPct(payments), closeTo(4.0, 0.01));
+    });
+
+    test('growth needs two years with payments', () {
+      final oneYear = [
+        DividendPayment(exDate: DateTime(2025, 3, 15), amount: 0.26),
+      ];
+      expect(dividendGrowthPct(oneYear), isNull);
+    });
+  });
+
+  group('normalizePercent', () {
+    test('rescales a series to percent change', () {
+      final now = DateTime(2026, 1, 1);
+      final series = [
+        ChartPoint(now, 12.0),
+        ChartPoint(now.add(const Duration(days: 1)), 15.0),
+      ];
+      final norm = normalizePercent(series)!;
+      expect(norm.first.close, 0);
+      expect(norm[1].close, closeTo(25, 0.0001));
+    });
+
+    test('rejects short series', () {
+      final now = DateTime(2026, 1, 1);
+      expect(normalizePercent([ChartPoint(now, 10.0)]), isNull);
+    });
+  });
+
+  group('StockSplit', () {
     test('parses event json and computes multiplier', () {
-      final s = Split.fromEventJson({
+      final s = StockSplit.fromEventJson({
         'date': 1600000000,
         'numerator': 4,
         'denominator': 1,

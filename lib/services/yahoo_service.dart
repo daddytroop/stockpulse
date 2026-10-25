@@ -17,7 +17,7 @@ class ChartHistory {
   final Map<String, dynamic> meta;
   final List<ChartPoint> points;
   final List<DividendPayment> dividends;
-  final List<Split> splits;
+  final List<StockSplit> splits;
   const ChartHistory({
     required this.meta,
     required this.points,
@@ -257,12 +257,12 @@ class YahooService {
         dividends.sort((a, b) => a.exDate.compareTo(b.exDate));
       }
 
-      final splits = <Split>[];
+      final splits = <StockSplit>[];
       final splitsMap = events?['splits'] as Map<String, dynamic>?;
       if (splitsMap != null) {
         for (final e in splitsMap.values.whereType<Map<String, dynamic>>()) {
           try {
-            splits.add(Split.fromEventJson(e));
+            splits.add(StockSplit.fromEventJson(e));
           } catch (_) {}
         }
         splits.sort((a, b) => a.date.compareTo(b.date));

@@ -126,11 +126,22 @@ platform_overlay/android/            native widget providers (Kotlin) + layouts
 
 ## Roadmap
 
-- [ ] Custom launcher icon & adaptive icon
-- [ ] Background widget refresh via WorkManager
-- [ ] Optional: sync portfolios between devices via a private Gist/WebDAV
-- [ ] Split/adjust cost basis tracking (sells, DRIP shares)
-- [ ] Linux/macOS desktop targets
+Shipped recently:
+- ✅ Custom launcher icon, adaptive icons & splash screen
+- ✅ FX conversion with a display-currency setting (Yahoo `FROMTO=X` pairs)
+- ✅ Stock split detection with a one-tap guided fix on holding pages
+- ✅ Sell/reduce positions with a transaction ledger, realized P/L, dividends received and DRIP projections
+- ✅ Allocation donut (by type or currency)
+- ✅ Dividend growth per payer (YoY) + income-by-year chart
+- ✅ Portfolio chart vs SPY benchmark (% change, same window)
+
+Next:
+- [ ] Background widget refresh via WorkManager + local notifications (dividend paid today, earnings tomorrow, price moves)
+- [ ] Configurable widgets (portfolio picker, light/dark)
+- [ ] Optional cross-device sync via a private Gist
+- [ ] Biometric/PIN app lock
+- [ ] Flutter web build through a Yahoo CORS proxy (Cloudflare Worker)
+- [ ] Sector-level allocation, splits/transactions in portfolio history charts
 
 ## Disclaimer
 

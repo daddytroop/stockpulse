@@ -151,7 +151,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
   }
 
   Widget _splitBanner(
-      BuildContext context, PortfolioProvider provider, Split split, Holding holding) {
+      BuildContext context, PortfolioProvider provider, StockSplit split, Holding holding) {
     final theme = Theme.of(context);
     final newQty = holding.quantity * split.multiplier;
     return Card(

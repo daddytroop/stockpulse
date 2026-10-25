@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/portfolio.dart';
+import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../utils/formatters.dart';
 import '../widgets/month_calendar.dart';
+import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 
 class DividendsScreen extends StatefulWidget {
@@ -112,6 +115,10 @@ class _DividendsScreenState extends State<DividendsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              _growthCard(context, provider, portfolio, currency),
+              const SizedBox(height: 10),
+              _incomeByYear(context, provider, portfolio, currency),
               if (_selectedDay != null) ...[
                 const SizedBox(height: 10),
                 _sectionTitle(context, 'Events on ${fmtDate(_selectedDay)}'),
@@ -235,6 +242,75 @@ class _DividendsScreenState extends State<DividendsScreen> {
           ),
         ),
     ];
+  }
+
+  Widget _growthCard(
+      BuildContext context, PortfolioProvider provider, Portfolio portfolio, String? currency) {
+    final theme = Theme.of(context);
+    final rows = provider.dividendGrowthRows(portfolio);
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Dividend growth (per share, YoY)',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            for (final r in rows.take(6))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Text(r.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text(
+                      fmtMoney(r.ttmIncome, currency: currency),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.hintColor),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 62,
+                      child: Text(
+                        r.growthPct == null
+                            ? '–'
+                            : '${r.growthPct! > 0 ? '+' : ''}${r.growthPct!.toStringAsFixed(1)}%',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: r.growthPct == null
+                              ? theme.hintColor
+                              : pnlColor(r.growthPct!),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _incomeByYear(BuildContext context, PortfolioProvider provider, Portfolio portfolio,
+      String? currency) {
+    final byYear = provider.annualIncomeByYearFor(portfolio);
+    if (byYear.length < 2) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: PortfolioChart(
+          points: [
+            for (final e in byYear.entries) ChartPoint(DateTime(e.key), e.value),
+          ],
+          title: 'Dividend income by year (est. · current holdings)',
+        ),
+      ),
+    );
   }
 
   Widget _sectionTitle(BuildContext context, String text) {
