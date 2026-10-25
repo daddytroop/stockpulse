@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'providers/portfolio_provider.dart';
+import 'screens/lock_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +17,7 @@ Future<void> main() async {
   runApp(
     ChangeNotifierProvider.value(
       value: provider,
-      child: const StockPulseApp(),
+      child: const LockGate(child: StockPulseApp()),
     ),
   );
 }

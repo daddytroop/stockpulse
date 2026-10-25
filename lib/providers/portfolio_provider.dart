@@ -86,6 +86,10 @@ class PortfolioProvider extends ChangeNotifier {
   bool _notifyDividends = true;
   bool _notifyEarnings = true;
   double _priceAlertPct = 0; // 0 = off
+  bool _lockEnabled = false;
+  String _gistId = '';
+  String _gistToken = '';
+  DateTime? _lastSyncAt;
 
   bool _loaded = false;
   bool _quotesLoading = false;
@@ -124,6 +128,37 @@ class PortfolioProvider extends ChangeNotifier {
   bool get notifyDividends => _notifyDividends;
   bool get notifyEarnings => _notifyEarnings;
   double get priceAlertPct => _priceAlertPct;
+  bool get lockEnabled => _lockEnabled;
+  String get gistId => _gistId;
+  String get gistToken => _gistToken;
+  DateTime? get lastSyncAt => _lastSyncAt;
+
+  bool get hasSyncConfig => _gistId.isNotEmpty && _gistToken.isNotEmpty;
+
+  Future<void> configureSync({required String token, String? gistId}) async {
+    _gistToken = token.trim();
+    if (gistId != null && gistId.trim().isNotEmpty) _gistId = gistId.trim();
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> setGistCreated(String id) async {
+    _gistId = id.trim();
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> setLastSyncAt(DateTime t) async {
+    _lastSyncAt = t;
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> setLockEnabled(bool v) async {
+    _lockEnabled = v;
+    notifyListeners();
+    await _persistData();
+  }
 
   /// Portfolio shown in the UI - always resolves to a portfolio.
   Portfolio get active {
@@ -166,6 +201,10 @@ class PortfolioProvider extends ChangeNotifier {
       _notifyDividends = data['notifyDividends'] as bool? ?? true;
       _notifyEarnings = data['notifyEarnings'] as bool? ?? true;
       _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
+      _lockEnabled = data['lockEnabled'] as bool? ?? false;
+      _gistId = data['gistId']?.toString() ?? '';
+      _gistToken = data['gistToken']?.toString() ?? '';
+      _lastSyncAt = _ms(data['lastSyncMs']);
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -206,6 +245,10 @@ class PortfolioProvider extends ChangeNotifier {
       'notifyDividends': _notifyDividends,
       'notifyEarnings': _notifyEarnings,
       'priceAlertPct': _priceAlertPct,
+      'lockEnabled': _lockEnabled,
+      'gistId': _gistId,
+      'gistToken': _gistToken,
+      'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
     });
   }
 

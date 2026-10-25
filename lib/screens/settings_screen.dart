@@ -1,11 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../services/export_service.dart';
+import '../services/sync_service.dart';
 import '../services/widget_service.dart';
+import '../utils/formatters.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -192,6 +195,73 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
 
+          _section(context, 'Security'),
+          Card(
+            child: SwitchListTile(
+              secondary: const Icon(Icons.lock_outline),
+              title: const Text('Biometric lock'),
+              subtitle: const Text(
+                  'Require fingerprint/face or Windows Hello when the app opens '
+                  'or returns from the background'),
+              value: provider.lockEnabled,
+              onChanged: (v) => _toggleLock(context, provider, v),
+            ),
+          ),
+
+          _section(context, 'Cloud sync (private Gist)'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    provider.hasSyncConfig
+                        ? 'Portfolios sync to a private GitHub Gist. PUSH overwrites '
+                            'the gist with this device; PULL replaces this device with '
+                            'the gist (no merging - pull carefully).'
+                        : 'Back up & restore through a private GitHub Gist that you '
+                            'own. Needs a GitHub token with the "gist" scope - the '
+                            'token is stored only on this device.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.link, size: 18),
+                        label: Text(
+                            provider.hasSyncConfig ? 'Change token / gist' : 'Set up sync'),
+                        onPressed: () => _configureSync(context, provider),
+                      ),
+                      if (provider.hasSyncConfig) ...[
+                        FilledButton.tonalIcon(
+                          icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                          label: const Text('Push'),
+                          onPressed: () => _syncPush(context, provider),
+                        ),
+                        FilledButton.tonalIcon(
+                          icon: const Icon(Icons.cloud_download_outlined, size: 18),
+                          label: const Text('Pull'),
+                          onPressed: () => _syncPull(context, provider),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (provider.hasSyncConfig && provider.lastSyncAt != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Last synced: ${fmtDate(provider.lastSyncAt)}',
+                      style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
           _section(context, 'Notifications'),
           Card(
             child: Column(
@@ -362,6 +432,150 @@ class SettingsScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _toggleLock(
+      BuildContext context, PortfolioProvider provider, bool want) async {
+    if (!want) {
+      await provider.setLockEnabled(false);
+      return;
+    }
+    final auth = LocalAuthentication();
+    try {
+      final ok = await auth.authenticate(
+        localizedReason: 'Confirm biometric lock',
+        options: const AuthenticationOptions(
+            biometricOnly: true, stickyAuth: false),
+      );
+      if (!ok) return;
+      await provider.setLockEnabled(true);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Biometrics not available - lock not enabled: $e')));
+      }
+      return;
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Biometric lock enabled.')));
+    }
+  }
+
+  Future<void> _configureSync(
+      BuildContext context, PortfolioProvider provider) async {
+    final tokenCtl = TextEditingController(text: provider.gistToken);
+    final gistCtl = TextEditingController(text: provider.gistId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('GitHub Gist sync'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Paste a personal access token with the "gist" scope '
+                  '(github.com/settings/tokens).'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: tokenCtl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'GitHub token',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: gistCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Existing Gist ID (optional)',
+                  hintText: 'leave empty to create one on first push',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await provider.configureSync(token: tokenCtl.text, gistId: gistCtl.text);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sync configuration saved.')));
+    }
+  }
+
+  Future<void> _syncPush(
+      BuildContext context, PortfolioProvider provider) async {
+    try {
+      final content =
+          const JsonEncoder.withIndent('  ').convert(provider.exportBackup());
+      final sync = SyncService();
+      String gistId = provider.gistId;
+      if (gistId.isEmpty) {
+        gistId = await sync.createGist(token: provider.gistToken, content: content);
+        await provider.setGistCreated(gistId);
+      } else {
+        await sync.push(token: provider.gistToken, gistId: gistId, content: content);
+      }
+      await provider.setLastSyncAt(DateTime.now());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pushed to your private Gist.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Push failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _syncPull(
+      BuildContext context, PortfolioProvider provider) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pull from gist?'),
+        content: const Text(
+            'This REPLACES the portfolios on this device with the gist '
+            'contents. Push your current data first if it matters.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Pull')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      final sync = SyncService();
+      final content = await sync.pull(token: provider.gistToken, gistId: provider.gistId);
+      final data = jsonDecode(content);
+      if (data is! Map<String, dynamic>) throw 'Invalid backup payload.';
+      final ok = await provider.restoreBackup(data);
+      await provider.setLastSyncAt(DateTime.now());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok ? 'Pulled and restored from gist.' : 'No portfolios found.'),
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Pull failed: $e')));
       }
     }
   }

@@ -15,6 +15,9 @@ dependencies:
   # State management
   provider: ^6.1.2
 
+  # Biometric lock (fingerprint / Windows Hello)
+  local_auth: ^2.3.0
+
   # Networking (Yahoo Finance - no API key required)
   http: ^1.2.2
 
