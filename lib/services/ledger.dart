@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../models/dividends.dart';
+import '../models/quote.dart';
 import '../models/transaction.dart';
 
 /// Pure-Dart position ledger computations (no I/O, easily unit tested).

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:home_widget/home_widget.dart';
@@ -40,6 +41,45 @@ class StockPulseWidgetService {
       final ok2 = await HomeWidget.updateWidget(
           qualifiedAndroidName: '$_appId.NextDividendWidgetProvider');
       return ok1 == true && ok2 == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Writes the compact snapshot the Kotlin background worker consumes:
+  /// aggregated positions, FX rates into the display currency, the next
+  /// ex-dividend date, upcoming earnings and price-alert thresholds.
+  static Future<bool> pushBackgroundSnapshot({
+    required List<({String symbol, double qty, String currency, String name})> positions,
+    required String displayCurrency,
+    required Map<String, double> ratesByFrom,
+    required ({String symbol, DateTime? exDate})? nextDividend,
+    required Map<String, int> earningsBySymbol,
+    required Map<String, double>? alerts,
+  }) async {
+    if (!supported) return false;
+    try {
+      final symbols = [
+        for (final p in positions) {'s': p.symbol, 'q': p.qty, 'cur': p.currency, 'name': p.name},
+      ];
+      await HomeWidget.saveWidgetData<String>('bg_symbols', jsonEncode(symbols));
+      await HomeWidget.saveWidgetData<String>('bg_display', displayCurrency);
+      await HomeWidget.saveWidgetData<String>('bg_rates', jsonEncode(ratesByFrom));
+
+      if (nextDividend != null) {
+        await HomeWidget.saveWidgetData<String>(
+          'bg_next_div',
+          jsonEncode({
+            's': nextDividend.symbol,
+            'exMs': nextDividend.exDate?.millisecondsSinceEpoch ?? 0,
+          }),
+        );
+      }
+      await HomeWidget.saveWidgetData<String>(
+          'bg_earnings', jsonEncode(earningsBySymbol));
+      await HomeWidget.saveWidgetData<String>(
+          'bg_alerts', jsonEncode(alerts ?? const {}));
+      return true;
     } catch (_) {
       return false;
     }

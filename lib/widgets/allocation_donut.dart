@@ -35,7 +35,6 @@ class AllocationDonut extends StatelessWidget {
       shown.add(AllocationSlice(label: 'Other', value: rest, color: const Color(0xFF90A4AE)));
     }
 
-    final f = NumberFormat();
     return Column(
       children: [
         SizedBox(

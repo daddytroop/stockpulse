@@ -83,6 +83,9 @@ class PortfolioProvider extends ChangeNotifier {
   String _displayCurrency = '';
   final Map<String, double> _fxRates = {}; // 'CADUSD' -> rate
   bool _fxLoading = false;
+  bool _notifyDividends = true;
+  bool _notifyEarnings = true;
+  double _priceAlertPct = 0; // 0 = off
 
   bool _loaded = false;
   bool _quotesLoading = false;
@@ -118,6 +121,9 @@ class PortfolioProvider extends ChangeNotifier {
   String get displayCurrency => _displayCurrency;
   bool get fxLoading => _fxLoading;
   bool get converting => _displayCurrency.isNotEmpty;
+  bool get notifyDividends => _notifyDividends;
+  bool get notifyEarnings => _notifyEarnings;
+  double get priceAlertPct => _priceAlertPct;
 
   /// Portfolio shown in the UI - always resolves to a portfolio.
   Portfolio get active {
@@ -157,6 +163,9 @@ class PortfolioProvider extends ChangeNotifier {
           ThemeMode.values[min(((data['themeMode'] as num?) ?? 0).toInt(), 2)];
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
       _displayCurrency = data['displayCurrency']?.toString() ?? '';
+      _notifyDividends = data['notifyDividends'] as bool? ?? true;
+      _notifyEarnings = data['notifyEarnings'] as bool? ?? true;
+      _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -194,6 +203,9 @@ class PortfolioProvider extends ChangeNotifier {
       'themeMode': _themeMode.index,
       'autoRefreshOnStart': _autoRefreshOnStart,
       'displayCurrency': _displayCurrency,
+      'notifyDividends': _notifyDividends,
+      'notifyEarnings': _notifyEarnings,
+      'priceAlertPct': _priceAlertPct,
     });
   }
 
@@ -1169,6 +1181,27 @@ class PortfolioProvider extends ChangeNotifier {
     await ensureFxRates();
   }
 
+  Future<void> setNotifyDividends(bool v) async {
+    _notifyDividends = v;
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  Future<void> setNotifyEarnings(bool v) async {
+    _notifyEarnings = v;
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  Future<void> setPriceAlertPct(double pct) async {
+    _priceAlertPct = pct;
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
   Map<String, dynamic> exportBackup() {
     return {
       'app': 'Stock Pulse',
@@ -1247,6 +1280,72 @@ class PortfolioProvider extends ChangeNotifier {
       changeSign: sign,
       nextDividendLine1: nd1,
       nextDividendLine2: nd2,
+    );
+    await pushWorkerSnapshot();
+  }
+
+  /// Writes the compact JSON snapshot the native background worker reads:
+  /// aggregated positions, FX rates into the display currency, next
+  /// ex-dividend and earnings dates, and price-alert thresholds.
+  Future<void> pushWorkerSnapshot() async {
+    if (!StockPulseWidgetService.supported) return;
+
+    final qtyBySymbol = <String, double>{};
+    final curBySymbol = <String, String>{};
+    final nameBySymbol = <String, String>{};
+    for (final p in _portfolios) {
+      for (final h in p.holdings.values) {
+        qtyBySymbol[h.symbol] = (qtyBySymbol[h.symbol] ?? 0) + h.quantity;
+        curBySymbol[h.symbol] = h.currency;
+        final name = nameBySymbol[h.symbol];
+        if ((name == null || name.isEmpty) && h.name.isNotEmpty) {
+          nameBySymbol[h.symbol] = h.name;
+        }
+      }
+    }
+    if (qtyBySymbol.isEmpty) return;
+
+    final positions = [
+      for (final e in qtyBySymbol.entries)
+        (
+          symbol: e.key,
+          qty: e.value,
+          currency: curBySymbol[e.key] ?? 'USD',
+          name: nameBySymbol[e.key] ?? '',
+        ),
+    ];
+
+    // rates keyed FROM currency -> value, only pairs targeting the display
+    final display = _displayCurrency;
+    final rates = {
+      for (final e in _fxRates.entries)
+        if (display.isNotEmpty &&
+            e.key.length > display.length &&
+            e.key.endsWith(display))
+          e.key.substring(0, e.key.length - display.length): e.value,
+    };
+
+    final next = nextUpcomingAcrossAll();
+    final earnings = <String, int>{};
+    for (final s in qtyBySymbol.keys) {
+      final earn = _quotes[s]?.earningsDate;
+      if (earn != null && earn.isAfter(DateTime.now())) {
+        earnings[s] = earn.millisecondsSinceEpoch;
+      }
+    }
+
+    final alerts = _priceAlertPct > 0
+        ? {for (final e in qtyBySymbol.entries) e.key: _priceAlertPct}
+        : null;
+
+    await StockPulseWidgetService.pushBackgroundSnapshot(
+      positions: positions,
+      displayCurrency: display,
+      ratesByFrom: rates,
+      nextDividend:
+          (next != null && _notifyDividends) ? (symbol: next.symbol, exDate: next.exDate) : null,
+      earningsBySymbol: _notifyEarnings ? earnings : const {},
+      alerts: alerts,
     );
   }
 

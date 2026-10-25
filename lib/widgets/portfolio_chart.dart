@@ -1,6 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' show NumberFormat;
+import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../models/quote.dart';
 
@@ -213,9 +213,9 @@ class PortfolioChart extends StatelessWidget {
       10000, 20000, 50000, 100000, 250000, 500000, 1000000,
     ];
     for (final c in candidates) {
-      if (c >= raw) return c;
+      if (c >= raw) return c.toDouble();
     }
-    return 1000000;
+    return 1000000.0;
   }
 
   List<ChartPoint> _normalize(List<ChartPoint> raw) {

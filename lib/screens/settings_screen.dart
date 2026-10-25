@@ -192,6 +192,56 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
 
+          _section(context, 'Notifications'),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.payments_outlined),
+                  title: const Text('Dividend alerts'),
+                  subtitle: const Text('When an ex-dividend date lands today'),
+                  value: provider.notifyDividends,
+                  onChanged: (v) => provider.setNotifyDividends(v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.query_stats_outlined),
+                  title: const Text('Earnings alerts'),
+                  subtitle: const Text('When a holding reports earnings today'),
+                  value: provider.notifyEarnings,
+                  onChanged: (v) => provider.setNotifyEarnings(v),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.notifications_active_outlined),
+                  title: const Text('Daily price-move alert'),
+                  subtitle: const Text('When a holding moves at least this much in a day'),
+                  trailing: DropdownButton<double>(
+                    value: provider.priceAlertPct,
+                    items: const [
+                      DropdownMenuItem(value: 0.0, child: Text('Off')),
+                      DropdownMenuItem(value: 3.0, child: Text('3%')),
+                      DropdownMenuItem(value: 5.0, child: Text('5%')),
+                      DropdownMenuItem(value: 8.0, child: Text('8%')),
+                    ],
+                    onChanged: (v) => provider.setPriceAlertPct(v ?? 0),
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Checked hourly in the background on Android (works even '
+                    'when the app is closed). Android may ask for notification '
+                    'permission on first launch. Widgets refresh on the same '
+                    'schedule and on every app open.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           _section(context, 'Android home-screen widgets'),
           Card(
             child: Padding(

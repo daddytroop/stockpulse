@@ -21,8 +21,8 @@ android {
 
     defaultConfig {
         applicationId "app.stockpulse"
-        // minSdk 23 covers home widgets + file selectors comfortably.
-        minSdk 23
+        // minSdk 26 = java.time usage in the background worker; ~99% devices.
+        minSdk 26
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode
         versionName flutter.versionName
@@ -39,4 +39,9 @@ android {
 
 flutter {
     source '../..'
+}
+
+dependencies {
+    implementation "androidx.work:work-runtime-kotlin:2.9.1"
+    implementation "androidx.core:core-ktx:1.13.1"
 }
