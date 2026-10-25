@@ -32,6 +32,7 @@ dependencies:
 
   # Android home-screen widgets
   home_widget: ^0.7.0
+  google_mobile_ads: ^5.3.1
 
   # Charts
   fl_chart: ^0.69.2

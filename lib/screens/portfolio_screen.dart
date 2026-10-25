@@ -9,6 +9,7 @@ import '../providers/portfolio_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/allocation_donut.dart';
+import '../widgets/portfolio_banner.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
@@ -85,6 +86,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             _chart(context, portfolio, provider),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
+            const PortfolioBanner(),
             const SizedBox(height: 12),
             if (events.isNotEmpty) ...[
               SectionHeader(title: 'Upcoming', subtitle: '${events.length} events in the next 90 days'),

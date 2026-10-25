@@ -41,7 +41,11 @@ The included workflow builds a signed, sideloadable APK on every push:
 
 Tag a release (`git tag v1.2.0 && git push origin v1.2.0`) and the workflow also creates a GitHub Release with the APK, Windows zip, and web build attached.
 
-On-device data is stored only in the app's private folder — no accounts, no telemetry.
+Portfolios are stored locally unless you enable Gist sync. Android includes a Google AdMob banner; the advertising SDK processes device/ad-request data separately from portfolio storage.
+
+### Android advertising
+
+Debug/profile builds use Google's test banner. Release builds use the Stock Pulse AdMob placement. Consent information is refreshed before requesting ads; when required, the placement exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
 
 ### Windows
 
