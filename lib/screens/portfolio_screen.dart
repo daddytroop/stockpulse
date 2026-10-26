@@ -66,7 +66,20 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: _portfolioSelector(context, provider),
+        toolbarHeight: 96,
+        titleSpacing: 20,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your money in motion', style: Theme.of(context).textTheme.labelSmall),
+            const SizedBox(height: 4),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Image.asset('assets/icon/app_icon_foreground.png', width: 34, height: 34),
+              const SizedBox(width: 10),
+              _portfolioSelector(context, provider),
+            ]),
+          ],
+        ),
         actions: [
           _refreshButton(context, provider),
           _moreMenu(context, provider, portfolio),
@@ -323,8 +336,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     return SpCard(
       padding: const EdgeInsets.all(18),
       gradient: isDark
-          ? [const Color(0xFF142B2E), const Color(0xFF0F2224)]
-          : [const Color(0xFFE0F2F1), const Color(0xFFF5F7F8)],
+          ? [const Color(0xFF12333A), const Color(0xFF0C2027)]
+          : [const Color(0xFFDCF8F1), const Color(0xFFFFFFFF)],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -366,9 +379,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
               ),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Wrap(
-            spacing: 18,
+            spacing: 10,
             runSpacing: 8,
             children: [
               _inlineStat('Total P/L', fmtSignedMoney(t.pnl, currency: currency),
@@ -389,7 +402,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+        Text(label, style: theme.textTheme.labelSmall?
+            .copyWith(color: theme.hintColor, letterSpacing: 0.7)),
+        const SizedBox(height: 2),
         Text(
           sub == null ? value : '$value  $sub',
           style: theme.textTheme.bodyMedium?.copyWith(

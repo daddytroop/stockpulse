@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 
@@ -49,9 +50,13 @@ class SpCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.shimmerBase.withValues(alpha: 0.5),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: (scheme.brightness == Brightness.dark
+                    ? Colors.black
+                    : colors.shimmerBase)
+                .withValues(alpha: scheme.brightness == Brightness.dark ? .22 : .05),
+            blurRadius: 18,
+            spreadRadius: 1,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -109,6 +114,9 @@ class _PressScaleState extends State<_PressScale> with SingleTickerProviderState
       onTapDown: (_) => _controller.animateTo(0.97),
       onTapUp: (_) {
         _controller.animateTo(1.0);
+        if (!MediaQuery.disableAnimationsOf(context)) {
+          HapticFeedback.selectionClick();
+        }
         widget.onTap();
       },
       onTapCancel: () => _controller.animateTo(1.0),

@@ -10,15 +10,22 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color seed = Color(0xFF009688);
-  static const Color seedDeep = Color(0xFF00695C);
+  static const Color seed = Color(0xFF14B8A6);
 
   static ThemeData light() => _build(
-        ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
+        ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
       );
 
   static ThemeData dark() => _build(
-        ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
+        ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+          surface: const Color(0xFF111A1F),
+        ),
       );
 
   static ThemeData _build(ColorScheme scheme) {
@@ -29,13 +36,27 @@ class AppTheme {
       useMaterial3: true,
       brightness: scheme.brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF101416) : const Color(0xFFF6F8FA),
+      scaffoldBackgroundColor: isDark ? const Color(0xFF081116) : const Color(0xFFF7F9F7),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 76,
         elevation: 0,
-        backgroundColor: isDark ? const Color(0xFF171D20) : Colors.white,
+        backgroundColor: (isDark ? const Color(0xFF10191E) : Colors.white)
+            .withValues(alpha: .94),
         indicatorColor: scheme.primaryContainer,
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+          color: states.contains(WidgetState.selected)
+              ? scheme.primary
+              : scheme.onSurfaceVariant,
+          size: 24,
+        )),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+          fontSize: 11,
+          height: 1.2,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w800
+              : FontWeight.w600,
+        )),
       ),
       // Typography: slightly tighter, finance-app feel.
       textTheme: _textTheme(scheme),
@@ -110,7 +131,7 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,
-        backgroundColor: isDark ? const Color(0xFF101416) : const Color(0xFFF6F8FA),
+        backgroundColor: isDark ? const Color(0xE8081116) : const Color(0xCCF7F9F7),
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w800,

@@ -32,6 +32,20 @@ class _PulseIndicatorState extends State<PulseIndicator> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    if (disableAnimations) {
+      return SizedBox(
+        width: widget.size * 2,
+        height: widget.size * 2,
+        child: Center(
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: widget.size * 2,
       height: widget.size * 2,

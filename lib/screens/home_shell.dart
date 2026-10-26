@@ -93,7 +93,19 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     return Scaffold(
-      body: content,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(0, -1.2),
+            radius: 1.35,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+              Theme.of(context).scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: content,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

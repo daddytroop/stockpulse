@@ -47,6 +47,8 @@ Portfolios are stored locally unless you enable Gist sync. Android includes a Go
 
 Debug/profile builds use Google's test banner. Release builds use the Stock Pulse AdMob placement. Consent information is refreshed before requesting ads; when required, the placement exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
 
+The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
+
 ### 1.3 dashboard update
 
 - Larger balance summary, a focused performance panel, and a cleaner mobile navigation bar.
