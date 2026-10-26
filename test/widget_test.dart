@@ -13,7 +13,7 @@ void main() {
     expect(find.text('Welcome to your money dashboard'), findsOneWidget);
     expect(find.text('Add your first holding'), findsOneWidget);
     expect(find.text('Or import everything at once'), findsOneWidget);
-    expect(find.text('Start exploring'), findsOneWidget);
+    expect(find.bySemanticsLabel('Start exploring'), findsOneWidget);
   });
 
   testWidgets('Navigation bar keeps labels readable', (tester) async {
