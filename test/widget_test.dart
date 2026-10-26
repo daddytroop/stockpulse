@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stock_pulse/screens/onboarding_screen.dart';
 import 'package:stock_pulse/widgets/symbol_avatar.dart';
 import 'package:stock_pulse/widgets/ui/pulse_indicator.dart';
 
 void main() {
+  testWidgets('Onboarding highlights the first-run actions', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(useMaterial3: true),
+      home: OnboardingScreen(onAction: (_) {}, onDone: () {}),
+    ));
+    expect(find.text('Welcome to your money dashboard'), findsOneWidget);
+    expect(find.text('Add your first holding'), findsOneWidget);
+    expect(find.text('Or import everything at once'), findsOneWidget);
+    expect(find.text('Start exploring'), findsOneWidget);
+  });
+
   testWidgets('Navigation bar keeps labels readable', (tester) async {
     final widget = MaterialApp(home: Scaffold(
       bottomNavigationBar: NavigationBar(

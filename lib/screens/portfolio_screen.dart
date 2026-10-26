@@ -111,6 +111,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 padding: EdgeInsets.only(bottom: 12),
                 child: LinearProgressIndicator(minHeight: 2),
               ),
+            _freshnessBanner(context, provider),
             _totalsCard(context, totals, currency, colors),
             const SizedBox(height: 12),
             SpCard(child: Column(
@@ -322,6 +323,42 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               message,
               style: TextStyle(color: theme.colorScheme.onErrorContainer),
             ),
+          ),
+          TextButton(
+            onPressed: () async {
+              final provider = context.read<PortfolioProvider>();
+              await provider.refreshQuotes();
+              await provider.ensureDividendInfo();
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _freshnessBanner(BuildContext context, PortfolioProvider provider) {
+    if (provider.quotesLoading || provider.lastError != null) return const SizedBox.shrink();
+    final at = provider.lastRefreshAt;
+    if (at != null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return SpCard(
+      child: Row(
+        children: [
+          Icon(Icons.schedule_outlined, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Quotes have not refreshed yet. Pull down to try again.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await provider.refreshQuotes();
+              await provider.ensureDividendInfo();
+            },
+            child: const Text('Retry'),
           ),
         ],
       ),

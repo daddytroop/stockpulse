@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/portfolio_provider.dart';
 import 'screens/home_shell.dart';
+import 'screens/onboarding_screen.dart';
 import 'theme/app_theme.dart';
 
 class StockPulseApp extends StatelessWidget {
@@ -18,7 +19,24 @@ class StockPulseApp extends StatelessWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: provider.themeMode,
-      home: const HomeShell(),
+      home: const RootScreen(),
     );
+  }
+}
+
+/// Chooses the onboarding shell or main navigation from persisted state.
+class RootScreen extends StatelessWidget {
+  const RootScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<PortfolioProvider>();
+    if (!provider.showsOnboarding) {
+      return OnboardingScreen(
+        onAction: (_) => provider.completeOnboarding(),
+        onDone: provider.completeOnboarding,
+      );
+    }
+    return const HomeShell();
   }
 }

@@ -6,11 +6,14 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'providers/portfolio_provider.dart';
 import 'screens/lock_gate.dart';
+import 'services/diagnostics.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final provider = PortfolioProvider();
+  Diagnostics.setEnabled(provider.crashDiagnostics);
+  await Diagnostics.install(enabled: provider.crashDiagnostics);
   // First paint immediately; data loads + refreshes continue in background.
   unawaited(provider.warmStart());
 

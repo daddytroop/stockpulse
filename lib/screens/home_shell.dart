@@ -58,6 +58,33 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
+    final provider = context.watch<PortfolioProvider>();
+    if (provider.backupReminderDue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<PortfolioProvider>().markBackupReminderShown();
+        showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Back up your portfolio?'),
+            content: const Text('Your data stays on this device unless you save '
+              'a backup. Export JSON or CSV before reinstalling or switching phones.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Maybe later'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  setState(() => _index = 4);
+                },
+                child: const Text('Open backup'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
     final content = IndexedStack(
         index: _index,
         children: [for (var i = 0; i < _labels.length; i++)

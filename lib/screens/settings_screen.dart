@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
+import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
@@ -413,6 +414,39 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
 
+          _section(context, 'Privacy & diagnostics'),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.favorite_border),
+                  title: const Text('Optional crash diagnostics'),
+                  subtitle: const Text('Write a short, redacted local error log only '
+                    'when this is enabled. It is never sent automatically; share it '
+                    'only with a bug report if you want to.'),
+                  value: provider.crashDiagnostics,
+                  onChanged: provider.setCrashDiagnostics,
+                ),
+                if (Diagnostics.path != null)
+                  ListTile(
+                    leading: const Icon(Icons.bug_report_outlined),
+                    title: const Text('Diagnostics log'),
+                    subtitle: Text(Diagnostics.path!),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Portfolio data is local. Optional Gist sync stores a backup in the '
+                    'private Gist you own. Android advertising asks Google ad services for '
+                    'a banner and consent status. Diagnostics never include symbols, '
+                    'quantities, tokens, or account numbers when enabled.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           _section(context, 'About'),
           Card(
             child: Padding(
@@ -420,14 +454,14 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Stock Pulse v1.0.0', style: theme.textTheme.titleSmall),
+                  const Text('Stock Pulse v1.3.1', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
                   Text(
                     'A free, open-source replacement for paid portfolio trackers. '
                     'Market data comes from Yahoo Finance\'s unofficial endpoints; '
                     'dividend and earnings dates may be estimated (marked with *).\n\n'
                     'This app is for tracking only and is not investment advice. '
-                    'Prices are delayed and currency conversion between holdings is not applied.',
+                    'Prices are delayed; enabling a display currency applies Yahoo FX rates.',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                   ),
                 ],

@@ -11,6 +11,7 @@ import '../models/transaction.dart';
 import '../services/csv_import.dart';
 import '../services/ledger.dart' as ledger;
 import '../services/store.dart';
+import '../services/diagnostics.dart';
 import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
 import '../utils/formatters.dart';
@@ -100,6 +101,9 @@ class PortfolioProvider extends ChangeNotifier {
   DateTime? _lastRefreshAt;
   ThemeMode _themeMode = ThemeMode.system;
   bool _autoRefreshOnStart = true;
+  bool _onboardingComplete = false;
+  bool _crashDiagnostics = false;
+  DateTime? _lastBackupReminderAt;
 
   final Map<String, _CachedHistory> _historyCache = {};
   final Map<String, Future<List<ChartPoint>>> _historyInflight = {};
@@ -123,6 +127,13 @@ class PortfolioProvider extends ChangeNotifier {
   DateTime? get lastRefreshAt => _lastRefreshAt;
   ThemeMode get themeMode => _themeMode;
   bool get autoRefreshOnStart => _autoRefreshOnStart;
+  bool get showsOnboarding => _onboardingComplete;
+  bool get crashDiagnostics => _crashDiagnostics;
+  bool get backupReminderDue {
+    if (_portfolios.every((p) => p.holdings.isEmpty)) return false;
+    final at = _lastBackupReminderAt;
+    return at == null || DateTime.now().difference(at) >= const Duration(days: 30);
+  }
   String get displayCurrency => _displayCurrency;
   bool get fxLoading => _fxLoading;
   bool get converting => _displayCurrency.isNotEmpty;
@@ -171,6 +182,25 @@ class PortfolioProvider extends ChangeNotifier {
     await _persistData();
   }
 
+  Future<void> completeOnboarding() async {
+    _onboardingComplete = true;
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> setCrashDiagnostics(bool v) async {
+    _crashDiagnostics = v;
+    Diagnostics.setEnabled(v);
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> markBackupReminderShown() async {
+    _lastBackupReminderAt = DateTime.now();
+    notifyListeners();
+    await _persistData();
+  }
+
   /// Portfolio shown in the UI - always resolves to a portfolio.
   Portfolio get active {
     if (_portfolios.isEmpty) {
@@ -213,6 +243,10 @@ class PortfolioProvider extends ChangeNotifier {
       _notifyEarnings = data['notifyEarnings'] as bool? ?? true;
       _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
       _lockEnabled = data['lockEnabled'] as bool? ?? false;
+      _onboardingComplete = data['onboardingComplete'] as bool? ?? false;
+      Diagnostics.setEnabled(data['crashDiagnostics'] as bool? ?? false);
+      _crashDiagnostics = data['crashDiagnostics'] as bool? ?? false;
+      _lastBackupReminderAt = _ms(data['lastBackupReminderMs']);
       _gistId = data['gistId']?.toString() ?? '';
       _gistToken = data['gistToken']?.toString() ?? '';
       _lastSyncAt = _ms(data['lastSyncMs']);
@@ -254,6 +288,9 @@ class PortfolioProvider extends ChangeNotifier {
       'activeIndex': _activeIndex,
       'themeMode': _themeMode.index,
       'autoRefreshOnStart': _autoRefreshOnStart,
+      'onboardingComplete': _onboardingComplete,
+      'crashDiagnostics': _crashDiagnostics,
+      'lastBackupReminderMs': _lastBackupReminderAt?.millisecondsSinceEpoch,
       'displayCurrency': _displayCurrency,
       'notifyDividends': _notifyDividends,
       'notifyEarnings': _notifyEarnings,

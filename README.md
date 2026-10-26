@@ -41,6 +41,12 @@ The included workflow builds a signed, sideloadable APK on every push:
 
 Tag a release (`git tag v1.2.0 && git push origin v1.2.0`) and the workflow also creates a GitHub Release with the APK, Windows zip, and web build attached.
 
+### Play/publishing checklist
+
+- **Data-safety:** portfolio symbols and quantities are local; optional Gist sync stores a full backup in the user's private Gist; Android ad requests send Google advertising/device data; optional diagnostics are user-controlled, local, and redacted.
+- Verify a fresh-install APK: onboarding, quotes and chart retries, portfolio search/sort, dividends, import/export, widgets, biometric lock, and banner loading.
+- Check AdMob **app readiness** and **Policy center**. Publishing consent messages does not by itself prove ad approval.
+
 Portfolios are stored locally unless you enable Gist sync. Android includes a Google AdMob banner; the advertising SDK processes device/ad-request data separately from portfolio storage.
 
 ### Android advertising
