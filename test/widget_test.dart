@@ -5,8 +5,8 @@ import 'package:stock_pulse/widgets/ui/pulse_indicator.dart';
 
 void main() {
   testWidgets('Navigation bar keeps labels readable', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(
-      bottomNavigationBar: NavigationBar(
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      bottomNavigationBar: const NavigationBar(
         destinations: [
           NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
