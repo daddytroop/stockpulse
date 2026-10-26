@@ -35,6 +35,11 @@ class PortfolioScreen extends StatefulWidget {
 class _PortfolioScreenState extends State<PortfolioScreen> {
   String _range = '3mo';
   String _allocBy = 'type';
+  String _query = '';
+  String _sort = 'symbol';
+  bool _compare = false;
+  String? _historyKey;
+  Future<List<List<ChartPoint>?>>? _history;
 
   static const _rangeLabels = {
     '1mo': '1M', '3mo': '3M', '6mo': '6M', '1y': '1Y', '2y': '2Y', '5y': '5Y',
@@ -49,6 +54,15 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 90).take(5).toList();
     final colors = AppColors.of(context);
+    final holdings = portfolio.holdings.values.where((h) =>
+        '${h.symbol} ${h.name}'.toLowerCase().contains(_query.toLowerCase())).toList();
+    holdings.sort((a, b) {
+      if (_sort == 'day') {
+        return (provider.quoteOf(b.symbol)?.dayChangePercent ?? double.negativeInfinity)
+            .compareTo(provider.quoteOf(a.symbol)?.dayChangePercent ?? double.negativeInfinity);
+      }
+      return a.symbol.compareTo(b.symbol);
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -69,9 +83,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           await provider.refreshQuotes();
           await provider.ensureDividendInfo();
         },
-        child: ListView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: ListView(
+          key: const PageStorageKey('portfolio-scroll'),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
           children: [
             if (provider.lastError != null)
               _errorBanner(context, provider.lastError!)
@@ -82,8 +100,22 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ),
             _totalsCard(context, totals, currency, colors),
             const SizedBox(height: 12),
-            _rangeChips(context),
-            _chart(context, portfolio, provider),
+            SpCard(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  Text('Performance', style: Theme.of(context).textTheme.titleLarge),
+                  FilterChip(label: const Text('Compare SPY'), selected: _compare,
+                    onSelected: (v) => setState(() => _compare = v)),
+                ]),
+                const SizedBox(height: 16),
+                _chart(context, portfolio, provider),
+                const SizedBox(height: 12),
+                _rangeChips(context),
+                Text('Based on current holdings · drag chart to explore',
+                  style: Theme.of(context).textTheme.labelSmall),
+              ],
+            )),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
             const PortfolioBanner(),
@@ -100,10 +132,28 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               _emptyState(context)
             else ...[
               SectionHeader(title: 'Holdings (${portfolio.holdings.length})'),
-              ...portfolio.holdings.values.map((h) => _holdingTile(context, provider, portfolio.id, h)).toList().animate(
-                interval: 30.ms,
-                effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.05), end: Offset.zero, duration: 300.ms)],
-              ),
+              Row(children: [
+                Expanded(child: TextField(
+                  decoration: const InputDecoration(hintText: 'Find a holding',
+                    prefixIcon: Icon(Icons.search)),
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                )),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  tooltip: 'Sort holdings',
+                  icon: const Icon(Icons.sort),
+                  initialValue: _sort,
+                  onSelected: (v) => setState(() => _sort = v),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'symbol', child: Text('Symbol A–Z')),
+                    PopupMenuItem(value: 'day', child: Text('Daily change: highest first')),
+                  ],
+                ),
+              ]),
+              const SizedBox(height: 12),
+              if (holdings.isEmpty) const Padding(
+                padding: EdgeInsets.all(24), child: Center(child: Text('No matching holdings'))),
+              ...holdings.map((h) => _holdingTile(context, provider, portfolio.id, h)),
               const SizedBox(height: 20),
               Center(
                 child: Text(
@@ -114,6 +164,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ),
             ],
           ],
+        ),
+          ),
         ),
       ),
     );
@@ -219,10 +271,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('Allocation', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const Spacer(),
               SegmentedButton<String>(
                 showSelectedIcon: false,
                 style: const ButtonStyle(visualDensity: VisualDensity.compact),
@@ -285,19 +339,21 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               AnimatedNumber(
                 value: t.marketValue,
                 formatter: (v) => fmtMoney(v, currency: currency),
-                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+                style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(width: 10),
               ChangeChip(
                 percent: t.hasDayChange ? t.dayChangePercent : null,
                 label: t.hasDayChange
-                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)})'
+                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)}) today'
                     : '–',
               ),
             ],
@@ -364,14 +420,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   }
 
   Widget _chart(BuildContext context, Portfolio portfolio, PortfolioProvider provider) {
-    return FutureBuilder(
-      key: ValueKey('${portfolio.id}|$_range|${portfolio.symbols.length}'
-          '|${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
-      future: Future.wait([
+    final key = '${portfolio.id}|$_range|${portfolio.holdings.values.map((h) => '${h.symbol}:${h.quantity}').join(',')}|${provider.lastRefreshAt}';
+    if (_historyKey != key) {
+      _historyKey = key;
+      _history = Future.wait([
         provider.portfolioHistory(portfolio.id, _range),
         provider.benchmarkHistory(_range),
-      ]),
+      ]);
+    }
+    return FutureBuilder(
+      key: ValueKey(key),
+      future: _history,
       builder: (context, snap) {
+        if (snap.hasError) {
+          return SizedBox(height: 180, child: Center(child: TextButton.icon(
+            icon: const Icon(Icons.refresh), label: const Text('Retry chart'),
+            onPressed: () => setState(() => _historyKey = null),
+          )));
+        }
         if (!snap.hasData && snap.connectionState != ConnectionState.done) {
           return const ShimmerSkeleton.chart(height: 180);
         }
@@ -380,8 +446,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         final benchmark = results.length > 1 ? results[1] as List<ChartPoint>? : null;
         return PortfolioChart(
           points: points,
-          benchmark: benchmark,
-          title: 'Portfolio value vs SPY',
+          benchmark: _compare ? benchmark : null,
+          title: _compare ? 'Relative growth' : 'Value history',
         );
       },
     );
@@ -468,9 +534,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final color = isDiv ? colors.dividend : colors.earnings;
     return SpCard(
       margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      onTap: () => pushSharedAxis(context, HoldingDetailScreen(
+        portfolioId: context.read<PortfolioProvider>().active.id,
+        symbol: e.symbol,
+      )),
       child: ListTile(
         dense: true,
-        leading: Icon(isDiv ? Icons.payments_outlined : Icons.query_stats_outlined, color: color),
+        leading: Container(
+          width: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text('${e.date.day}', style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 18)),
+            Text(isDiv ? 'DIV' : 'EPS', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w700)),
+          ]),
+        ),
         title: Text(e.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(
           isDiv

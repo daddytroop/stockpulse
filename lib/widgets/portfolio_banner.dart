@@ -17,6 +17,8 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
   bool _ready = false;
   bool _started = false;
   bool _privacyRequired = false;
+  bool _privacyOpen = false;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -24,22 +26,32 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
     if (!isAndroidPlatform) return;
     ConsentInformation.instance.requestConsentInfoUpdate(
       ConsentRequestParameters(),
-      () => ConsentForm.loadAndShowConsentFormIfRequired((_) => _load()),
+      () {
+        if (!mounted) return;
+        ConsentForm.loadAndShowConsentFormIfRequired((_) => _load());
+      },
       (_) => _load(),
     );
   }
 
   Future<void> _load() async {
+    if (!mounted || _started || _privacyOpen) return;
+    _started = true;
+    final generation = _generation;
+    try {
     final privacy = await ConsentInformation.instance
         .getPrivacyOptionsRequirementStatus();
     if (!mounted) return;
     setState(() => _privacyRequired =
         privacy == PrivacyOptionsRequirementStatus.required);
-    if (_started || !await ConsentInformation.instance.canRequestAds()) return;
-    if (!mounted) return;
-    _started = true;
+    final allowed = await ConsentInformation.instance.canRequestAds();
+    if (!mounted || generation != _generation) return;
+    if (!allowed) {
+      _started = false;
+      return;
+    }
     await MobileAds.instance.initialize();
-    if (!mounted) return;
+    if (!mounted || generation != _generation) return;
     final ad = BannerAd(
       adUnitId: kReleaseMode
           ? 'ca-app-pub-2085007206942111/8657501940'
@@ -47,27 +59,53 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (_) {
-          if (mounted) setState(() => _ready = true);
+        onAdLoaded: (ad) {
+          if (!mounted || generation != _generation) {
+            ad.dispose();
+            return;
+          }
+          setState(() => _ready = true);
         },
-        onAdFailedToLoad: (ad, _) {
+        onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          if (mounted) setState(() { _ad = null; _ready = false; });
+          if (kDebugMode) debugPrint('Banner request failed: ${error.code} ${error.message}');
+          if (mounted && generation == _generation) {
+            setState(() { _ad = null; _ready = false; _started = false; });
+          }
         },
       ),
     );
     _ad = ad;
     await ad.load();
+    } catch (error) {
+      if (kDebugMode) debugPrint('Ad initialization failed: $error');
+      if (mounted && generation == _generation) {
+        _ad?.dispose();
+        setState(() { _ad = null; _ready = false; _started = false; });
+      }
+    }
   }
 
   void _privacyOptions() {
+    if (_privacyOpen) return;
+    _generation++;
     _ad?.dispose();
-    setState(() { _ad = null; _ready = false; _started = false; });
-    ConsentForm.showPrivacyOptionsForm((_) => _load());
+    setState(() { _ad = null; _ready = false; _started = false; _privacyOpen = true; });
+    ConsentForm.showPrivacyOptionsForm((error) {
+      if (!mounted) return;
+      setState(() => _privacyOpen = false);
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Privacy choices could not open. Please try again.'),
+        ));
+      }
+      _load();
+    });
   }
 
   @override
   void dispose() {
+    _generation++;
     _ad?.dispose();
     super.dispose();
   }
@@ -94,7 +132,7 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
           }),
         ],
         if (_privacyRequired)
-          TextButton(onPressed: _privacyOptions,
+          TextButton(onPressed: _privacyOpen ? null : _privacyOptions,
               child: const Text('Ad privacy choices')),
       ],
     );

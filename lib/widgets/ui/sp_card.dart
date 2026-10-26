@@ -115,7 +115,7 @@ class _PressScaleState extends State<_PressScale> with SingleTickerProviderState
       child: AnimatedBuilder(
         animation: _controller,
         builder: (_, child) => Transform.scale(
-          scale: _controller.value,
+          scale: MediaQuery.disableAnimationsOf(context) ? 1 : _controller.value,
           child: child,
         ),
         child: widget.child,

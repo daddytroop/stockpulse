@@ -1,4 +1,3 @@
-import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -59,18 +58,10 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
-    final content = PageTransitionSwitcher(
-      duration: const Duration(milliseconds: 220),
-      transitionBuilder: (child, primary, secondary) => FadeThroughTransition(
-        animation: primary,
-        secondaryAnimation: secondary,
-        child: child,
-      ),
-      child: IndexedStack(
-        key: ValueKey(_index),
+    final content = IndexedStack(
         index: _index,
-        children: [for (var i = 0; i < _labels.length; i++) _screen(i)],
-      ),
+        children: [for (var i = 0; i < _labels.length; i++)
+          TickerMode(enabled: i == _index, child: _screen(i))],
     );
 
     if (wide) {

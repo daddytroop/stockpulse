@@ -47,6 +47,16 @@ Portfolios are stored locally unless you enable Gist sync. Android includes a Go
 
 Debug/profile builds use Google's test banner. Release builds use the Stock Pulse AdMob placement. Consent information is refreshed before requesting ads; when required, the placement exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
 
+### 1.3 dashboard update
+
+- Larger balance summary, a focused performance panel, and a cleaner mobile navigation bar.
+- Toggle SPY comparison, drag the chart for dated values, search holdings, and sort by symbol or daily percentage change.
+- Tap upcoming events to open the holding; tab switches preserve screen state and the banner instance.
+- Chart requests are reused across dashboard interactions, with a retry action for failures.
+- Ad loading remains gated by Google's consent status, with stale-callback protection and recoverable privacy-form errors.
+
+For device verification, use debug/profile builds and Google's test ads. Check banner loading, tab switching, privacy choices where required, and offline startup. European/US messages do not normally appear for Canadian users. A published consent message is not itself confirmation of AdMob app approval: check the app readiness status and Policy center in AdMob. Build checks do not replace on-device consent testing.
+
 ### Windows
 
 The same workflow produces a **StockPulse-windows** artifact (a zip of the Release build). Unzip and run `stock_pulse.exe`.

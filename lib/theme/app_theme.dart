@@ -29,7 +29,14 @@ class AppTheme {
       useMaterial3: true,
       brightness: scheme.brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF0F1416) : const Color(0xFFF5F7F8),
+      scaffoldBackgroundColor: isDark ? const Color(0xFF101416) : const Color(0xFFF6F8FA),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF171D20) : Colors.white,
+        indicatorColor: scheme.primaryContainer,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      ),
       // Typography: slightly tighter, finance-app feel.
       textTheme: _textTheme(scheme),
       // Cards: subtle rounded surfaces with a hairline border instead of
@@ -103,7 +110,7 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,
-        backgroundColor: isDark ? const Color(0xFF0F1416) : const Color(0xFFF5F7F8),
+        backgroundColor: isDark ? const Color(0xFF101416) : const Color(0xFFF6F8FA),
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w800,

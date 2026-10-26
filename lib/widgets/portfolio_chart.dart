@@ -124,8 +124,8 @@ class PortfolioChart extends StatelessWidget {
             child: Row(
               children: [
                 if (title.isNotEmpty)
-                  Text(title,
-                      style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
+                  Flexible(child: Text(title,
+                      style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor))),
                 const Spacer(),
                 if (normalized) ...[
                   _legendDot(color),
@@ -185,7 +185,8 @@ class PortfolioChart extends StatelessWidget {
                   getTooltipItems: (spots) => [
                     for (final s in spots)
                       LineTooltipItem(
-                        normalized ? '${s.y.toStringAsFixed(1)}%' : NumberFormat('#,##0.00').format(s.y),
+                        '${DateFormat('d MMM').format(DateTime.fromMillisecondsSinceEpoch(s.x.round()))}\n'
+                        '${normalized ? '${s.y.toStringAsFixed(1)}%' : NumberFormat('#,##0.00').format(s.y)}',
                         TextStyle(
                           color: s.bar.color ?? theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
