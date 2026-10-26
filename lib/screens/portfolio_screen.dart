@@ -167,7 +167,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                       context: context,
                       builder: (ctx) => SafeArea(child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Padding(padding: EdgeInsets.all(16), child: Text('Sort holdings', style: TextStyle(fontWeight: FontWeight.w800))),
                           ListTile(leading: Icon(Icons.sort_by_alpha), title: Text('Symbol A–Z'), subtitle: Text('Easy to scan'), onTap: () => Navigator.pop(ctx, 'symbol')),
                           ListTile(leading: Icon(Icons.trending_up), title: Text('Daily change'), subtitle: Text('Biggest movers first'), onTap: () => Navigator.pop(ctx, 'day')),
