@@ -472,7 +472,7 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Stock Pulse v1.3.1', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const Text('Stock Pulse v1.4.1', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
                   Text(
                     'A free, open-source replacement for paid portfolio trackers. '
