@@ -16,8 +16,10 @@ class StockPulseApp extends StatelessWidget {
     return MaterialApp(
       title: 'Stock Pulse',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.themeFor(provider.themeMode, Brightness.light),
-      darkTheme: AppTheme.themeFor(provider.themeMode, Brightness.dark),
+      theme: AppTheme.themeFor(provider.themeMode, Brightness.light,
+          accent: AppTheme.accents[provider.accentIndex]),
+      darkTheme: AppTheme.themeFor(provider.themeMode, Brightness.dark,
+          accent: AppTheme.accents[provider.accentIndex]),
       // Theme selection is handled explicitly so every surface uses the
       // selected palette instead of only swapping light/dark shells.
       themeMode: ThemeMode.light,

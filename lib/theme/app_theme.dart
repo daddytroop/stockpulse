@@ -26,45 +26,68 @@ enum AppThemeId {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData themeFor(AppThemeId id, Brightness platformBrightness) {
+  static const accents = [
+    Color(0xFF14B8A6),
+    Color(0xFF2563EB),
+    Color(0xFF7C3AED),
+    Color(0xFF0EA5E9),
+    Color(0xFFF97316),
+    Color(0xFFE11D48),
+    Color(0xFF84CC16),
+    Color(0xFFEAB308),
+  ];
+
+  static ThemeData themeFor(AppThemeId id, Brightness platformBrightness,
+      {Color? accent}) {
     final effective = id == AppThemeId.system
         ? (platformBrightness == Brightness.dark ? AppThemeId.dark : AppThemeId.light)
         : id;
+    final seed = accent ?? _defaultAccent(effective);
     return switch (effective) {
-      AppThemeId.system || AppThemeId.light => light(),
-      AppThemeId.dark => dark(),
-      AppThemeId.amoled => amoled(),
-      AppThemeId.mint => mint(),
-      AppThemeId.ocean => ocean(),
+      AppThemeId.system || AppThemeId.light => _custom(seed, Brightness.light),
+      AppThemeId.dark => _custom(seed, Brightness.dark),
+      AppThemeId.amoled => amoled(seed),
+      AppThemeId.mint => mint(seed),
+      AppThemeId.ocean => ocean(seed),
     };
+  }
+
+  static Color _defaultAccent(AppThemeId id) => switch (id) {
+        AppThemeId.mint => const Color(0xFF00A878),
+        AppThemeId.ocean => const Color(0xFF2563EB),
+        AppThemeId.amoled => const Color(0xFF34D399),
+        _ => accents.first,
+      };
+
+  static ThemeData _custom(Color seed, Brightness brightness) => _build(
+        ColorScheme.fromSeed(seedColor: seed, brightness: brightness, surface: brightness == Brightness.dark ? const Color(0xFF111A1F) : Colors.white),
+      );
   }
 
   static ThemeData light() => _build(_scheme(const Color(0xFF14B8A6), Brightness.light));
 
   static ThemeData dark() => _build(_scheme(const Color(0xFF2DD4BF), Brightness.dark));
 
-  static ThemeData amoled() => _build(
-        _scheme(const Color(0xFF34D399), Brightness.dark)
+  static ThemeData amoled([Color seed = const Color(0xFF34D399)]) => _build(
+        _scheme(seed, Brightness.dark)
             .copyWith(surface: Colors.black, surfaceContainer: Colors.black),
         amoled: true,
       );
 
-  static ThemeData mint() => _build(
+  static ThemeData mint([Color seed = const Color(0xFF00A878)]) => _build(
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00A878),
+          seedColor: seed,
           brightness: Brightness.light,
           surface: const Color(0xFFF4FFFA),
-          primary: const Color(0xFF008C6A),
         ),
         background: const Color(0xFFEEFAFA),
       );
 
-  static ThemeData ocean() => _build(
+  static ThemeData ocean([Color seed = const Color(0xFF2563EB)]) => _build(
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
+          seedColor: seed,
           brightness: Brightness.dark,
           surface: const Color(0xFF0B1220),
-          primary: const Color(0xFF60A5FA),
         ),
         background: const Color(0xFF070B14),
       );

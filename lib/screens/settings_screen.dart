@@ -166,6 +166,27 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
+          Card(
+            margin: const EdgeInsets.only(top: 10),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Accent color', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 6),
+                Text('Use the same accent across both light and dark palettes.',
+                  style: theme.textTheme.bodySmall),
+                const SizedBox(height: 12),
+                Wrap(spacing: 12, runSpacing: 12, children: [
+                  for (var i = 0; i < AppTheme.accents.length; i++)
+                    _AccentChoice(
+                      color: AppTheme.accents[i],
+                      selected: provider.accentIndex == i,
+                      onTap: () => provider.setAccentIndex(i),
+                    ),
+                ]),
+              ]),
+            ),
+          ),
 
           _section(context, 'Data'),
           Card(
@@ -689,6 +710,35 @@ Future<String?> _askText(BuildContext context, String title, String initial) asy
     ),
   );
   return value;
+}
+
+class _AccentChoice extends StatelessWidget {
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AccentChoice({required this.color, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+          border: Border.all(
+            color: selected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
+            width: selected ? 3 : 0,
+          ),
+          boxShadow: selected ? [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 14)] : null,
+        ),
+        child: selected ? const Icon(Icons.check, color: Colors.white) : null,
+      ),
+    );
+  }
 }
 
 class RadioAdaptiveTile extends StatelessWidget {

@@ -13,6 +13,83 @@ import '../widgets/stat_cards.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
 
+class _SampleCallout extends StatelessWidget {
+  const _SampleCallout();
+
+  @override
+  Widget build(BuildContext context) {
+    return SpCard(
+      gradient: const [Color(0xFFFFF7D8), Color(0xFFFFFFFF)],
+      child: Row(children: [
+        const Icon(Icons.auto_awesome, color: Color(0xFFB45309)),
+        const SizedBox(width: 10),
+        Expanded(child: Text('This is demo data. Add or import your holdings to replace it.')),
+      ]),
+    );
+  }
+}
+
+class _HeroPill extends StatelessWidget {
+  final String label;
+  final String value;
+  const _HeroPill({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .16)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
+      ]),
+    );
+  }
+}
+
+class _IncomeCadence {
+  final String label;
+  final double value;
+  final IconData icon;
+  const _IncomeCadence({required this.label, required this.value, required this.icon});
+}
+
+class _CadenceCard extends StatelessWidget {
+  final _IncomeCadence data;
+  final String? currency;
+  const _CadenceCard({required this.data, required this.currency});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .10)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(data.icon, color: theme.colorScheme.primary, size: 22),
+        const Spacer(),
+        Text(data.label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+        const SizedBox(height: 4),
+        Text(
+          fmtMoney(data.value, currency: currency),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge,
+        ),
+      ]),
+    );
+  }
+}
+
 class DividendsScreen extends StatefulWidget {
   const DividendsScreen({super.key});
 
@@ -71,44 +148,30 @@ class _DividendsScreenState extends State<DividendsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dividends · ${portfolio.name}'),
+        toolbarHeight: 84,
+        titleSpacing: 20,
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Income dashboard', style: Theme.of(context).textTheme.labelSmall),
+          Text(portfolio.name),
+        ]),
       ),
       body: Stack(
         children: [
-          ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+          Center(child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             children: [
+              if (portfolio.name.startsWith('Sample'))
+                const _SampleCallout(),
               if (provider.dividendsLoading)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: LinearProgressIndicator(value: provider.dividendsProgress, minHeight: 3),
                 ),
-              StatGrid(cards: [
-                StatCard(
-                  label: 'Annual income (est.)',
-                  value: fmtMoney(totals.annualIncome, currency: currency),
-                  valueColor: colors.dividend,
-                ),
-                StatCard(
-                  label: 'Next 30 days',
-                  value: fmtMoney(next30, currency: currency),
-                  sub: upcoming.isNotEmpty ? 'next: ${upcoming.first.symbol}' : null,
-                ),
-                StatCard(
-                  label: 'Portfolio yield',
-                  value: fmtPct(totals.incomeYield, signed: false),
-                ),
-                StatCard(
-                  label: 'Yield on cost',
-                  value: fmtPct(totals.yieldOnCost, signed: false),
-                ),
-                StatCard(
-                  label: '5-yr income (DRIP est.)',
-                  value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency),
-                  sub: 'if payments are reinvested',
-                  valueColor: colors.dividend,
-                ),
-              ]),
+              _incomeHero(context, provider, portfolio, totals, next30, currency, colors),
+              const SizedBox(height: 12),
+              _incomeFrequencyGrid(context, provider, portfolio, totals, currency),
               const SizedBox(height: 12),
               SpCard(
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
@@ -164,9 +227,68 @@ class _DividendsScreenState extends State<DividendsScreen> {
                 ),
             ],
           ),
+          )),
         ],
       ),
     );
+  }
+
+  Widget _incomeHero(BuildContext context, PortfolioProvider provider, Portfolio portfolio,
+      PortfolioTotals totals, double next30, String? currency, AppColors colors) {
+    final theme = Theme.of(context);
+    final isDark = theme.colorScheme.brightness == Brightness.dark;
+    final monthly = provider.monthlyDividendRateFor(portfolio);
+    return SpCard(
+      padding: const EdgeInsets.all(22),
+      gradient: isDark
+          ? [const Color(0xFF06362E), const Color(0xFF101820)]
+          : [const Color(0xFFDDF7EA), const Color(0xFFFFFFFF)],
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('Estimated annual income', style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+          const Spacer(),
+          Icon(Icons.eco_outlined, color: colors.dividend),
+        ]),
+        const SizedBox(height: 6),
+        Text(
+          fmtMoney(totals.annualIncome, currency: currency),
+          style: theme.textTheme.displayLarge?.copyWith(color: colors.dividend),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${fmtPct(totals.incomeYield, signed: false)} yield · about ${fmtMoney(monthly, currency: currency)} each month',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+        ),
+        const SizedBox(height: 18),
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          _HeroPill(label: 'Next 30 days', value: fmtMoney(next30, currency: currency)),
+          _HeroPill(label: 'Yield on cost', value: fmtPct(totals.yieldOnCost, signed: false)),
+          _HeroPill(label: 'Reinvested in 5 years', value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _incomeFrequencyGrid(BuildContext context, PortfolioProvider provider, Portfolio portfolio,
+      PortfolioTotals totals, String? currency) {
+    final cards = [
+      _IncomeCadence(label: 'Annual', value: totals.annualIncome, icon: Icons.calendar_month_outlined),
+      _IncomeCadence(label: 'Quarterly', value: provider.quarterlyDividendRateFor(portfolio), icon: Icons.view_week_outlined),
+      _IncomeCadence(label: 'Monthly', value: provider.monthlyDividendRateFor(portfolio), icon: Icons.today_outlined),
+      _IncomeCadence(label: 'Daily equivalent', value: provider.dailyDividendRateFor(portfolio), icon: Icons.bolt_outlined),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final compact = constraints.maxWidth < 700;
+      return GridView.count(
+        crossAxisCount: compact ? 2 : 4,
+        childAspectRatio: compact ? 1.45 : 1.55,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [for (final c in cards) _CadenceCard(data: c, currency: currency)],
+      );
+    });
   }
 
   List<Widget> _eventsOn(List<UpcomingEvent> events, DateTime day, String? currency, AppColors colors) {

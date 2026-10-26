@@ -103,6 +103,7 @@ class PortfolioProvider extends ChangeNotifier {
   String? _lastError;
   DateTime? _lastRefreshAt;
   AppThemeId _themeMode = AppThemeId.system;
+  int _accentIndex = 0;
   bool _autoRefreshOnStart = true;
   bool _onboardingComplete = false;
   bool _crashDiagnostics = false;
@@ -129,6 +130,7 @@ class PortfolioProvider extends ChangeNotifier {
   String? get lastError => _lastError;
   DateTime? get lastRefreshAt => _lastRefreshAt;
   AppThemeId get themeMode => _themeMode;
+  int get accentIndex => _accentIndex.clamp(0, AppTheme.accents.length - 1);
   bool get autoRefreshOnStart => _autoRefreshOnStart;
   bool get showsOnboarding => _onboardingComplete;
   bool get crashDiagnostics => _crashDiagnostics;
@@ -240,6 +242,8 @@ class PortfolioProvider extends ChangeNotifier {
       _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt();
       _themeMode = AppThemeId.values[
           min(((data['themeMode'] as num?) ?? 0).toInt(), AppThemeId.values.length - 1)];
+      _accentIndex = ((data['accentIndex'] as num?) ?? 0).toInt()
+          .clamp(0, AppTheme.accents.length - 1);
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
       _displayCurrency = data['displayCurrency']?.toString() ?? '';
       _notifyDividends = data['notifyDividends'] as bool? ?? true;
@@ -311,6 +315,7 @@ class PortfolioProvider extends ChangeNotifier {
       'portfolios': [for (final p in _portfolios) p.toMap()],
       'activeIndex': _activeIndex,
       'themeMode': _themeMode.index,
+      'accentIndex': _accentIndex,
       'autoRefreshOnStart': _autoRefreshOnStart,
       'onboardingComplete': _onboardingComplete,
       'crashDiagnostics': _crashDiagnostics,
@@ -1171,6 +1176,10 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// Portfolio dividend income per calendar year (current quantities,
   /// FX-converted when available - approximate).
+  double dailyDividendRateFor(Portfolio p) => totalsFor(p).annualIncome / 365.0;
+  double monthlyDividendRateFor(Portfolio p) => totalsFor(p).annualIncome / 12.0;
+  double quarterlyDividendRateFor(Portfolio p) => totalsFor(p).annualIncome / 4.0;
+
   Map<int, double> annualIncomeByYearFor(Portfolio p) {
     final byYear = <int, double>{};
     for (final h in p.holdings.values) {
@@ -1281,6 +1290,12 @@ class PortfolioProvider extends ChangeNotifier {
 
   Future<void> setThemeMode(AppThemeId mode) async {
     _themeMode = mode;
+    notifyListeners();
+    await _persistData();
+  }
+
+  Future<void> setAccentIndex(int index) async {
+    _accentIndex = index.clamp(0, AppTheme.accents.length - 1);
     notifyListeners();
     await _persistData();
   }
