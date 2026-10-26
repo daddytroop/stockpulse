@@ -692,10 +692,10 @@ Future<String?> _askText(BuildContext context, String title, String initial) asy
 }
 
 class RadioAdaptiveTile extends StatelessWidget {
-  final ThemeMode groupValue;
-  final ThemeMode value;
+  final AppThemeId groupValue;
+  final AppThemeId value;
   final String title;
-  final void Function(ThemeMode) onChanged;
+  final void Function(AppThemeId) onChanged;
   const RadioAdaptiveTile({
     super.key,
     required this.groupValue,
@@ -706,7 +706,7 @@ class RadioAdaptiveTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RadioListTile<ThemeMode>(
+    return RadioListTile<AppThemeId>(
       title: Text(title),
       value: value,
       groupValue: groupValue,
