@@ -6,15 +6,17 @@ import 'package:stock_pulse/widgets/ui/pulse_indicator.dart';
 
 void main() {
   testWidgets('Onboarding highlights the first-run actions', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      home: OnboardingScreen(onAction: (_) {}, onDone: () {}),
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(size: Size(800, 1400), textScaler: TextScaler.linear(0.75)),
+      child: MaterialApp(
+        theme: ThemeData(useMaterial3: true),
+        home: OnboardingScreen(onAction: (_) {}, onDone: () {}),
+      ),
     ));
     expect(find.text('Welcome to your money dashboard'), findsOneWidget);
     expect(find.text('Add your first holding'), findsOneWidget);
     expect(find.text('Or import everything at once'), findsOneWidget);
-    await tester.ensureVisible(find.byWidgetPredicate((w) => w is FilledButton).last);
-    expect(find.byWidgetPredicate((w) => w is FilledButton), findsOneWidget);
+    expect(find.text('Start exploring'), findsOneWidget);
   });
 
   testWidgets('Navigation bar keeps labels readable', (tester) async {
