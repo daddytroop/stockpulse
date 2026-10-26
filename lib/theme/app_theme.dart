@@ -62,7 +62,6 @@ class AppTheme {
   static ThemeData _custom(Color seed, Brightness brightness) => _build(
         ColorScheme.fromSeed(seedColor: seed, brightness: brightness, surface: brightness == Brightness.dark ? const Color(0xFF111A1F) : Colors.white),
       );
-  }
 
   static ThemeData light() => _build(_scheme(const Color(0xFF14B8A6), Brightness.light));
 

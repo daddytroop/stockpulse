@@ -9,7 +9,6 @@ import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/portfolio_chart.dart';
-import '../widgets/stat_cards.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
 
