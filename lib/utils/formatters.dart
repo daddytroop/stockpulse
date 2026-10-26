@@ -7,7 +7,7 @@ import '../theme/app_colors.dart';
 
 String fmtMoney(num? v, {required String? currency, int decimals = 2}) {
   if (v == null) return '–';
-  final f = NumberFormat('#,##0.${'0' * decimals}#####');
+  final f = NumberFormat.currency(locale: 'en_US', symbol: '', decimalDigits: decimals);
   final body = f.format(v);
   final sym = currencySymbol(currency);
   return sym.isEmpty ? body : '$sym$body';

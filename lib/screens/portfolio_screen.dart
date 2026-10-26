@@ -74,9 +74,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             Text('Your money in motion', style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(height: 4),
             Row(mainAxisSize: MainAxisSize.min, children: [
-              Image.asset('assets/icon/app_icon_foreground.png', width: 34, height: 34),
+              Image.asset('assets/icon/app_icon_foreground.png', width: 30, height: 30),
               const SizedBox(width: 10),
-              _portfolioSelector(context, provider),
+              Flexible(child: _portfolioSelector(context, provider)),
             ]),
           ],
         ),
@@ -85,10 +85,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           _moreMenu(context, provider, portfolio),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
         heroTag: 'addHolding',
-        icon: const Icon(Icons.add),
-        label: const Text('Add holding'),
+        tooltip: 'Add holding',
+        elevation: 1.5,
+        child: const Icon(Icons.add),
         onPressed: () => showAddEditHoldingSheet(context, provider, portfolio.id),
       ),
       body: RefreshIndicator(
@@ -114,7 +116,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             _freshnessBanner(context, provider),
             _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
             const SizedBox(height: 12),
-            SpCard(child: Column(
+            SpCard(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -122,11 +126,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   FilterChip(label: const Text('Compare SPY'), selected: _compare,
                     onSelected: (v) => setState(() => _compare = v)),
                 ]),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 _chart(context, portfolio, provider),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _rangeChips(context),
-                Text('Based on current holdings · drag chart to explore',
+                const SizedBox(height: 2),
+                Text('Based on current holdings · drag the chart',
                   style: Theme.of(context).textTheme.labelSmall),
               ],
             )),
@@ -151,17 +156,26 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   decoration: const InputDecoration(hintText: 'Find a holding',
                     prefixIcon: Icon(Icons.search)),
                   onChanged: (v) => setState(() => _query = v.trim()),
+                  textInputAction: TextInputAction.search,
                 )),
                 const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  tooltip: 'Sort holdings',
-                  icon: const Icon(Icons.sort),
-                  initialValue: _sort,
-                  onSelected: (v) => setState(() => _sort = v),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'symbol', child: Text('Symbol A–Z')),
-                    PopupMenuItem(value: 'day', child: Text('Daily change: highest first')),
-                  ],
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Sort'),
+                  onPressed: () async {
+                    final v = await showModalBottomSheet<String>(
+                      context: context,
+                      builder: (ctx) => SafeArea(child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Padding(padding: EdgeInsets.all(16), child: Text('Sort holdings', style: TextStyle(fontWeight: FontWeight.w800))),
+                          ListTile(leading: Icon(Icons.sort_by_alpha), title: Text('Symbol A–Z'), subtitle: Text('Easy to scan'), onTap: () => Navigator.pop(ctx, 'symbol')),
+                          ListTile(leading: Icon(Icons.trending_up), title: Text('Daily change'), subtitle: Text('Biggest movers first'), onTap: () => Navigator.pop(ctx, 'day')),
+                        ],
+                      )),
+                    );
+                    if (v != null) setState(() => _sort = v);
+                  },
                 ),
               ]),
               const SizedBox(height: 12),

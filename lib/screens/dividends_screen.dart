@@ -17,12 +17,19 @@ class _SampleCallout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.colorScheme.brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF3A2E10) : const Color(0xFFFFF7D8);
+    final fg = isDark ? const Color(0xFFFFE9B3) : const Color(0xFF78350F);
     return SpCard(
-      gradient: const [Color(0xFFFFF7D8), Color(0xFFFFFFFF)],
+      backgroundColor: bg,
       child: Row(children: [
-        const Icon(Icons.auto_awesome, color: Color(0xFFB45309)),
+        Icon(Icons.auto_awesome, color: fg),
         const SizedBox(width: 10),
-        Expanded(child: Text('This is demo data. Add or import your holdings to replace it.')),
+        Expanded(child: Text(
+          'This is demo data. Add or import your holdings to replace it.',
+          style: theme.textTheme.bodySmall?.copyWith(color: fg),
+        )),
       ]),
     );
   }
