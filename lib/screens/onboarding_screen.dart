@@ -74,6 +74,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
+                    key: const ValueKey('onboarding-start'),
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Start exploring'),
                     onPressed: onDone,
