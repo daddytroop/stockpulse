@@ -3,157 +3,163 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// Builds the full Material 3 [ThemeData] for Stock Pulse.
-///
-/// Call [AppTheme.light] or [AppTheme.dark] from [app.dart]. All component
-/// sub-themes are tuned here so individual screens don't have to guess.
+/// Visual themes for Stock Pulse. Themes are intentionally named instead of
+/// just light/dark so accents, contrast, and surface depth can feel distinct.
+enum AppThemeId {
+  system,
+  light,
+  dark,
+  amoled,
+  mint,
+  ocean;
+
+  String get label => switch (this) {
+        AppThemeId.system => 'Follow system',
+        AppThemeId.light => 'Light',
+        AppThemeId.dark => 'Dark',
+        AppThemeId.amoled => 'AMOLED black',
+        AppThemeId.mint => 'Mint',
+        AppThemeId.ocean => 'Ocean',
+      };
+}
+
 class AppTheme {
   AppTheme._();
 
-  static const Color seed = Color(0xFF14B8A6);
+  static ThemeData themeFor(AppThemeId id, Brightness platformBrightness) {
+    final effective = id == AppThemeId.system
+        ? (platformBrightness == Brightness.dark ? AppThemeId.dark : AppThemeId.light)
+        : id;
+    return switch (effective) {
+      AppThemeId.system || AppThemeId.light => light(),
+      AppThemeId.dark => dark(),
+      AppThemeId.amoled => amoled(),
+      AppThemeId.mint => mint(),
+      AppThemeId.ocean => ocean(),
+    };
+  }
 
-  static ThemeData light() => _build(
+  static ThemeData light() => _build(_scheme(const Color(0xFF14B8A6), Brightness.light));
+
+  static ThemeData dark() => _build(_scheme(const Color(0xFF2DD4BF), Brightness.dark));
+
+  static ThemeData amoled() => _build(
+        _scheme(const Color(0xFF34D399), Brightness.dark)
+            .copyWith(surface: Colors.black, surfaceContainer: Colors.black),
+        amoled: true,
+      );
+
+  static ThemeData mint() => _build(
         ColorScheme.fromSeed(
-          seedColor: seed,
+          seedColor: const Color(0xFF00A878),
           brightness: Brightness.light,
-          surface: Colors.white,
+          surface: const Color(0xFFF4FFFA),
+          primary: const Color(0xFF008C6A),
         ),
+        background: const Color(0xFFEEFAFA),
       );
 
-  static ThemeData dark() => _build(
+  static ThemeData ocean() => _build(
         ColorScheme.fromSeed(
-          seedColor: seed,
+          seedColor: const Color(0xFF2563EB),
           brightness: Brightness.dark,
-          surface: const Color(0xFF111A1F),
+          surface: const Color(0xFF0B1220),
+          primary: const Color(0xFF60A5FA),
         ),
+        background: const Color(0xFF070B14),
       );
 
-  static ThemeData _build(ColorScheme scheme) {
+  static ColorScheme _scheme(Color seed, Brightness brightness) {
+    return ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: brightness,
+      surface: brightness == Brightness.dark ? const Color(0xFF111A1F) : Colors.white,
+    );
+  }
+
+  static ThemeData _build(ColorScheme scheme, {bool amoled = false, Color? background}) {
     final colors = AppColors.fromScheme(scheme);
     final isDark = scheme.brightness == Brightness.dark;
+    final base = background ?? (isDark ? const Color(0xFF081116) : const Color(0xFFF7F9F7));
 
     return ThemeData(
       useMaterial3: true,
       brightness: scheme.brightness,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF081116) : const Color(0xFFF7F9F7),
-      navigationBarTheme: NavigationBarThemeData(
-        height: 76,
-        elevation: 0,
-        backgroundColor: (isDark ? const Color(0xFF10191E) : Colors.white)
-            .withValues(alpha: .94),
-        indicatorColor: scheme.primaryContainer,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
-          color: states.contains(WidgetState.selected)
-              ? scheme.primary
-              : scheme.onSurfaceVariant,
-          size: 24,
-        )),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-          fontSize: 11,
-          height: 1.2,
-          fontWeight: states.contains(WidgetState.selected)
-              ? FontWeight.w800
-              : FontWeight.w600,
-        )),
-      ),
-      // Typography: slightly tighter, finance-app feel.
+      colorScheme: scheme.copyWith(surface: amoled ? Colors.black : scheme.surface),
+      scaffoldBackgroundColor: base,
       textTheme: _textTheme(scheme),
-      // Cards: subtle rounded surfaces with a hairline border instead of
-      // flat elevation-0 cards.
       cardTheme: CardThemeData(
         elevation: 0,
-        color: isDark ? const Color(0xFF1A2226) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        color: amoled ? const Color(0xFF050505) : scheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         margin: EdgeInsets.zero,
       ),
-      // Chips: compact, rounded.
       chipTheme: ChipThemeData(
-        backgroundColor: scheme.surfaceContainerHighest,
+        backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: .72),
         selectedColor: scheme.primaryContainer,
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: scheme.onSurface,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: scheme.onSurface),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         side: BorderSide.none,
       ),
-      // List tiles: denser, no default icon tint.
       listTileTheme: ListTileThemeData(
         iconColor: scheme.onSurfaceVariant,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      // Buttons: fully rounded tonal buttons.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
-      // Input: rounded outlines with consistent dense height.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
+        fillColor: scheme.surfaceContainerHighest.withValues(alpha: .58),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: scheme.outline.withValues(alpha: .22)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      // AppBar: transparent-ish, large titles.
       appBarTheme: AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,
-        backgroundColor: isDark ? const Color(0xE8081116) : const Color(0xCCF7F9F7),
-        titleTextStyle: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          color: scheme.onSurface,
-        ),
+        backgroundColor: base.withValues(alpha: isDark ? .92 : .82),
+        titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: scheme.onSurface),
       ),
-      // FAB: rounded extended.
+      navigationBarTheme: NavigationBarThemeData(
+        height: 80,
+        elevation: 0,
+        backgroundColor: scheme.surface.withValues(alpha: .94),
+        indicatorColor: scheme.primaryContainer,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        extendedTextStyle: const TextStyle(fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        extendedTextStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
-      // Dividers: subtler.
-      dividerTheme: DividerThemeData(
-        color: scheme.outlineVariant.withValues(alpha: 0.5),
-        space: 1,
-      ),
-      // Snackbar: rounded.
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: .55), space: 1),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      // Page transitions: shared-axis feel on Android, fallback elsewhere.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: SharedAxisPageTransitionsBuilder(
@@ -162,35 +168,29 @@ class AppTheme {
           TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
-      // Misc.
-      splashColor: scheme.primary.withValues(alpha: 0.08),
-      highlightColor: scheme.primary.withValues(alpha: 0.04),
-      extensions: [
-        colors,
-      ],
+      splashColor: scheme.primary.withValues(alpha: .08),
+      highlightColor: scheme.primary.withValues(alpha: .04),
+      extensions: [colors],
     );
   }
 
   static TextTheme _textTheme(ColorScheme scheme) {
     const base = TextTheme(
-      displayLarge: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-      displayMedium: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.6),
-      headlineLarge: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.4),
-      headlineMedium: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-      headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-      titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+      displayLarge: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, letterSpacing: -1.3),
+      displayMedium: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.9),
+      headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+      headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.35),
+      headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+      titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-      titleSmall: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+      titleSmall: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
       bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
       bodyMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
-      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.4),
-      labelLarge: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      labelMedium: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-      labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.45),
+      labelLarge: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+      labelMedium: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+      labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: .45),
     );
-    return base.apply(
-      bodyColor: scheme.onSurface,
-      displayColor: scheme.onSurface,
-    );
+    return base.apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
   }
 }

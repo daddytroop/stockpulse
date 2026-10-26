@@ -112,7 +112,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 child: LinearProgressIndicator(minHeight: 2),
               ),
             _freshnessBanner(context, provider),
-            _totalsCard(context, totals, currency, colors),
+            _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
             const SizedBox(height: 12),
             SpCard(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,7 +365,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
-  Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency, AppColors colors) {
+  Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency, AppColors colors, bool sampleMode) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
@@ -384,6 +384,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 'Portfolio value',
                 style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
               ),
+              if (sampleMode) ...[
+                const SizedBox(width: 8),
+                Chip(label: const Text('Sample'), visualDensity: VisualDensity.compact),
+              ],
               const Spacer(),
               if (t.hasDayChange) const PulseIndicator(size: 6),
             ],
@@ -624,7 +628,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     return EmptyState(
       icon: Icons.wallet_outlined,
       title: 'No holdings yet',
-      subtitle: 'Add a symbol one-by-one, or import a full portfolio from a CSV file in seconds.',
+      subtitle: 'Add a symbol one-by-one, or import a full portfolio from a CSV file in seconds.'
+        ' This sample portfolio is replaced as soon as you add or import your own.',
       action: FilledButton.tonalIcon(
         icon: const Icon(Icons.upload_file_outlined),
         label: const Text('Import CSV / paste'),

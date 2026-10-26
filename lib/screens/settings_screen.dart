@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
+import '../theme/app_theme.dart';
 import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
@@ -155,15 +156,11 @@ class SettingsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                for (final mode in ThemeMode.values)
+                for (final mode in AppThemeId.values)
                   RadioAdaptiveTile(
                     groupValue: provider.themeMode,
                     value: mode,
-                    title: switch (mode) {
-                      ThemeMode.system => 'Follow system',
-                      ThemeMode.light => 'Light',
-                      ThemeMode.dark => 'Dark',
-                    },
+                    title: mode.label,
                     onChanged: (v) => provider.setThemeMode(v),
                   ),
               ],

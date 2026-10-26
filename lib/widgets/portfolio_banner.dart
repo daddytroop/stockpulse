@@ -18,6 +18,8 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
   bool _started = false;
   bool _privacyRequired = false;
   bool _privacyOpen = false;
+  bool _failed = false;
+  String? _error;
   int _generation = 0;
 
   @override
@@ -70,13 +72,21 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
           ad.dispose();
           if (kDebugMode) debugPrint('Banner request failed: ${error.code} ${error.message}');
           if (mounted && generation == _generation) {
-            setState(() { _ad = null; _ready = false; _started = false; });
+            setState(() {
+              _ad = null;
+              _ready = false;
+              _started = false;
+              _failed = true;
+              _error = 'Fill unavailable (${error.domain}:${error.code})';
+            });
           }
         },
       ),
     );
     _ad = ad;
     await ad.load();
+      _error = null;
+      _failed = false;
     } catch (error) {
       if (kDebugMode) debugPrint('Ad initialization failed: $error');
       if (mounted && generation == _generation) {
@@ -134,6 +144,24 @@ class _PortfolioBannerState extends State<PortfolioBanner> {
         if (_privacyRequired)
           TextButton(onPressed: _privacyOpen ? null : _privacyOptions,
               child: const Text('Ad privacy choices')),
+        if (!kReleaseMode && _failed)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text(
+                'Ad fill unavailable${_error == null ? '' : ' · ${_error!}'}',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              TextButton(
+                onPressed: _privacyOpen ? null : () {
+                  _generation++;
+                  setState(() { _ad?.dispose(); _ad = null; _ready = false; _started = false; _failed = false; });
+                  _load();
+                },
+                child: const Text('Retry ad'),
+              ),
+            ]),
+          ),
       ],
     );
   }

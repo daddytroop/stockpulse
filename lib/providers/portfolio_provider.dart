@@ -1,7 +1,9 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color, ThemeMode;
+import 'package:flutter/material.dart' show Color;
+
+import '../theme/app_theme.dart';
 
 import '../models/dividends.dart';
 import '../models/holding.dart';
@@ -99,7 +101,7 @@ class PortfolioProvider extends ChangeNotifier {
   double _dividendsProgress = 0;
   String? _lastError;
   DateTime? _lastRefreshAt;
-  ThemeMode _themeMode = ThemeMode.system;
+  AppThemeId _themeMode = AppThemeId.system;
   bool _autoRefreshOnStart = true;
   bool _onboardingComplete = false;
   bool _crashDiagnostics = false;
@@ -125,7 +127,7 @@ class PortfolioProvider extends ChangeNotifier {
   double get dividendsProgress => _dividendsProgress;
   String? get lastError => _lastError;
   DateTime? get lastRefreshAt => _lastRefreshAt;
-  ThemeMode get themeMode => _themeMode;
+  AppThemeId get themeMode => _themeMode;
   bool get autoRefreshOnStart => _autoRefreshOnStart;
   bool get showsOnboarding => _onboardingComplete;
   bool get crashDiagnostics => _crashDiagnostics;
@@ -235,8 +237,8 @@ class PortfolioProvider extends ChangeNotifier {
           Portfolio.fromMap(m)
       ];
       _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt();
-      _themeMode =
-          ThemeMode.values[min(((data['themeMode'] as num?) ?? 0).toInt(), 2)];
+      _themeMode = AppThemeId.values[
+          min(((data['themeMode'] as num?) ?? 0).toInt(), AppThemeId.values.length - 1)];
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
       _displayCurrency = data['displayCurrency']?.toString() ?? '';
       _notifyDividends = data['notifyDividends'] as bool? ?? true;
@@ -277,8 +279,29 @@ class PortfolioProvider extends ChangeNotifier {
     }
 
     _loaded = true;
+    if (_portfolios.every((p) => p.holdings.isEmpty)) _seedSamplePortfolio();
     YahooService.webProxyBase = _webProxyUrl;
     notifyListeners();
+  }
+
+  void _seedSamplePortfolio() {
+    final now = DateTime.now();
+    final samples = {
+      'SCHD': const Holding(symbol: 'SCHD', name: 'Schwab U.S. Dividend Equity ETF', quantity: 18, avgCost: 76.40),
+      'AAPL': const Holding(symbol: 'AAPL', name: 'Apple Inc.', quantity: 6, avgCost: 182.25),
+      'MSFT': const Holding(symbol: 'MSFT', name: 'Microsoft', quantity: 3, avgCost: 410.10),
+      'V': const Holding(symbol: 'V', name: 'Visa', quantity: 4, avgCost: 252.30),
+      'O': const Holding(symbol: 'O', name: 'Realty Income', quantity: 12, avgCost: 55.85),
+      'BTC-USD': const Holding(symbol: 'BTC-USD', name: 'Bitcoin', quantity: 0.035, avgCost: 62000),
+    };
+    _portfolios = [
+      Portfolio(id: _newId(), name: 'Sample portfolio', holdings: {
+        for (final e in samples.entries) e.key: e.value.copyWith(addedAt: now),
+      }),
+    ];
+    _activeIndex = 0;
+    unawaited(refreshQuotes());
+    unawaited(ensureDividendInfo());
   }
 
   Future<void> _persistData() async {
@@ -1255,7 +1278,7 @@ class PortfolioProvider extends ChangeNotifier {
   // Settings & export
   // ---------------------------------------------------------------------------
 
-  Future<void> setThemeMode(ThemeMode mode) async {
+  Future<void> setThemeMode(AppThemeId mode) async {
     _themeMode = mode;
     notifyListeners();
     await _persistData();
