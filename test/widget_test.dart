@@ -13,6 +13,7 @@ void main() {
     expect(find.text('Welcome to your money dashboard'), findsOneWidget);
     expect(find.text('Add your first holding'), findsOneWidget);
     expect(find.text('Or import everything at once'), findsOneWidget);
+    await tester.ensureVisible(find.byWidgetPredicate((w) => w is FilledButton).last);
     expect(find.byWidgetPredicate((w) => w is FilledButton), findsOneWidget);
   });
 
