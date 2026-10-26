@@ -1,24 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stock_pulse/widgets/symbol_avatar.dart';
-
 import 'package:stock_pulse/widgets/ui/pulse_indicator.dart';
 
 void main() {
-  testWidgets('Navigation theme has comfortable selected styling', (tester) async {
-    final theme = ThemeData(
-      useMaterial3: true,
-      navigationBarTheme: NavigationBarThemeData(
-        height: 76,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-          fontWeight: states.contains(WidgetState.selected)
-              ? FontWeight.w800
-              : FontWeight.w600,
-        )),
-      ),
-    );
-    await tester.pumpWidget(MaterialApp(theme: theme, home: const Scaffold(
+  testWidgets('Navigation bar keeps labels readable', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(
       bottomNavigationBar: NavigationBar(
         destinations: [
           NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
@@ -27,7 +14,7 @@ void main() {
       ),
     )));
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Search'), findsNothing);
+    expect(find.text('Search'), findsOneWidget);
   });
 
   testWidgets('PulseIndicator becomes static with reduced motion', (tester) async {

@@ -43,7 +43,7 @@ class AppTheme {
         backgroundColor: (isDark ? const Color(0xFF10191E) : Colors.white)
             .withValues(alpha: .94),
         indicatorColor: scheme.primaryContainer,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
           color: states.contains(WidgetState.selected)
               ? scheme.primary

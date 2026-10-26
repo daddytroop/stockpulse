@@ -402,8 +402,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelSmall?
-            .copyWith(color: theme.hintColor, letterSpacing: 0.7)),
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, letterSpacing: 0.7)),
         const SizedBox(height: 2),
         Text(
           sub == null ? value : '$value  $sub',
