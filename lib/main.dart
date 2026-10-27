@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'providers/portfolio_provider.dart';
-import 'screens/lock_gate.dart';
 import 'services/diagnostics.dart';
 
 Future<void> main() async {
@@ -20,7 +19,7 @@ Future<void> main() async {
   runApp(
     ChangeNotifierProvider.value(
       value: provider,
-      child: const LockGate(child: StockPulseApp()),
+      child: const StockPulseApp(),
     ),
   );
 }

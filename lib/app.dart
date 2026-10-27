@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/portfolio_provider.dart';
 import 'screens/home_shell.dart';
+import 'screens/lock_gate.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -23,6 +24,7 @@ class StockPulseApp extends StatelessWidget {
       // Theme selection is handled explicitly so every surface uses the
       // selected palette instead of only swapping light/dark shells.
       themeMode: ThemeMode.light,
+      builder: (context, child) => LockGate(child: child!),
       home: const RootScreen(),
     );
   }

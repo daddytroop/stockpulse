@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
@@ -7,8 +6,8 @@ import '../providers/portfolio_provider.dart';
 
 /// Shows a lock screen while the app is "secure", when the user enabled
 /// biometric lock. Re-locks whenever the app goes to the background.
-/// Safe fallback: if no biometric hardware is available the app stays open
-/// (a lock you can never open would be worse).
+/// Lives inside MaterialApp so authentication always has themed UI. Keeps the
+/// navigator mounted behind the gate so unlocking preserves the current route.
 class LockGate extends StatefulWidget {
   final Widget child;
   const LockGate({super.key, required this.child});
@@ -38,8 +37,8 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
+    if (!_checking && (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden)) {
       setState(() => _unlocked = false);
     }
   }
@@ -48,8 +47,16 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final provider = context.watch<PortfolioProvider>();
     final locked = provider.loaded && provider.lockEnabled && !_unlocked;
-    if (!locked) return widget.child;
-    return _lockScreen(context, provider);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(
+          offstage: locked,
+          child: TickerMode(enabled: !locked, child: widget.child),
+        ),
+        if (locked) _lockScreen(context, provider),
+      ],
+    );
   }
 
   Widget _lockScreen(BuildContext context, PortfolioProvider provider) {
@@ -59,10 +66,7 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 52, color: theme.colorScheme.primary)
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scaleXY(begin: 0.92, end: 1.08, duration: 1800.ms, curve: Curves.easeInOut)
-                .shimmer(duration: 1800.ms, color: theme.colorScheme.primaryContainer),
+            Icon(Icons.lock_outline, size: 52, color: theme.colorScheme.primary),
             const SizedBox(height: 14),
             Text('Stock Pulse is locked', style: theme.textTheme.titleLarge),
             const SizedBox(height: 6),
