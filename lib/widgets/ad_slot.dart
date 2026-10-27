@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:provider/provider.dart';
 
 import '../services/ad_service.dart';
 
@@ -36,7 +37,12 @@ class _AdSlotState extends State<AdSlot> {
   bool _ready = false;
   int _generation = 0;
 
-  AdService get _service => AdScope.of(context);
+  /// The shared ad service.
+  ///
+  /// It is read from the app-wide provider rather than an inherited
+  /// widget, because a pushed route (a story, a holding) sits above the
+  /// app shell in the navigator and would otherwise be outside the scope.
+  AdService get _service => context.read<AdService>();
 
   @override
   void initState() {
@@ -185,7 +191,11 @@ class _AdSlotState extends State<AdSlot> {
 
   @override
   Widget build(BuildContext context) {
+    // Watching the service means the slot reacts when ads are switched off
+    // or consent changes.
+    final ads = context.watch<AdService>();
     if (!_ready || _ad == null) return const SizedBox.shrink();
+    if (!ads.adsEnabled) return const SizedBox.shrink();
     final theme = Theme.of(context);
 
     if (widget.native) {
@@ -246,19 +256,4 @@ class _AdSlotState extends State<AdSlot> {
           ),
         ],
       );
-}
-
-/// Makes the shared [AdService] available to ad slots.
-class AdScope extends InheritedNotifier<AdService> {
-  const AdScope({
-    super.key,
-    required AdService service,
-    required super.child,
-  }) : super(notifier: service);
-
-  static AdService of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<AdScope>();
-    assert(scope != null, 'No AdScope found in the widget tree.');
-    return scope!.notifier!;
-  }
 }

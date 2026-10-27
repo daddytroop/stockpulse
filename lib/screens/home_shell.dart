@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
-import '../services/ad_service.dart';
 import '../services/app_navigation.dart';
-import '../widgets/ad_slot.dart';
 import 'dividends_screen.dart';
 import 'import_screen.dart';
 import 'news_screen.dart';
@@ -115,10 +113,10 @@ class _HomeShellState extends State<HomeShell> {
           TickerMode(enabled: i == _index, child: _screen(i))],
     );
 
-    // Ads are scoped to the whole app so every placement shares one consent
-    // state and one frequency budget.
-    final ads = context.watch<AdService>();
-    final body = AdScope(service: ads, child: content);
+    // The ad service is app-wide, so every placement shares one consent
+    // state and one frequency budget. Ad slots read it from the provider,
+    // which also covers routes pushed above this shell.
+    final body = content;
 
     if (wide) {
       return Scaffold(
