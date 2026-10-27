@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../models/quote.dart';
@@ -264,7 +263,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
                 touchSpotThreshold: 24,
                 getTouchedSpotIndicator: (barData, indexes) => indexes
                     .map(
-                      (_) => TouchedSpotIndicator(
+                      (_) => TouchedSpotIndicatorData(
                         FlLine(
                           color: (barData.color ?? theme.colorScheme.primary)
                               .withValues(alpha: 0.35),

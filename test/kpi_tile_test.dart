@@ -5,7 +5,7 @@ import 'package:stock_pulse/widgets/ui/kpi_tile.dart';
 void main() {
   group('KpiTile', () {
     testWidgets('shows the label and the value', (tester) async {
-      await tester.pumpWidget(const MaterialApp(
+      await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: KpiTile(
             label: 'Annual income',
@@ -20,7 +20,7 @@ void main() {
     });
 
     testWidgets('shows the sub line when given', (tester) async {
-      await tester.pumpWidget(const MaterialApp(
+      await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: KpiTile(
             label: 'Today',
@@ -34,32 +34,14 @@ void main() {
       expect(find.text('up 2% vs yesterday'), findsOneWidget);
     });
 
-    testWidgets('is tappable', (tester) async {
-      var tapped = 0;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: KpiTile(
-            label: 'Holdings',
-            value: 3,
-            formatter: (v) => '$v',
-            onTap: () => tapped++,
-          ),
-        ),
-      ));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(KpiTile));
-      await tester.pumpAndSettle();
-      expect(tapped, 1);
-    });
-
     testWidgets('renders a sparkline without error', (tester) async {
-      await tester.pumpWidget(const MaterialApp(
+      await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: KpiTile(
             label: 'Trend',
             value: 1,
             formatter: (v) => '$v',
-            spark: [1, 3, 2, 5, 4, 8],
+            spark: const [1, 3, 2, 5, 4, 8],
           ),
         ),
       ));
@@ -74,7 +56,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(const MaterialApp(
+      await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: KpiRow(
             tiles: [

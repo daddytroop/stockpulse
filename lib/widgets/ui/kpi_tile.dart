@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
-import '../../utils/formatters.dart';
 import 'animated_number.dart';
 
 /// A headline metric tile.

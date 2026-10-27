@@ -6,6 +6,7 @@ import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../services/ad_service.dart';
 import '../services/app_navigation.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';

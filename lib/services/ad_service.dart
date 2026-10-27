@@ -145,7 +145,6 @@ class AdService extends ChangeNotifier {
   final List<AdImpression> _log = [];
 
   bool _initialized = false;
-  bool _consentReady = false;
   bool _adsAllowed = true;
   bool _privacyRequired = false;
 
@@ -212,10 +211,13 @@ class AdService extends ChangeNotifier {
     _initialized = true;
     try {
       await MobileAds.instance.initialize();
-      await ConsentInformation.instance.requestConsentInfoUpdate(
+      ConsentInformation.instance.requestConsentInfoUpdate(
         ConsentRequestParameters(),
         () => _checkConsent(),
-        () => _checkConsent(),
+        (error) {
+          if (kDebugMode) debugPrint('Consent update failed: ${error.message}');
+          _checkConsent();
+        },
       );
     } catch (e) {
       if (kDebugMode) debugPrint('Ad init failed: $e');

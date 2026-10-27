@@ -32,7 +32,7 @@ class AdSlot extends StatefulWidget {
 }
 
 class _AdSlotState extends State<AdSlot> {
-  Ad? _ad;
+  AdWithView? _ad;
   bool _ready = false;
   int _generation = 0;
 
@@ -85,7 +85,7 @@ class _AdSlotState extends State<AdSlot> {
                 return;
               }
               setState(() {
-                _ad = ad;
+                _ad = ad as AdWithView;
                 _ready = true;
               });
               _service.recordImpression(widget.placement);
@@ -121,7 +121,7 @@ class _AdSlotState extends State<AdSlot> {
                 return;
               }
               setState(() {
-                _ad = ad;
+                _ad = ad as AdWithView;
                 _ready = true;
               });
               _service.recordImpression(widget.placement);
