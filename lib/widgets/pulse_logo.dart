@@ -22,6 +22,37 @@ class PulseBrand {
   static const Color mark = Color(0xFF64EFAE);
 }
 
+/// The geometry of the mark, shared with `tools/icon.ps1`.
+///
+/// Keeping these in one place is what makes the launcher artwork and the
+/// in-app icon the same picture; the test suite checks the generated PNG
+/// still matches.
+class PulseLogoGeometry {
+  PulseLogoGeometry._();
+
+  /// The mark is drawn inside a 100x100 box.
+  static const double units = 100;
+
+  /// Fraction of the tile the mark occupies.
+  static const double markScale = 0.62;
+
+  /// Fraction of the tile left as padding around the mark.
+  static const double markOffset = 0.19;
+
+  /// Corner radius of the tile, as a fraction of its edge.
+  static const double tileRadius = 0.22;
+
+  /// Stroke width of the mark, in the 100x100 space.
+  static const double strokeWidth = 7;
+
+  /// The orbit, in the 100x100 space.
+  static const Rect orbit = Rect.fromLTWH(10, 10, 80, 80);
+
+  /// Where the orbit starts and how far it sweeps.
+  static const double orbitStart = 0.08;
+  static const double orbitSweep = math.pi * 1.71;
+}
+
 /// The Stock Pulse app icon: a rounded tile with an open orbit and a rising
 /// pulse arrow. This is the exact artwork used for the Android launcher icon,
 /// the splash screen and the in-app icon.
@@ -73,7 +104,7 @@ class _PulseLogoPainter extends CustomPainter {
     if (tiled) {
       // Rounded tile, matching the masked shape Android gives an adaptive
       // icon.
-      final r = size.width * 0.22;
+      final r = size.width * PulseLogoGeometry.tileRadius;
       final tile = Path()
         ..addRRect(RRect.fromRectAndRadius(
           Offset.zero & size,
@@ -83,19 +114,26 @@ class _PulseLogoPainter extends CustomPainter {
     }
     canvas.save();
     // The mark occupies the middle of the tile, matching the launcher
-    // artwork's safe area.
-    final scale = tiled ? size.width / 100 * 0.62 : size.width / 100;
-    final offset = tiled ? size.width * 0.19 : 0.0;
+    // artwork's safe area. The bare mark fills the whole box instead.
+    final scale = tiled
+        ? size.width / PulseLogoGeometry.units * PulseLogoGeometry.markScale
+        : size.width / PulseLogoGeometry.units;
+    final offset = tiled ? size.width * PulseLogoGeometry.markOffset : 0.0;
     canvas.translate(offset, offset);
     canvas.scale(scale, scale);
     final pen = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
+      ..strokeWidth = PulseLogoGeometry.strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    canvas.drawArc(const Rect.fromLTWH(10, 10, 80, 80),
-        0.08, math.pi * 1.71, false, pen);
+    canvas.drawArc(
+      PulseLogoGeometry.orbit,
+      PulseLogoGeometry.orbitStart,
+      PulseLogoGeometry.orbitSweep,
+      false,
+      pen,
+    );
     final pulse = Path()
       ..moveTo(12, 59)
       ..lineTo(29, 59)

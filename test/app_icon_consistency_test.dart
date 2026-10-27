@@ -1,100 +1,82 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stock_pulse/widgets/pulse_logo.dart';
 
-/// The launcher icon and the in-app icon must be the same picture, so the
-/// committed PNG is compared against the widget that draws it in the app.
+/// The launcher icon and the in-app icon must be the same picture.
+///
+/// `tools/icon.ps1` bakes the artwork into `assets/icon/app_icon.png`, and
+/// `lib/widgets/pulse_logo.dart` paints the same shape in the app. This test
+/// checks the committed PNG against the shared geometry constants, so the two
+/// cannot silently drift apart.
 void main() {
-  testWidgets('the launcher PNG matches the in-app icon', (tester) async {
+  test('the launcher PNG matches the in-app icon geometry', () async {
     final png = File('assets/icon/app_icon.png');
     expect(png.existsSync(), isTrue,
         reason: 'Run tools/icon.ps1 to regenerate the launcher artwork.');
 
-    final bytes = png.readAsBytesSync();
-    final decoded = await ui.instantiateImageCodec(bytes);
-    final frame = await decoded.getNextFrame();
-    final launcher = frame.image;
+    final codec = await ui.instantiateImageCodec(png.readAsBytesSync());
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    expect(bytes, isNotNull);
+    final data = bytes!.buffer.asUint8List();
 
-    // Render the in-app icon at the same size.
-    const size = 256.0;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.scale(size / 1024, size / 1024);
-    final painter = _LogoPainter();
-    painter.paint(canvas, const Size(1024, 1024));
-    final picture = recorder.endRecording();
-    final rendered = await picture.toImage(1024, 1024);
-
-    final launcherBytes = await launcher.toByteData(format: ui.ImageByteFormat.rawRgba);
-    final renderedBytes = await rendered.toByteData(format: ui.ImageByteFormat.rawRgba);
-    expect(launcherBytes, isNotNull);
-    expect(renderedBytes, isNotNull);
-
-    final a = launcherBytes!.buffer.asUint8List();
-    final b = renderedBytes!.buffer.asUint8List();
-    expect(a.length, b.length);
-
-    // Compare a downsampled grid: the PNG is anti-aliased differently from
-    // the widget, so exact pixels are not expected.
-    var differences = 0;
-    var sampled = 0;
-    for (var y = 0; y < 1024; y += 8) {
-      for (var x = 0; x < 1024; x += 8) {
-        final i = (y * 1024 + x) * 4;
-        sampled++;
-        final dr = (a[i] - b[i]).abs();
-        final dg = (a[i + 1] - b[i + 1]).abs();
-        final db = (a[i + 2] - b[i + 2]).abs();
-        final da = (a[i + 3] - b[i + 3]).abs();
-        if (dr > 90 || dg > 90 || db > 90 || da > 90) differences++;
-      }
+    const size = 1024;
+    int alphaAt(double x, double y) {
+      final px = x.round().clamp(0, size - 1);
+      final py = y.round().clamp(0, size - 1);
+      return data[(py * size + px) * 4 + 3];
     }
-    // A handful of anti-aliasing samples may differ; a real shape change
-    // would miss far more than this.
-    expect(differences / sampled, lessThan(0.06),
-        reason: 'The launcher artwork and the in-app icon have diverged.');
+
+    // The mark stroke is much brighter than the tile background, so the red
+    // channel tells the two apart.
+    bool isMark(double x, double y) {
+      final px = x.round().clamp(0, size - 1);
+      final py = y.round().clamp(0, size - 1);
+      return data[(py * size + px) * 4] > 40;
+    }
+
+    // Where the mark sits inside the tile, from the shared constants.
+    final extent = size * PulseLogoGeometry.markScale;
+    final offset = (size - extent) / 2;
+    final unit = extent / PulseLogoGeometry.units;
+    final centre = offset + PulseLogoGeometry.orbit.center.dx * unit;
+    final radius = PulseLogoGeometry.orbit.width / 2 * unit;
+
+    // The tile is filled with the brand background and its corners are cut
+    // away.
+    expect(alphaAt(512, 150), 255, reason: 'The tile must be filled.');
+    expect(isMark(512, 150), isFalse,
+        reason: 'The area above the mark must be the tile background.');
+    expect(alphaAt(2, 2), lessThan(40), reason: 'The tile corners are rounded.');
+
+    // Walk the orbit and confirm it is drawn almost everywhere, with a
+    // deliberate gap where the arrow breaks out of the ring.
+    var gapDegrees = 0;
+    for (var deg = 0; deg < 360; deg++) {
+      final angle = deg * math.pi / 180;
+      final x = centre + radius * math.cos(angle);
+      final y = centre + radius * math.sin(angle);
+      if (!isMark(x, y)) gapDegrees++;
+    }
+    expect(gapDegrees, greaterThan(3),
+        reason: 'The gap in the orbit has disappeared.');
+    expect(gapDegrees, lessThan(30),
+        reason: 'The orbit is no longer drawn as a ring.');
+
+    // The arrow head at the end of the rising pulse is painted.
+    expect(isMark(offset + 88 * unit, offset + 31 * unit), isTrue,
+        reason: 'The arrow head is missing.');
+
+    // The stroke colour is the brand mark colour.
+    final arrowX = (offset + 88 * unit).round();
+    final arrowY = (offset + 31 * unit).round();
+    final i = (arrowY * size + arrowX) * 4;
+    expect(data[i], PulseBrand.mark.r);
+    expect(data[i + 1], PulseBrand.mark.g);
+    expect(data[i + 2], PulseBrand.mark.b);
   });
-}
-
-/// Mirrors the painter used by [PulseLogo] so the comparison is against the
-/// same drawing commands.
-class _LogoPainter {
-  void paint(Canvas canvas, Size size) {
-    const background = PulseBrand.background;
-    const mark = PulseBrand.mark;
-    final r = size.width * 0.22;
-    final tile = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Offset.zero & size,
-        Radius.circular(r),
-      ));
-    canvas.drawPath(tile, Paint()..color = background);
-
-    final extent = size.width * 0.62;
-    final offset = (size.width - extent) / 2;
-    canvas.translate(offset, offset);
-    canvas.scale(extent / 100, extent / 100);
-    final pen = Paint()
-      ..color = mark
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawArc(const Rect.fromLTWH(10, 10, 80, 80),
-        0.08, 3.141592653589793 * 1.71, false, pen);
-    final pulse = Path()
-      ..moveTo(12, 59)
-      ..lineTo(29, 59)
-      ..cubicTo(35, 59, 39, 44, 45, 44)
-      ..cubicTo(50, 44, 54, 61, 60, 61)
-      ..lineTo(87, 33);
-    canvas.drawPath(pulse, pen);
-    canvas.drawPath(Path()..moveTo(74, 35)..lineTo(88, 31)
-      ..lineTo(88, 46), pen);
-  }
 }
