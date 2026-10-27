@@ -13,6 +13,7 @@ import '../utils/formatters.dart';
 import '../utils/market_identity.dart';
 import '../widgets/allocation_donut.dart';
 import '../widgets/ad_slot.dart';
+import '../widgets/portfolio_chart.dart';
 import '../widgets/pulse_logo.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
@@ -580,7 +581,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final isDark = scheme.brightness == Brightness.dark;
 
     return SpCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       gradient: isDark
           ? [const Color(0xFF12333A), const Color(0xFF0C2027)]
           : [const Color(0xFFDCF8F1), const Color(0xFFFFFFFF)],
@@ -601,45 +602,37 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               if (t.hasDayChange) const PulseIndicator(size: 6),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
+          AnimatedNumber(
+            value: t.marketValue,
+            formatter: (v) => fmtMoney(v, currency: currency),
+            style: theme.textTheme.displayMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 10),
           Wrap(
-            spacing: 12,
+            spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              AnimatedNumber(
-                value: t.marketValue,
-                formatter: (v) => fmtMoney(v, currency: currency),
-                style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(width: 10),
               ChangeChip(
                 percent: t.hasDayChange ? t.dayChangePercent : null,
                 label: t.hasDayChange
-                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} (${fmtPct(t.dayChangePercent)}) today'
-                    : '–',
+                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} · ${fmtPct(t.dayChangePercent)} today'
+                    : 'No change data yet',
               ),
-            ],
-          ),
-          if (t.converted && t.displayCurrency != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                'FX-converted to ${t.displayCurrency}',
-                style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-              ),
-            ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _inlineStat('Total P/L', fmtSignedMoney(t.pnl, currency: currency),
-                  '(${fmtPct(t.pnlPercent)})', pnlColor(t.pnl, context)),
-              _inlineStat('Annual dividends', fmtMoney(t.annualIncome, currency: currency),
-                  null, colors.dividend),
-              _inlineStat('Yield', fmtPct(t.incomeYield, signed: false), 'on value', null),
-              _inlineStat('Yield on cost', fmtPct(t.yieldOnCost, signed: false), 'on cost', null),
+              if (t.converted && t.displayCurrency != null)
+                _Pill(
+                  label: 'in ${t.displayCurrency}',
+                  icon: Icons.currency_exchange,
+                ),
+              if (t.hasDayChange)
+                _Pill(
+                  label: 'Cost ${fmtMoney(t.costBasis, currency: currency)}',
+                  icon: Icons.savings_outlined,
+                ),
             ],
           ),
         ],
@@ -823,7 +816,26 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(h.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        h.symbol,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _HoldingSparkline(
+                      symbol: h.symbol,
+                      provider: provider,
+                      color: dayPct == null
+                          ? Theme.of(context).hintColor
+                          : (dayPct >= 0 ? colors.gain : colors.loss),
+                    ),
+                  ],
+                ),
                 if (h.name.isNotEmpty)
                   Text(
                     h.name,
@@ -921,6 +933,91 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         icon: const Icon(Icons.upload_file_outlined),
         label: const Text('Import CSV / paste'),
         onPressed: () => pushSharedAxis(context, const ImportScreen()),
+      ),
+    );
+  }
+}
+
+/// A small inline trend line for a holding, loaded from real price history.
+class _HoldingSparkline extends StatefulWidget {
+  final String symbol;
+  final PortfolioProvider provider;
+  final Color color;
+
+  const _HoldingSparkline({
+    required this.symbol,
+    required this.provider,
+    required this.color,
+  });
+
+  @override
+  State<_HoldingSparkline> createState() => _HoldingSparklineState();
+}
+
+class _HoldingSparklineState extends State<_HoldingSparkline> {
+  List<double>? _points;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_HoldingSparkline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.symbol != widget.symbol) _load();
+  }
+
+  Future<void> _load() async {
+    final points = await widget.provider.symbolSparkline(widget.symbol);
+    if (!mounted) return;
+    if (points.length < 2) return;
+    setState(() => _points = points);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = _points;
+    if (points == null) return const SizedBox.shrink();
+    return MiniSparkline(points: points, color: widget.color);
+  }
+}
+
+/// A small rounded label used for contextual details next to a headline.
+class _Pill extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+
+  const _Pill({required this.label, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: theme.hintColor),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.hintColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

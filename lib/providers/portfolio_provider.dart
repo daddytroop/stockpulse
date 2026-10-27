@@ -79,6 +79,7 @@ class PortfolioProvider extends ChangeNotifier {
   static const String _dataFile = 'stockpulse_data.json';
   static const String _cacheFile = 'stockpulse_cache.json';
   static const Duration _dividendTtl = Duration(hours: 24);
+  static const Duration _sparkTtl = Duration(minutes: 10);
 
   List<Portfolio> _portfolios = [];
   int _activeIndex = 0;
@@ -111,6 +112,10 @@ class PortfolioProvider extends ChangeNotifier {
 
   final Map<String, _CachedHistory> _historyCache = {};
   final Map<String, Future<List<ChartPoint>>> _historyInflight = {};
+
+  /// Short trend lines shown next to holdings.
+  final Map<String, _CachedSparkline> _sparkCache = {};
+  final Map<String, Future<List<double>>> _sparkInflight = {};
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -1006,6 +1011,42 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  /// A short recent trend for a symbol, used for the inline sparklines.
+  ///
+  /// Shares the chart cache with [symbolHistory], so the extra request is
+  /// made at most once every few minutes per symbol.
+  Future<List<double>> symbolSparkline(String symbol) async {
+    final cached = _sparkCache[symbol];
+    if (cached != null && DateTime.now().difference(cached.at) < _sparkTtl) {
+      return cached.points;
+    }
+    final inflight = _sparkInflight[symbol];
+    if (inflight != null) return inflight;
+
+    final future = _loadSparkline(symbol);
+    _sparkInflight[symbol] = future;
+    try {
+      final points = await future;
+      _sparkCache[symbol] = _CachedSparkline(points);
+      return points;
+    } finally {
+      _sparkInflight.remove(symbol);
+    }
+  }
+
+  Future<List<double>> _loadSparkline(String symbol) async {
+    try {
+      final h = await _yahoo.chartHistory(symbol, range: '1mo', interval: '1d');
+      if (h == null || h.points.length < 2) return const [];
+      // Drop the live bar so the sparkline does not wobble between refreshes.
+      final pts = h.points;
+      final stable = pts.length > 1 ? pts.sublist(0, pts.length - 1) : pts;
+      return [for (final p in stable) p.close];
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// Portfolio value history merged from every holding's chart.
   Future<List<ChartPoint>> portfolioHistory(String portfolioId, String range) async {
     final key = '$portfolioId|$range';
@@ -1698,4 +1739,10 @@ class _CachedHistory {
   final DateTime at;
   _CachedHistory(this.points) : at = DateTime.now();
   bool get fresh => DateTime.now().difference(at) < const Duration(minutes: 5);
+}
+
+class _CachedSparkline {
+  final List<double> points;
+  final DateTime at;
+  _CachedSparkline(this.points) : at = DateTime.now();
 }

@@ -11,6 +11,7 @@ import '../utils/formatters.dart';
 import '../widgets/ad_slot.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/portfolio_chart.dart';
+import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
@@ -225,9 +226,15 @@ class _DividendsScreenState extends State<DividendsScreen> {
           Icon(Icons.eco_outlined, color: colors.dividend),
         ]),
         const SizedBox(height: 6),
-        Text(
-          fmtMoney(totals.annualIncome, currency: currency),
-          style: theme.textTheme.displayLarge?.copyWith(color: colors.dividend),
+        AnimatedNumber(
+          value: totals.annualIncome,
+          formatter: (v) => fmtMoney(v, currency: currency),
+          duration: const Duration(milliseconds: 900),
+          style: theme.textTheme.displayLarge?.copyWith(
+            color: colors.dividend,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
