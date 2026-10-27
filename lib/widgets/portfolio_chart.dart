@@ -164,33 +164,16 @@ class _PortfolioChartState extends State<PortfolioChart> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (widget.title.isNotEmpty)
-                Flexible(
-                  child: Text(
-                    widget.title,
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: theme.hintColor),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              const Spacer(),
-              if (normalized) ...[
-                _legendDot(color),
-                const SizedBox(width: 5),
-                Text('You', style: theme.textTheme.labelSmall),
-                const SizedBox(width: 12),
-                _legendDot(colors.benchmark),
-                const SizedBox(width: 5),
-                Text('SPY', style: theme.textTheme.labelSmall),
-              ],
-            ],
+        if (widget.title.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 6),
+            child: Text(
+              widget.title,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.hintColor),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
         // The readout replaces the header while scrubbing so the numbers stay
         // stable and the chart does not jump.
         AnimatedSize(
@@ -205,23 +188,25 @@ class _PortfolioChartState extends State<PortfolioChart> {
                 ),
         ),
         // The period summary: how the portfolio did against the benchmark.
+        // It also acts as the chart legend.
         if (normalized)
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 _periodChip(
                   label: 'You',
                   value: series.last.close - series.first.close,
                   color: color,
                 ),
-                const SizedBox(width: 8),
                 _periodChip(
                   label: 'SPY',
                   value: benchSeries!.last.close - benchSeries.first.close,
                   color: colors.benchmark,
                 ),
-                const SizedBox(width: 8),
                 Text(
                   _beatLabel(series.last.close - series.first.close,
                       benchSeries.last.close - benchSeries.first.close),
@@ -349,12 +334,6 @@ class _PortfolioChartState extends State<PortfolioChart> {
     );
   }
 
-  Widget _legendDot(Color c) => Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      );
-
   /// A small chip with the change over the whole period.
   Widget _periodChip({
     required String label,
@@ -373,6 +352,12 @@ class _PortfolioChartState extends State<PortfolioChart> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
