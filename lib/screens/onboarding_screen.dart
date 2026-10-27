@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../widgets/ui/sp_card.dart';
 import '../widgets/pulse_logo.dart';
@@ -40,11 +41,25 @@ class OnboardingScreen extends StatelessWidget {
                       'Welcome to your money dashboard',
                       style: theme.textTheme.headlineMedium,
                     )),
-                  ]),
+                  ]).animate(
+                    delay: 60.ms,
+                    effects: [
+                      FadeEffect(duration: 400.ms),
+                      SlideEffect(
+                        begin: const Offset(0, 0.08),
+                        end: Offset.zero,
+                        duration: 400.ms,
+                        curve: Curves.easeOut,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Stock Pulse is private by default and keeps getting more useful as you add holdings.',
                     style: theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
+                  ).animate(
+                    delay: 160.ms,
+                    effects: [FadeEffect(duration: 400.ms)],
                   ),
                   const SizedBox(height: 24),
                   _Step(
