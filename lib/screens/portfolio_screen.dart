@@ -10,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/allocation_donut.dart';
 import '../widgets/portfolio_banner.dart';
+import '../widgets/pulse_logo.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
@@ -74,7 +75,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             Text('Your money in motion', style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(height: 4),
             Row(mainAxisSize: MainAxisSize.min, children: [
-              Image.asset('assets/icon/app_icon_foreground.png', width: 30, height: 30),
+              const PulseLogo(size: 30),
               const SizedBox(width: 10),
               Flexible(child: _portfolioSelector(context, provider)),
             ]),

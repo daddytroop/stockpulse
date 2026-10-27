@@ -13,6 +13,7 @@ import '../services/sync_service.dart';
 import '../services/widget_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
+import '../widgets/pulse_logo.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -472,7 +473,11 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Stock Pulse v1.4.1', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const Row(children: [
+                    PulseLogo(size: 44),
+                    SizedBox(width: 12),
+                    Text('Stock Pulse v1.4.2', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ]),
                   const SizedBox(height: 6),
                   Text(
                     'A free, open-source replacement for paid portfolio trackers. '

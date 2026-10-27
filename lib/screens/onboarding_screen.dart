@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/ui/sp_card.dart';
+import '../widgets/pulse_logo.dart';
 
 /// One-time, skippable first-run orientation. Core tracking remains usable
 /// without holding any account or API keys.
@@ -95,7 +96,7 @@ class PulseMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset('assets/icon/app_icon_foreground.png', width: size, height: size);
+    return PulseLogo(size: size);
   }
 }
 
