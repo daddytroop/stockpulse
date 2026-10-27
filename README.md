@@ -58,6 +58,8 @@ Debug/profile builds use Google's test banner. Release builds use the Stock Puls
 
 The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
 
+The artwork and the in-app icon share one geometry definition (`PulseLogoGeometry` in `lib/widgets/pulse_logo.dart`), and `test/app_icon_consistency_test.dart` checks the committed PNG still matches it — so the icon on the home screen and the icon inside the app cannot drift apart.
+
 ### 1.3 dashboard update
 
 - Larger balance summary, a focused performance panel, and a cleaner mobile navigation bar.
@@ -186,6 +188,8 @@ Shipped recently:
 
 Next:
 - [x] Visual / animation polish pass
+- [x] Real company logos and holdings grouped by exchange
+- [x] Launcher icon and in-app icon generated from one shared definition
 - [ ] Configurable widgets (portfolio picker, light/dark)
 - [ ] Sector-level allocation, splits/transactions in portfolio history charts
 - [ ] Linux/macOS desktop targets
@@ -193,6 +197,8 @@ Next:
 ## Disclaimer
 
 Prices and dividend/earnings dates are from Yahoo Finance's unofficial API and may be delayed, missing or wrong. Estimates are marked with `*` in-app. This tool tracks *your* numbers; it is **not** investment advice. Yahoo data use is subject to their terms; consider contributing to a paid alternative you like if you need guarantees.
+
+Company logos are served by Wikimedia Commons and remain under their respective owners' terms; a logo is only shown when the ticker maps unambiguously to one company.
 
 ## License
 
