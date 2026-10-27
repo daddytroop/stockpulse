@@ -178,9 +178,15 @@ class _NewsScreenState extends State<NewsScreen> {
                           ).animate(
                             // Stories fade in as the feed appears.
                             delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
-                            fadeIn: const Duration(milliseconds: 280),
-                            slideY: const Tween(begin: 0.05, end: 0.0)
-                                .chain(CurveTween(curve: Curves.easeOut)),
+                            effects: [
+                              FadeEffect(duration: 280.ms),
+                              SlideEffect(
+                                begin: const Offset(0, 0.05),
+                                end: Offset.zero,
+                                duration: 280.ms,
+                                curve: Curves.easeOut,
+                              ),
+                            ],
                           );
                         },
                       ),
