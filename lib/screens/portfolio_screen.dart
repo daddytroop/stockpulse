@@ -80,8 +80,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               const PulseLogo(size: 30),
               const SizedBox(width: 10),
               Flexible(child: _portfolioSelector(context, provider)),
-            ]),
-          ],
+            ]),          ],
         ),
         actions: [
           _refreshButton(context, provider),

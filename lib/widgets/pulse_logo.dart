@@ -5,8 +5,13 @@ import 'package:flutter/material.dart';
 /// Brand colours for the Stock Pulse mark.
 ///
 /// The launcher icon, the splash artwork and the in-app icon are all built
-/// from these values so the icon on the home screen and the icon inside the
-/// app are the same picture.
+/// from these values, so the icon on the home screen is the same picture as
+/// the icon inside the app.
+///
+/// A launcher icon is baked into the app package at build time, so it cannot
+/// follow a colour the user picks later. The icon therefore uses these fixed
+/// brand colours in both places; the accent colour themes the rest of the
+/// app.
 class PulseBrand {
   PulseBrand._();
 

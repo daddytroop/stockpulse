@@ -23,13 +23,14 @@ function Save-PulseIcon($name, $includeBackground, $strokeColor) {
   $g.Clear([System.Drawing.Color]::Transparent)
 
   if ($includeBackground) {
+    # Rounded tile with the same corner radius the Flutter painter uses
+    # (22% of the tile edge).
     $radius = 1024 * 0.22
     $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $d = $radius * 2
-    $path.AddArc(0, 0, $d, $d, 180, 90)
-    $path.AddArc(1024 - $d, 0, $d, $d, 270, 90)
-    $path.AddArc(1024 - $d, 1024 - $d, $d, $d, 0, 90)
-    $path.AddArc(0, 1024 - $d, $d, $d, 90, 90)
+    $path.AddArc(0, 0, $radius, $radius, 180, 90)
+    $path.AddArc(1024 - $radius, 0, $radius, $radius, 270, 90)
+    $path.AddArc(1024 - $radius, 1024 - $radius, $radius, $radius, 0, 90)
+    $path.AddArc(0, 1024 - $radius, $radius, $radius, 90, 90)
     $path.CloseFigure()
     $g.FillPath((New-Object System.Drawing.SolidBrush $background), $path)
     $path.Dispose()
