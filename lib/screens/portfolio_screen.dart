@@ -793,6 +793,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final pnl = value - h.costBasis;
     final dayPct = q?.dayChangePercent;
     final currency = q?.currency ?? h.currency;
+    final colors = AppColors.of(context);
 
     return GestureDetector(
       onLongPress: () => showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
