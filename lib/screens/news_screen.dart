@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -174,6 +175,12 @@ class _NewsScreenState extends State<NewsScreen> {
                                 ],
                               ),
                             ),
+                          ).animate(
+                            // Stories fade in as the feed appears.
+                            delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
+                            fadeIn: const Duration(milliseconds: 280),
+                            slideY: const Tween(begin: 0.05, end: 0.0)
+                                .chain(CurveTween(curve: Curves.easeOut)),
                           );
                         },
                       ),

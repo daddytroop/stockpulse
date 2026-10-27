@@ -13,6 +13,7 @@ import '../utils/market_identity.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/symbol_avatar.dart';
+import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
@@ -102,9 +103,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                   future: _history(provider, quote),
                   builder: (context, snap) {
                     if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-                      return const ShimmerSkeleton.chart(height: 180);
+                      return const ShimmerSkeleton.chart(height: 200);
                     }
-                    return PortfolioChart(points: snap.data ?? const []);
+                    return PortfolioChart(
+                      points: snap.data ?? const [],
+                      title: 'Price history',
+                      currency: currency,
+                      valueFormatter: (v) => fmtMoney(v, currency: currency),
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -298,9 +304,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  fmtMoney(quote?.price ?? 0, currency: currency),
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                AnimatedNumber(
+                  value: quote?.price ?? 0,
+                  formatter: (v) => fmtMoney(v, currency: currency),
+                  duration: const Duration(milliseconds: 800),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
                 ),
                 ChangeChip(
                   percent: quote?.dayChangePercent,

@@ -24,12 +24,14 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - ⏱️ **Visible data freshness** — the exchange timestamp Yahoo reports is shown next to each quote, alongside the fetch time, so a delayed price is never presented as a live one.
 - 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
 - 📅 **Dividend calendar** — month view with ex-dividend/payout days. Exact upcoming dates when Yahoo publishes them, otherwise dates are **estimated from each payer's cadence** (marked `*`).
-- 📊 **Charts** — portfolio value history (1M–5Y) and per-holding price charts with dividend markers, plus a **SPY benchmark overlay**.
+- 📊 **Interactive charts** — drag across the chart to scrub the exact value and date; the line draws itself in, the area is a soft gradient, and a **SPY benchmark overlay** stays legible but clearly secondary.
+- 🧮 **Live KPI tiles** — today, total return, annual income and holdings, all counted up from real quote data, each one tappable through to the screen that explains it.
+- 📈 **Per-holding sparklines** — a real one-month price trend next to every holding, from the same price history the charts use.
 - 📰 **Earnings + news** — upcoming earnings dates for your holdings and an aggregated news feed.
 - 🧾 **Bulk CSV import** — paste rows from your broker or open a `.csv` file. Column mapping is auto-detected and can be overridden. No more adding holdings one-by-one.
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
 - 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget, updated hourly by a native WorkManager worker even when the app is closed.
-- 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
+- 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
 - 💱 **FX display currency**, 🔒 **biometric lock**, ☁️ **private Gist sync**, 🔔 **local notifications** for dividends/earnings/price moves.
 
 ## Getting the app
@@ -54,7 +56,28 @@ Portfolios are stored locally unless you enable Gist sync. Android includes a Go
 
 ### Android advertising
 
-Debug/profile builds use Google's test banner. Release builds use the Stock Pulse AdMob placement. Consent information is refreshed before requesting ads; when required, the placement exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
+Debug/profile builds use Google's test ads. Release builds use the AdMob placements below. Consent information is refreshed before requesting ads; when required, the app exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
+
+**Placements.** Each placement has its own ad unit so AdMob reports revenue per placement, which is what makes it possible to tell which one actually earns:
+
+| Placement | Where it appears | Format |
+|---|---|---|
+| `holdings_native` | Below the holdings list | Native |
+| `news_native` | Every sixth story in the news feed | Native |
+| `dividends_native` | End of the dividends screen | Native |
+| `portfolio_banner` | Very end of the portfolio screen | Banner |
+
+Native ads need **native ad units** in the AdMob console; the banner unit ships with the app. Ad units can be pasted in at runtime under **Settings → Advertising → Ad unit per placement**, so experimenting with placements does not need a rebuild. A blank ID simply hides that placement.
+
+**Why it does not feel like an ad app.** The rules are in `lib/services/ad_service.dart`:
+
+- Ads sit *after* the content the user came for, never in front of it.
+- A failed ad collapses to nothing, so the layout never shows a hole.
+- Each placement is capped per day (native 3–6, banner 8) and all placements together are capped per session, so the app cannot turn into a slot machine.
+- A placement never repeats within three minutes.
+- Native ads are labelled "Sponsored", and the whole app can be ad-free from Settings.
+
+**Measuring it.** Settings → Advertising shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
 
 The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
 

@@ -480,7 +480,7 @@ class SettingsScreen extends StatelessWidget {
                   const Row(children: [
                     PulseLogo(size: 44),
                     SizedBox(width: 12),
-                    Text('Stock Pulse v1.5.0', style: TextStyle(fontWeight: FontWeight.w700)),
+                    Text('Stock Pulse v1.5.1', style: TextStyle(fontWeight: FontWeight.w700)),
                   ]),
                   const SizedBox(height: 6),
                   Text(
