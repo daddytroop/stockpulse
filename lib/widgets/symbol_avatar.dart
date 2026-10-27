@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
 
+import '../services/logo_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 
-/// Round letter avatar with a stable per-symbol color.
-class SymbolAvatar extends StatelessWidget {
+/// Round avatar that shows the real company logo when one can be resolved,
+/// and a stable coloured letter badge otherwise.
+///
+/// The letter badge is always painted underneath, so the avatar never shows
+/// an empty circle while the logo loads and keeps working if the logo
+/// cannot be downloaded.
+class SymbolAvatar extends StatefulWidget {
   final String symbol;
   final double radius;
-  const SymbolAvatar({super.key, required this.symbol, this.radius = 18});
+
+  /// Name of the company the symbol belongs to; used to pick the right logo
+  /// when a ticker is shared by several issuers.
+  final String? companyName;
+
+  /// Overrides the logo lookup. Mainly useful for tests.
+  final LogoService? logoService;
+
+  const SymbolAvatar({
+    super.key,
+    required this.symbol,
+    this.radius = 18,
+    this.companyName,
+    this.logoService,
+  });
 
   static Color colorFor(BuildContext context, String symbol) {
     final palette = AppColors.of(context).allocationPalette;
@@ -15,18 +35,88 @@ class SymbolAvatar extends StatelessWidget {
   }
 
   @override
+  State<SymbolAvatar> createState() => _SymbolAvatarState();
+}
+
+class _SymbolAvatarState extends State<SymbolAvatar> {
+  static final LogoService _defaultLogos = LogoService();
+  Future<String?>? _pending;
+
+  LogoService get _logos => widget.logoService ?? _defaultLogos;
+
+  @override
+  void initState() {
+    super.initState();
+    _pending = _resolve();
+  }
+
+  @override
+  void didUpdateWidget(SymbolAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.symbol != widget.symbol ||
+        oldWidget.companyName != widget.companyName ||
+        oldWidget.logoService != widget.logoService) {
+      _pending = _resolve();
+    }
+  }
+
+  Future<String?> _resolve() =>
+      _logos.logoUrlFor(widget.symbol, companyName: widget.companyName);
+
+  @override
   Widget build(BuildContext context) {
-    final color = colorFor(context, symbol);
-    final initials = _initials(symbol);
+    final size = widget.radius * 2;
+    return FutureBuilder<String?>(
+      future: _pending,
+      builder: (context, snapshot) {
+        final url = snapshot.data;
+        return ClipOval(
+          child: SizedBox.square(
+            dimension: size,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _letterAvatar(context),
+                if (url != null && url.isNotEmpty)
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(2),
+                    child: Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      semanticLabel: '${widget.symbol} logo',
+                      // Fades in over the letter badge, so the avatar is
+                      // never blank while the logo downloads.
+                      frameBuilder: (context, child, frame, wasSyncLoaded) {
+                        if (wasSyncLoaded) return child;
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: const Duration(milliseconds: 180),
+                          child: child,
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _letterAvatar(BuildContext context) {
+    final color = SymbolAvatar.colorFor(context, widget.symbol);
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundColor: color,
       child: Text(
-        initials,
+        _initials(widget.symbol),
         style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w700,
-          fontSize: radius * 0.9,
+          fontSize: widget.radius * 0.9,
         ),
       ),
     );

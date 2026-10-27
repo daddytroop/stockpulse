@@ -9,7 +9,8 @@ class Quote {
   final String name;
   final String currency;
   final String? quoteType; // EQUITY, ETF, CRYPTOCURRENCY, ...
-  final String? exchange;
+  final String? exchange; // venue code, e.g. NMS, NYQ, TOR
+  final String? fullExchangeName; // venue name, e.g. NasdaqGS, NYSE, Toronto
   final String? marketState;
 
   final double price;
@@ -28,6 +29,7 @@ class Quote {
   final bool earningsIsEstimate;
 
   final DateTime updatedAt;
+  final DateTime? marketTime;
 
   const Quote({
     required this.symbol,
@@ -35,8 +37,10 @@ class Quote {
     required this.currency,
     required this.price,
     required this.updatedAt,
+    this.marketTime,
     this.quoteType,
     this.exchange,
+    this.fullExchangeName,
     this.marketState,
     this.previousClose,
     this.dayChange,
@@ -62,7 +66,8 @@ class Quote {
       name: (j['shortName'] ?? j['longName'] ?? '') as String,
       currency: (j['currency'] ?? 'USD') as String,
       quoteType: j['quoteType'] as String?,
-      exchange: (j['fullExchangeName'] ?? j['exchange']) as String?,
+      exchange: j['exchange'] as String?,
+      fullExchangeName: j['fullExchangeName'] as String?,
       marketState: j['marketState'] as String?,
       price: price,
       previousClose: (j['regularMarketPreviousClose'] as num?)?.toDouble(),
@@ -75,6 +80,7 @@ class Quote {
       dividendPayDate: ts((j['dividendDate'] as num?)?.toInt()),
       earningsDate: ts((j['earningsTimestampStart'] as num?)?.toInt() ?? (j['earningsTimestamp'] as num?)?.toInt()),
       updatedAt: DateTime.now(),
+      marketTime: ts((j['regularMarketTime'] as num?)?.toInt()),
     );
   }
 
@@ -100,7 +106,8 @@ class Quote {
       name: (meta['shortName'] ?? meta['longName'] ?? '') as String,
       currency: (meta['currency'] ?? 'USD') as String,
       quoteType: meta['instrumentType'] as String?,
-      exchange: (meta['fullExchangeName'] ?? meta['exchangeName']) as String?,
+      exchange: meta['exchangeName'] as String?,
+      fullExchangeName: meta['fullExchangeName'] as String?,
       price: price,
       previousClose: prev,
       dayChange: change,
@@ -108,17 +115,21 @@ class Quote {
       fiftyTwoWeekHigh: (meta['fiftyTwoWeekHigh'] as num?)?.toDouble(),
       fiftyTwoWeekLow: (meta['fiftyTwoWeekLow'] as num?)?.toDouble(),
       updatedAt: DateTime.now(),
+      marketTime: (meta['regularMarketTime'] as num?) == null ? null
+          : DateTime.fromMillisecondsSinceEpoch((meta['regularMarketTime'] as num).toInt() * 1000),
     );
   }
 
   static double? _positive(double? v) => (v == null || v <= 0) ? null : v;
 
   Map<String, dynamic> toMap() => {
+        'marketTime': marketTime?.toIso8601String(),
         'symbol': symbol,
         'name': name,
         'currency': currency,
         'quoteType': quoteType,
         'exchange': exchange,
+        'fullExchangeName': fullExchangeName,
         'marketState': marketState,
         'price': price,
         'previousClose': previousClose,
@@ -141,6 +152,7 @@ class Quote {
       currency: (m['currency'] ?? 'USD') as String,
       quoteType: m['quoteType'] as String?,
       exchange: m['exchange'] as String?,
+      fullExchangeName: m['fullExchangeName'] as String?,
       marketState: m['marketState'] as String?,
       price: (m['price'] as num? ?? 0).toDouble(),
       previousClose: (m['previousClose'] as num?)?.toDouble(),
@@ -154,6 +166,9 @@ class Quote {
       earningsDate: _msToDt(m['earningsDateMs'] as num?),
       earningsIsEstimate: (m['earningsIsEstimate'] as bool? ?? false),
       updatedAt: m['updatedAt'] == null ? DateTime.now() : (DateTime.tryParse(m['updatedAt'] as String) ?? DateTime.now()),
+      marketTime: m['marketTime'] == null
+          ? null
+          : DateTime.tryParse(m['marketTime'] as String),
     );
   }
 

@@ -291,12 +291,17 @@ class PortfolioProvider extends ChangeNotifier {
 
   void _seedSamplePortfolio() {
     final now = DateTime.now();
+    // Illustrative positions across several exchanges so the market grouping
+    // has something to show. Prices for these symbols are live quotes; the
+    // quantities and cost bases are made up.
     final samples = {
       'SCHD': const Holding(symbol: 'SCHD', name: 'Schwab U.S. Dividend Equity ETF', quantity: 18, avgCost: 76.40),
       'AAPL': const Holding(symbol: 'AAPL', name: 'Apple Inc.', quantity: 6, avgCost: 182.25),
       'MSFT': const Holding(symbol: 'MSFT', name: 'Microsoft', quantity: 3, avgCost: 410.10),
       'V': const Holding(symbol: 'V', name: 'Visa', quantity: 4, avgCost: 252.30),
       'O': const Holding(symbol: 'O', name: 'Realty Income', quantity: 12, avgCost: 55.85),
+      'RY.TO': const Holding(symbol: 'RY.TO', name: 'Royal Bank of Canada', quantity: 8, avgCost: 78.40),
+      'ENB.TO': const Holding(symbol: 'ENB.TO', name: 'Enbridge', quantity: 15, avgCost: 52.10),
       'BTC-USD': const Holding(symbol: 'BTC-USD', name: 'Bitcoin', quantity: 0.035, avgCost: 62000),
     };
     _portfolios = [

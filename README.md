@@ -19,6 +19,9 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 ## Features
 
 - 📈 **Multi-portfolio tracking** — stocks, ETFs, crypto (`BTC-USD`), foreign exchanges (`SHOP.TO`, `AIR.PA`, ...). Quantities and average cost merge automatically when you buy more of the same symbol.
+- 🏛️ **Grouped by market** — holdings are split into exchange sections (NYSE, NASDAQ, TSX, TSX Venture, NYSE Arca, Crypto, …) using the venue each quote actually reports, so Canadian and US listings are never mixed up.
+- 🖼️ **Real company logos** — each holding shows the issuer's own logo, served by Wikimedia Commons. A ticker is only matched when it maps to a single company, otherwise a letter badge is used.
+- ⏱️ **Visible data freshness** — the exchange timestamp Yahoo reports is shown next to each quote, alongside the fetch time, so a delayed price is never presented as a live one.
 - 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
 - 📅 **Dividend calendar** — month view with ex-dividend/payout days. Exact upcoming dates when Yahoo publishes them, otherwise dates are **estimated from each payer's cadence** (marked `*`).
 - 📊 **Charts** — portfolio value history (1M–5Y) and per-holding price charts with dividend markers, plus a **SPY benchmark overlay**.
@@ -133,6 +136,8 @@ lib/
 │   ├── yahoo_service.dart   unofficial Yahoo client (cookie+crumb handshake,
 │   │                        batched v7 quotes, v8 chart fallback, search, news,
 │   │                        quoteSummary calendarEvents)
+│   ├── logo_service.dart    company logo lookup (curated ticker map +
+│   │                        ticker-matched Wikidata query, logos from Wikimedia)
 │   ├── store.dart           JSON file persistence (portfolios + cache)
 │   ├── csv_import.dart      pure-Dart CSV/TSV parser & column detection
 │   ├── export_service.dart  save dialog (desktop) / share sheet (Android)
@@ -142,6 +147,12 @@ lib/
 platform_overlay/android/            native widget providers (Kotlin) + layouts
 .github/workflows/build.yml          analyze+test, APK, Windows zip, tagged releases
 ```
+
+**Market grouping**: Yahoo reports a venue code (`NMS`, `NYQ`, `TOR`, …) and a venue name (`NasdaqGS`, `NYSE`, `Toronto`, …) per quote. The app normalises those into a market label, preferring the code because several venues share a name. Only well-known symbol suffixes (`.TO`, `.V`, `.L`, …) are used as a last resort, and a holding whose market genuinely cannot be determined is shown under **Other** rather than being guessed.
+
+**Company logos**: well-known tickers are hardcoded to a Wikimedia Commons file. Anything else is resolved by asking Wikidata which company claims that exact ticker symbol, then matching the candidate against the company name the quote carries — so `C` resolves to Citigroup rather than a different company that shares the ticker. If no candidate matches confidently, the holding keeps its letter badge. Wikimedia serves the images with permissive CORS headers, so the same URLs work on Android, Windows and the web.
+
+**App icon**: `tools/icon.ps1` draws the launcher and splash artwork from the same geometry as `lib/widgets/pulse_logo.dart`, so the icon on the home screen is the same picture as the icon inside the app.
 
 **Dividend dates**: when Yahoo's `calendarEvents` module returns an upcoming ex-dividend/pay date it is used verbatim; otherwise the next dates are extrapolated from the median gap between the last payments (quarterly ≈ 91 days, monthly ≈ 30, ...). Amounts per share come from the payment history (or `trailingAnnualDividendRate`).
 

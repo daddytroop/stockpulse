@@ -8,6 +8,7 @@ import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/market_identity.dart';
 import '../widgets/allocation_donut.dart';
 import '../widgets/portfolio_banner.dart';
 import '../widgets/pulse_logo.dart';
@@ -39,6 +40,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   String _query = '';
   String _sort = 'symbol';
   bool _compare = false;
+  bool _groupByMarket = true;
   String? _historyKey;
   Future<List<List<ChartPoint>?>>? _history;
 
@@ -116,6 +118,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ),
             _freshnessBanner(context, provider),
             _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
+            _dataProvenance(context, provider),
             const SizedBox(height: 12),
             SpCard(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
@@ -179,10 +182,21 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   },
                 ),
               ]),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  FilterChip(
+                    avatar: const Icon(Icons.account_balance_outlined, size: 16),
+                    label: const Text('Group by market'),
+                    selected: _groupByMarket,
+                    onSelected: (v) => setState(() => _groupByMarket = v),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               if (holdings.isEmpty) const Padding(
                 padding: EdgeInsets.all(24), child: Center(child: Text('No matching holdings'))),
-              ...holdings.map((h) => _holdingTile(context, provider, portfolio.id, h)),
+              ..._groupedHoldings(context, provider, portfolio.id, holdings),
               const SizedBox(height: 20),
               Center(
                 child: Text(
@@ -380,6 +394,84 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
+  /// Shows where the numbers come from and how fresh they are.
+  ///
+  /// Every price is a real quote from Yahoo Finance. The exchange timestamp
+  /// Yahoo reports is shown next to the time the app fetched it, so a delayed
+  /// or stale price is never presented as a live one.
+  Widget _dataProvenance(BuildContext context, PortfolioProvider provider) {
+    final theme = Theme.of(context);
+    final holdings = provider.active.holdings.values;
+    if (holdings.isEmpty) return const SizedBox.shrink();
+
+    // The newest exchange timestamp across the holdings.
+    DateTime? newest;
+    var withQuote = 0;
+    var missing = 0;
+    for (final h in holdings) {
+      final q = provider.quoteOf(h.symbol);
+      if (q == null || q.price <= 0) {
+        missing++;
+        continue;
+      }
+      withQuote++;
+      final t = q.marketTime;
+      if (t != null && (newest == null || t.isAfter(newest))) newest = t;
+    }
+
+    final refreshedAt = provider.lastRefreshAt;
+    final rows = <String>[];
+    rows.add('Source: Yahoo Finance (unofficial endpoints)');
+    if (newest != null) {
+      rows.add('Prices as of ${fmtTime(newest)} exchange time');
+    }
+    if (refreshedAt != null) {
+      rows.add('Fetched ${timeAgo(refreshedAt)}');
+    }
+    rows.add('Quotes may be delayed; not exchange real-time');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                row,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.hintColor,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          if (missing > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '$missing of ${holdings.length} holdings have no quote yet.',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          if (withQuote > 0 && missing == 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'All $withQuote holdings priced.',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency, AppColors colors, bool sampleMode) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -523,6 +615,81 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
+  /// Renders the holdings, grouped into market sections when enabled.
+  List<Widget> _groupedHoldings(
+    BuildContext context,
+    PortfolioProvider provider,
+    String portfolioId,
+    List<Holding> holdings,
+  ) {
+    if (!_groupByMarket) {
+      return [
+        for (final h in holdings) _holdingTile(context, provider, portfolioId, h),
+      ];
+    }
+
+    // Bucket the holdings by the exchange their quote reports. Symbols
+    // without a quote yet are placed under "Other" so nothing is hidden.
+    final buckets = <String, List<Holding>>{};
+    for (final h in holdings) {
+      final q = provider.quoteOf(h.symbol);
+      final market = marketFor(
+        symbol: h.symbol,
+        exchangeCode: q?.exchange,
+        exchangeName: q?.fullExchangeName,
+        quoteType: q?.quoteType,
+      ) ?? 'Other';
+      buckets.putIfAbsent(market, () => []).add(h);
+    }
+
+    final markets = buckets.keys.toList()
+      ..sort((a, b) => compareMarkets(a, b));
+
+    final widgets = <Widget>[];
+    for (final market in markets) {
+      final group = buckets[market]!;
+      widgets.add(_marketHeader(context, market, group.length));
+      for (final h in group) {
+        widgets.add(_holdingTile(context, provider, portfolioId, h));
+      }
+    }
+    return widgets;
+  }
+
+  Widget _marketHeader(BuildContext context, String market, int count) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+      child: Row(
+        children: [
+          Icon(Icons.account_balance_outlined,
+              size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            market,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              count == 1 ? '1 holding' : '$count holdings',
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _holdingTile(
       BuildContext context, PortfolioProvider provider, String portfolioId, Holding h) {
     final q = provider.quoteOf(h.symbol);
@@ -544,7 +711,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         children: [
           Hero(
             tag: 'avatar_${portfolioId}_${h.symbol}',
-            child: SymbolAvatar(symbol: h.symbol),
+            child: SymbolAvatar(
+              symbol: h.symbol,
+              companyName: q?.name,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

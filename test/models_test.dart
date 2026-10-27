@@ -105,6 +105,47 @@ void main() {
       expect(back.price, q.price);
       expect(back.dayChangePercent, q.dayChangePercent);
     });
+
+    test('keeps the exchange, market time and market state', () {
+      final q = Quote.fromV7Json({
+        'symbol': 'RY.TO',
+        'shortName': 'Royal Bank of Canada',
+        'currency': 'CAD',
+        'regularMarketPrice': 284.26,
+        'exchange': 'TOR',
+        'fullExchangeName': 'Toronto',
+        'marketState': 'POSTPOST',
+        'regularMarketTime': 1793044800,
+      });
+      expect(q.exchange, 'TOR');
+      expect(q.fullExchangeName, 'Toronto');
+      expect(q.marketState, 'POSTPOST');
+      expect(q.marketTime, isNotNull);
+      expect(
+        q.marketTime!.millisecondsSinceEpoch,
+        1793044800 * 1000,
+      );
+
+      final back = Quote.fromMap(q.toMap());
+      expect(back.exchange, 'TOR');
+      expect(back.fullExchangeName, 'Toronto');
+      expect(back.marketState, 'POSTPOST');
+      expect(back.marketTime, q.marketTime);
+    });
+
+    test('chart fallback keeps the venue code and name', () {
+      final q = Quote.fromChartJson({
+        'symbol': 'AAPL',
+        'currency': 'USD',
+        'regularMarketPrice': 343.91,
+        'exchangeName': 'NMS',
+        'fullExchangeName': 'NasdaqGS',
+        'regularMarketTime': 1793044801,
+      }, previousClose: null, closes: null);
+      expect(q.exchange, 'NMS');
+      expect(q.fullExchangeName, 'NasdaqGS');
+      expect(q.marketTime, isNotNull);
+    });
   });
 
   group('DividendInfo', () {

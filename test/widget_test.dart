@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stock_pulse/screens/onboarding_screen.dart';
+import 'package:stock_pulse/services/logo_service.dart';
 import 'package:stock_pulse/widgets/symbol_avatar.dart';
 import 'package:stock_pulse/widgets/ui/pulse_indicator.dart';
 
@@ -84,4 +85,26 @@ void main() {
     ));
     expect(find.text('BT'), findsOneWidget);
   });
+
+  testWidgets('SymbolAvatar keeps the letter badge when no logo exists',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SymbolAvatar(
+          symbol: 'ZZZZ',
+          logoService: _NoLogoService(),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(find.text('ZZ'), findsOneWidget);
+  });
+}
+
+/// A logo service that never finds a logo, so the fallback can be tested
+/// without touching the network.
+class _NoLogoService extends LogoService {
+  @override
+  Future<String?> logoUrlFor(String symbol, {String? companyName}) async =>
+      null;
 }

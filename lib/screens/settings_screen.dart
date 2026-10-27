@@ -476,7 +476,7 @@ class SettingsScreen extends StatelessWidget {
                   const Row(children: [
                     PulseLogo(size: 44),
                     SizedBox(width: 12),
-                    Text('Stock Pulse v1.4.3', style: TextStyle(fontWeight: FontWeight.w700)),
+                    Text('Stock Pulse v1.5.0', style: TextStyle(fontWeight: FontWeight.w700)),
                   ]),
                   const SizedBox(height: 6),
                   Text(
@@ -485,6 +485,26 @@ class SettingsScreen extends StatelessWidget {
                     'dividend and earnings dates may be estimated (marked with *).\n\n'
                     'This app is for tracking only and is not investment advice. '
                     'Prices are delayed; enabling a display currency applies Yahoo FX rates.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Market data',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Every price, quote and dividend shown comes from Yahoo Finance. '
+                    'The app shows the exchange timestamp Yahoo reports next to each '
+                    'quote, so a delayed or stale price is never presented as a live one. '
+                    'Yahoo does not provide a free real-time exchange feed, so quotes '
+                    'may lag the market by several minutes.\n\n'
+                    'Company logos are served by Wikimedia Commons under their own '
+                    'licences; a logo is only shown when the ticker can be matched to '
+                    'a single company. Otherwise a letter badge is used.\n\n'
+                    'The sample portfolio is demo data: the holdings are illustrative '
+                    'and its prices are live, but it is not advice.',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                   ),
                 ],

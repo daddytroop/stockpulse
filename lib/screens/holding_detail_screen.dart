@@ -9,6 +9,7 @@ import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/market_identity.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/symbol_avatar.dart';
@@ -266,7 +267,11 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         children: [
           Hero(
             tag: 'avatar_${widget.portfolioId}_${holding.symbol}',
-            child: SymbolAvatar(symbol: holding.symbol, radius: 24),
+            child: SymbolAvatar(
+              symbol: holding.symbol,
+              radius: 24,
+              companyName: quote?.name,
+            ),
           ),
           const SizedBox(width: 12),
             Expanded(
@@ -372,15 +377,45 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
         value: nextUp == null ? '–' : fmtDate(nextUp.payDate),
       ),
       StatCard(
-        label: currency,
-        value: quote?.exchange ?? '–',
+        label: 'Exchange',
+        value: marketFor(
+              symbol: holding.symbol,
+              exchangeCode: quote?.exchange,
+              exchangeName: quote?.fullExchangeName,
+              quoteType: quote?.quoteType,
+            ) ??
+            '–',
         sub: quote?.quoteType,
       ),
       StatCard(
         label: 'Market state',
-        value: quote?.marketState ?? '–',
+        value: _marketStateLabel(quote?.marketState),
+        sub: quote?.marketTime == null
+            ? null
+            : 'as of ${fmtDateTime(quote!.marketTime)}',
       ),
     ]);
+  }
+
+  /// Turns Yahoo's market state code into something readable.
+  String _marketStateLabel(String? state) {
+    switch (state) {
+      case 'REGULAR':
+        return 'Open';
+      case 'PRE':
+      case 'PREPRE':
+        return 'Pre-market';
+      case 'POST':
+      case 'POSTPOST':
+        return 'After hours';
+      case 'CLOSED':
+        return 'Closed';
+      case null:
+      case '':
+        return '–';
+      default:
+        return state;
+    }
   }
 
   Future<void> _confirmRemove(PortfolioProvider provider, Holding holding) async {

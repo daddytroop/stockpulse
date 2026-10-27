@@ -2,20 +2,55 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// An open orbit and rising pulse, drawn at any size in the user's accent.
+/// Brand colours for the Stock Pulse mark.
+///
+/// The launcher icon, the splash artwork and the in-app icon are all built
+/// from these values so the icon on the home screen and the icon inside the
+/// app are the same picture.
+class PulseBrand {
+  PulseBrand._();
+
+  /// Background of the app icon tile.
+  static const Color background = Color(0xFF061D2B);
+
+  /// The rising-pulse stroke.
+  static const Color mark = Color(0xFF64EFAE);
+}
+
+/// The Stock Pulse app icon: a rounded tile with an open orbit and a rising
+/// pulse arrow. This is the exact artwork used for the Android launcher icon,
+/// the splash screen and the in-app icon.
 class PulseLogo extends StatelessWidget {
   final double size;
-  const PulseLogo({super.key, this.size = 40});
+
+  /// Draws the icon on a rounded tile. Set to false for the bare mark.
+  final bool tiled;
+
+  /// Colour of the pulse stroke.
+  final Color? markColor;
+
+  const PulseLogo({
+    super.key,
+    this.size = 40,
+    this.tiled = true,
+    this.markColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final mark = markColor ?? PulseBrand.mark;
     return Semantics(
       label: 'Stock Pulse',
       image: true,
       child: SizedBox.square(
         dimension: size,
-        child: CustomPaint(painter: _PulseLogoPainter(scheme.primary)),
+        child: CustomPaint(
+          painter: _PulseLogoPainter(
+            mark,
+            tiled: tiled,
+            background: PulseBrand.background,
+          ),
+        ),
       ),
     );
   }
@@ -23,12 +58,31 @@ class PulseLogo extends StatelessWidget {
 
 class _PulseLogoPainter extends CustomPainter {
   final Color color;
-  const _PulseLogoPainter(this.color);
+  final bool tiled;
+  final Color background;
+
+  const _PulseLogoPainter(this.color, {required this.tiled, required this.background});
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (tiled) {
+      // Rounded tile, matching the masked shape Android gives an adaptive
+      // icon.
+      final r = size.width * 0.22;
+      final tile = Path()
+        ..addRRect(RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(r),
+        ));
+      canvas.drawPath(tile, Paint()..color = background);
+    }
     canvas.save();
-    canvas.scale(size.width / 100, size.height / 100);
+    // The mark occupies the middle of the tile, matching the launcher
+    // artwork's safe area.
+    final scale = tiled ? size.width / 100 * 0.62 : size.width / 100;
+    final offset = tiled ? size.width * 0.19 : 0.0;
+    canvas.translate(offset, offset);
+    canvas.scale(scale, scale);
     final pen = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -50,5 +104,8 @@ class _PulseLogoPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PulseLogoPainter oldDelegate) => color != oldDelegate.color;
+  bool shouldRepaint(_PulseLogoPainter oldDelegate) =>
+      color != oldDelegate.color ||
+      tiled != oldDelegate.tiled ||
+      background != oldDelegate.background;
 }

@@ -54,6 +54,18 @@ String fmtShortDate(DateTime? d) {
   return DateFormat('d MMM').format(d);
 }
 
+/// Time of day, e.g. `4:05 PM`.
+String fmtTime(DateTime? d) {
+  if (d == null) return '–';
+  return DateFormat('h:mm a').format(d);
+}
+
+/// Date and time, e.g. `26 Oct, 4:05 PM`.
+String fmtDateTime(DateTime? d) {
+  if (d == null) return '–';
+  return DateFormat('d MMM, h:mm a').format(d);
+}
+
 String fmtMonthYear(DateTime d) => DateFormat('MMMM yyyy').format(d);
 
 String timeAgo(DateTime d) {
