@@ -29,12 +29,17 @@ class _FakeYahooClient extends http.BaseClient {
     }
     if (url.path.contains('/v7/finance/quote')) {
       // The raw query is what Yahoo sees. Echo the symbols back so the
-      // service can be checked end to end.
+      // service can be checked end to end. Yahoo decodes each symbol before
+      // using it, and the response carries the decoded form.
       final raw = url.query.split('&').firstWhere(
             (p) => p.startsWith('symbols='),
             orElse: () => 'symbols=',
           );
-      final symbols = raw.substring('symbols='.length).split(',');
+      final symbols = raw
+          .substring('symbols='.length)
+          .split(',')
+          .map(Uri.decodeComponent)
+          .toList();
       final body = jsonEncode({
         'quoteResponse': {
           'result': [

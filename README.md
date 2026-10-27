@@ -23,14 +23,16 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 🖼️ **Real company logos** — each holding shows the issuer's own logo, served by Wikimedia Commons. A ticker is only matched when it maps to a single company, otherwise a letter badge is used.
 - ⏱️ **Visible data freshness** — the exchange timestamp Yahoo reports is shown next to each quote, alongside the fetch time, so a delayed price is never presented as a live one.
 - 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
-- 📅 **Dividend calendar** — month view with ex-dividend/payout days. Exact upcoming dates when Yahoo publishes them, otherwise dates are **estimated from each payer's cadence** (marked `*`).
+- 📅 **Dividend calendar** — a month view you can page through, with a tap on any day opening exactly what is scheduled that day. Below it, a month-by-month timeline of every upcoming dividend and earnings date.
+- 🏭 **Industry breakdown** — allocation can be split by type, currency or industry, using the sector and industry Yahoo reports for each holding.
 - 📊 **Interactive charts** — drag across the chart to scrub the exact value and date; the line draws itself in, the area is a soft gradient, and a **SPY benchmark overlay** stays legible but clearly secondary.
 - 🧮 **Live KPI tiles** — today, total return, annual income and holdings, all counted up from real quote data, each one tappable through to the screen that explains it.
 - 📈 **Per-holding sparklines** — a real one-month price trend next to every holding, from the same price history the charts use.
-- 📰 **Earnings + news** — upcoming earnings dates for your holdings and an aggregated news feed.
+- 📰 **In-app news** — read a story inside the app with its image and the tickers it mentions (with live prices), then open the original with one tap.
+- 📍 **52-week range bar** — on every holding, a marker shows exactly where today's price sits between the 52-week low and high.
 - 🧾 **Bulk CSV import** — paste rows from your broker or open a `.csv` file. Column mapping is auto-detected and can be overridden. No more adding holdings one-by-one.
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
-- 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget, updated hourly by a native WorkManager worker even when the app is closed.
+- 🔲 **Android home-screen widgets** — a value widget and a compact next-dividend widget in the app's own colours, updated hourly by a native WorkManager worker even when the app is closed.
 - 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
 - 💱 **FX display currency**, 🔒 **biometric lock**, ☁️ **private Gist sync**, 🔔 **local notifications** for dividends/earnings/price moves.
 
@@ -64,10 +66,11 @@ Debug/profile builds use Google's test ads. Release builds use the AdMob placeme
 |---|---|---|
 | `holdings_native` | Below the holdings list | Native |
 | `news_native` | Every sixth story in the news feed | Native |
+| `news_article` | Inside an opened story | Native |
 | `dividends_native` | End of the dividends screen | Native |
 | `portfolio_banner` | Very end of the portfolio screen | Banner |
 
-Native ads need **native ad units** in the AdMob console; the banner unit ships with the app. Ad units can be pasted in at runtime under **Settings → Advertising → Ad unit per placement**, so experimenting with placements does not need a rebuild. A blank ID simply hides that placement.
+Native ads need **native ad units** in the AdMob console; the banner unit ships with the app. Ad placement is a developer's decision, so there is no ad-unit setting in the app's normal settings — the unit editor is hidden behind five taps on the version number in **Settings → About**, and a blank ID simply hides that placement.
 
 **Why it does not feel like an ad app.** The rules are in `lib/services/ad_service.dart`:
 

@@ -96,7 +96,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                       context, provider, provider.splitSuggestionFor(holding)!, holding),
                   const SizedBox(height: 12),
                 ],
-                _header(context, holding, quote, currency),
+                _header(context, provider, portfolio, holding, quote, currency),
                 const SizedBox(height: 10),
                 _contextStrip(context, provider, holding, quote),
                 const SizedBox(height: 12),
@@ -267,12 +267,23 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     return provider.symbolHistory(widget.symbol, _range);
   }
 
-  Widget _header(BuildContext context, Holding holding, Quote? quote, String currency) {
+  Widget _header(BuildContext context, PortfolioProvider provider,
+      Portfolio? portfolio, Holding holding, Quote? quote, String currency) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
     final value = (quote?.price ?? 0) * holding.quantity;
     final pnl = value - holding.costBasis;
+
+    // How much of the portfolio this single position represents.
+    var weight = 0.0;
+    if (portfolio != null) {
+      final totals = provider.totalsFor(portfolio);
+      if (totals.marketValue > 0) {
+        weight = value / totals.marketValue * 100;
+      }
+    }
+
     return SpCard(
       padding: const EdgeInsets.all(16),
       gradient: isDark
@@ -307,6 +318,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                     '${holding.avgCost > 0 ? ' · P/L ${fmtSignedMoney(pnl, currency: currency)}' : ''}',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                   ),
+                  if (weight > 0)
+                    Text(
+                      '${weight.toStringAsFixed(1)}% of this portfolio',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                 ],
               ),
             ),
