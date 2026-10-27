@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../theme/app_theme.dart';
+import '../services/ad_service.dart';
 import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
@@ -216,6 +217,9 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
+
+          _section(context, 'Advertising'),
+          _adsCard(context, theme),
 
           _section(context, 'Web build (browser)'),
           Card(
@@ -520,6 +524,127 @@ class SettingsScreen extends StatelessWidget {
     return SectionHeader(
       title: title,
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
+    );
+  }
+
+  /// Advertising controls plus a local report on how each placement is
+  /// doing.
+  ///
+  /// The report is the point: it shows impressions, clicks and estimated
+  /// revenue per placement, so the ad units can be judged on evidence
+  /// instead of guesswork. Everything stays on the device.
+  Widget _adsCard(BuildContext context, ThemeData theme) {
+    final ads = context.watch<AdService>();
+    if (!ads.supported) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.ads_click_outlined),
+          title: const Text('No ads on this platform'),
+          subtitle: const Text(
+            'Advertising is Android-only. Windows and the web build never '
+            'request ads.',
+          ),
+        ),
+      );
+    }
+
+    final stats = [
+      for (final p in AdPlacement.values)
+        (placement: p, stats: ads.statsFor(p)),
+    ];
+    final totalImpressions = stats.fold<int>(0, (s, e) => s + e.stats.impressions);
+    final totalClicks = stats.fold<int>(0, (s, e) => s + e.stats.clicks);
+    final totalRevenue = stats.fold<double>(0, (s, e) => s + e.stats.revenueMicros);
+
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: const Icon(Icons.ads_click),
+            title: const Text('Show ads'),
+            subtitle: const Text(
+              'Turn off to remove every ad. The app works exactly the same.',
+            ),
+            value: ads.adsEnabled,
+            onChanged: (v) => ads.setEnabled(v),
+          ),
+          if (ads.privacyOptionsRequired)
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('Ad privacy choices'),
+              subtitle: const Text('Change what the ad SDK may share.'),
+              onTap: () => ads.showPrivacyOptions(),
+            ),
+          if (totalImpressions > 0) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('Placement report',
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800)),
+                      const Spacer(),
+                      Text(
+                        'on this device',
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.hintColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  for (final e in stats)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(e.placement.label,
+                                style: theme.textTheme.bodySmall),
+                          ),
+                          Text('${e.stats.impressions} imp',
+                              style: theme.textTheme.labelSmall),
+                          const SizedBox(width: 10),
+                          Text('${e.stats.clicks} clicks',
+                              style: theme.textTheme.labelSmall),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 74,
+                            child: Text(
+                              e.stats.revenueMicros > 0
+                                  ? '\$${e.stats.revenueDollars.toStringAsFixed(4)}'
+                                  : '–',
+                              textAlign: TextAlign.right,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Across all placements: $totalImpressions impressions, '
+                      '$totalClicks clicks, '
+                      'est. \$${(totalRevenue / 1000000).toStringAsFixed(4)} earned.\n'
+                      'Revenue figures come from the ad SDK\'s own paid-event '
+                      'reporting and are an estimate. Nothing is sent to a server.',
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.hintColor, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

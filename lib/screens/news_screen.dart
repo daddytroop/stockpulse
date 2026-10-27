@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../services/ad_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/ad_slot.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
@@ -118,8 +120,22 @@ class _NewsScreenState extends State<NewsScreen> {
                       child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                        itemCount: items.length,
+                        itemCount: items.length + 1,
                         itemBuilder: (context, i) {
+                          // A native ad every few stories, so it reads as part
+                          // of the feed rather than an interruption.
+                          if (i == items.length) {
+                            return const AdSlot(
+                              placement: AdPlacement.newsNative,
+                              native: true,
+                            );
+                          }
+                          if (i > 0 && i % 6 == 0) {
+                            return const AdSlot(
+                              placement: AdPlacement.newsNative,
+                              native: true,
+                            );
+                          }
                           final n = items[i];
                           return SpCard(
                             margin: const EdgeInsets.only(bottom: 6),

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
+import '../services/ad_service.dart';
+import '../services/app_navigation.dart';
+import '../widgets/ad_slot.dart';
 import 'dividends_screen.dart';
 import 'import_screen.dart';
 import 'news_screen.dart';
@@ -20,7 +23,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _labels = ['Portfolio', 'Dividends', 'News', 'Import', 'Settings'];
+  static const _labels = AppNavigation.labels;
   static const _icons = [
     Icons.account_balance_wallet_outlined,
     Icons.event_outlined,
@@ -28,6 +31,12 @@ class _HomeShellState extends State<HomeShell> {
     Icons.upload_file_outlined,
     Icons.settings_outlined,
   ];
+
+  /// Switches tabs from anywhere in the app (used by the KPI tiles).
+  void goToTab(int index) {
+    if (index < 0 || index >= _labels.length) return;
+    setState(() => _index = index);
+  }
 
   @override
   void initState() {
@@ -37,8 +46,23 @@ class _HomeShellState extends State<HomeShell> {
       if (!mounted) return;
       context.read<PortfolioProvider>().ensureDividendInfo();
     });
+    // Follow tab requests made from anywhere in the app.
+    _nav = context.read<AppNavigation>();
+    _nav.addListener(_onNavChanged);
   }
 
+  late final AppNavigation _nav;
+
+  void _onNavChanged() {
+    if (!mounted) return;
+    if (_nav.index != _index) setState(() => _index = _nav.index);
+  }
+
+  @override
+  void dispose() {
+    _nav.removeListener(_onNavChanged);
+    super.dispose();
+  }
   Widget _screen(int i) {
     switch (i) {
       case 0:
@@ -91,6 +115,11 @@ class _HomeShellState extends State<HomeShell> {
           TickerMode(enabled: i == _index, child: _screen(i))],
     );
 
+    // Ads are scoped to the whole app so every placement shares one consent
+    // state and one frequency budget.
+    final ads = context.watch<AdService>();
+    final body = AdScope(service: ads, child: content);
+
     if (wide) {
       return Scaffold(
         body: Row(
@@ -113,7 +142,7 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ),
             const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: content),
+            Expanded(child: body),
           ],
         ),
       );
@@ -131,7 +160,7 @@ class _HomeShellState extends State<HomeShell> {
             ],
           ),
         ),
-        child: content,
+        child: body,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

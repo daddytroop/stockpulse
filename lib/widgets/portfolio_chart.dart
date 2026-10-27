@@ -1,27 +1,51 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../models/quote.dart';
 import '../theme/app_colors.dart';
 
-/// A smooth line chart of value points with 4 date labels on the x-axis.
+/// A smooth, interactive line chart of value points.
 ///
-/// When a [benchmark] series (e.g. SPY closes for the same window) is given,
-/// both series are normalized to % change since their first point and drawn
-/// together - the y-axis becomes percent.
-class PortfolioChart extends StatelessWidget {
+/// Design goals:
+///  * the line draws itself in when the data arrives,
+///  * dragging scrubs the chart and reads out the exact value under the
+///    finger,
+///  * the area under the line is a soft gradient rather than a flat wash,
+///  * the benchmark overlay stays readable but clearly secondary.
+class PortfolioChart extends StatefulWidget {
   final List<ChartPoint> points;
   final List<ChartPoint>? benchmark;
   final String title;
-  const PortfolioChart({super.key, required this.points, this.benchmark, this.title = ''});
+  final String? currency;
+
+  /// Formats the value shown in the scrub readout.
+  final String Function(double)? valueFormatter;
+
+  const PortfolioChart({
+    super.key,
+    required this.points,
+    this.benchmark,
+    this.title = '',
+    this.currency,
+    this.valueFormatter,
+  });
+
+  @override
+  State<PortfolioChart> createState() => _PortfolioChartState();
+}
+
+class _PortfolioChartState extends State<PortfolioChart> {
+  /// Index of the point currently being scrubbed, or null when idle.
+  int? _activeIndex;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (points.length < 2) {
+    if (widget.points.length < 2) {
       return SizedBox(
-        height: 180,
+        height: 200,
         child: Center(
           child: Text(
             'Not enough history yet',
@@ -32,16 +56,16 @@ class PortfolioChart extends StatelessWidget {
     }
 
     final colors = AppColors.of(context);
-    final color = Theme.of(context).colorScheme.primary;
-    final bench = benchmark;
+    final color = theme.colorScheme.primary;
+    final bench = widget.benchmark;
     final normalized = bench != null && bench.length >= 2;
 
-    final series = normalized ? _normalize(points) : points;
+    final series = normalized ? _normalize(widget.points) : widget.points;
     final benchSeries = normalized ? _normalize(bench) : null;
 
     double minX = 0, maxX = 0;
-    for (var i = 0; i < points.length; i++) {
-      final x = points[i].time.millisecondsSinceEpoch.toDouble();
+    for (var i = 0; i < widget.points.length; i++) {
+      final x = widget.points[i].time.millisecondsSinceEpoch.toDouble();
       if (i == 0 || x < minX) minX = x;
       if (i == 0 || x > maxX) maxX = x;
     }
@@ -62,19 +86,18 @@ class PortfolioChart extends StatelessWidget {
       minY -= 1;
       maxY += 1;
     } else {
-      minY -= span * 0.08;
-      maxY += span * 0.08;
+      minY -= span * 0.10;
+      maxY += span * 0.10;
     }
 
-    // Pick ~4 evenly spaced label positions aligned to the axis interval.
-    final labelMap = <double, String>{};
     final labelCount = 4;
+    final labelMap = <double, String>{};
     final step = (maxX - minX) / (labelCount - 1);
     for (var i = 0; i < labelCount; i++) {
       final t = minX + i * step;
-      ChartPoint nearest = points[0];
+      ChartPoint nearest = widget.points[0];
       double best = double.infinity;
-      for (final p in points) {
+      for (final p in widget.points) {
         final d = (p.time.millisecondsSinceEpoch - t).abs().toDouble();
         if (d < best) {
           best = d;
@@ -84,31 +107,55 @@ class PortfolioChart extends StatelessWidget {
       labelMap[t] = DateFormat('d MMM').format(nearest.time);
     }
 
-    final fillColor = color.withValues(alpha: 0.14);
-    final benchColor = colors.benchmark;
+    // The readout while scrubbing.
+    final readout = _activeIndex == null
+        ? null
+        : _Readout(
+            point: widget.points[_activeIndex!.clamp(0, widget.points.length - 1)],
+            benchmarkPoint: benchSeries == null
+                ? null
+                : benchSeries[_activeIndex!.clamp(0, benchSeries.length - 1)],
+            normalized: normalized,
+            currency: widget.currency,
+            valueFormatter: widget.valueFormatter,
+          );
 
     final bars = <LineChartBarData>[
       LineChartBarData(
-        spots: [for (final p in series) FlSpot(p.time.millisecondsSinceEpoch.toDouble(), p.close)],
+        spots: [
+          for (final p in series)
+            FlSpot(p.time.millisecondsSinceEpoch.toDouble(), p.close),
+        ],
         isCurved: true,
-        curveSmoothness: 0.25,
-        barWidth: 2.2,
+        curveSmoothness: 0.28,
+        barWidth: 2.6,
         color: color,
         isStrokeCapRound: true,
         dotData: const FlDotData(show: false),
-        belowBarData: normalized ? BarAreaData(show: false) : BarAreaData(show: true, color: fillColor),
+        belowBarData: BarAreaData(
+          show: true,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              color.withValues(alpha: 0.28),
+              color.withValues(alpha: 0.0),
+            ],
+          ),
+        ),
       ),
     ];
     if (benchSeries != null) {
       bars.add(LineChartBarData(
         spots: [
-          for (final p in benchSeries) FlSpot(p.time.millisecondsSinceEpoch.toDouble(), p.close),
+          for (final p in benchSeries)
+            FlSpot(p.time.millisecondsSinceEpoch.toDouble(), p.close),
         ],
         isCurved: true,
-        curveSmoothness: 0.25,
-        barWidth: 1.4,
-        color: benchColor,
-        dashArray: [4, 3],
+        curveSmoothness: 0.28,
+        barWidth: 1.6,
+        color: colors.benchmark,
+        dashArray: [5, 4],
         isStrokeCapRound: true,
         dotData: const FlDotData(show: false),
         belowBarData: BarAreaData(show: false),
@@ -118,29 +165,48 @@ class PortfolioChart extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (title.isNotEmpty || normalized)
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 4),
-            child: Row(
-              children: [
-                if (title.isNotEmpty)
-                  Flexible(child: Text(title,
-                      style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor))),
-                const Spacer(),
-                if (normalized) ...[
-                  _legendDot(color),
-                  const SizedBox(width: 4),
-                  Text('You', style: theme.textTheme.labelSmall),
-                  const SizedBox(width: 10),
-                  _legendDot(benchColor),
-                  const SizedBox(width: 4),
-                  Text('SPY', style: theme.textTheme.labelSmall),
-                ],
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (widget.title.isNotEmpty)
+                Flexible(
+                  child: Text(
+                    widget.title,
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: theme.hintColor),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              const Spacer(),
+              if (normalized) ...[
+                _legendDot(color),
+                const SizedBox(width: 5),
+                Text('You', style: theme.textTheme.labelSmall),
+                const SizedBox(width: 12),
+                _legendDot(colors.benchmark),
+                const SizedBox(width: 5),
+                Text('SPY', style: theme.textTheme.labelSmall),
               ],
-            ),
+            ],
           ),
+        ),
+        // The readout replaces the header while scrubbing so the numbers stay
+        // stable and the chart does not jump.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.topLeft,
+          child: readout == null
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: readout,
+                ),
+        ),
         SizedBox(
-          height: 180,
+          height: 200,
           child: LineChart(
             LineChartData(
               minX: minX,
@@ -148,7 +214,16 @@ class PortfolioChart extends StatelessWidget {
               minY: minY,
               maxY: maxY,
               clipData: const FlClipData.none(),
-              gridData: const FlGridData(show: false),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: _yInterval(minY, maxY),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.10),
+                  strokeWidth: 1,
+                  dashArray: [4, 6],
+                ),
+              ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -157,7 +232,7 @@ class PortfolioChart extends StatelessWidget {
                     ? AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 36,
+                          reservedSize: 38,
                           interval: _yInterval(minY, maxY),
                           getTitlesWidget: (v, meta) => Text(
                             '${v.round()}%',
@@ -170,32 +245,78 @@ class PortfolioChart extends StatelessWidget {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 22,
+                    reservedSize: 24,
                     interval: (maxX - minX) / (labelCount - 1),
-                    getTitlesWidget: (value, meta) => Text(
-                      labelMap[value] ?? '',
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+                    getTitlesWidget: (value, meta) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        labelMap[value] ?? '',
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.hintColor),
+                      ),
                     ),
                   ),
                 ),
               ),
               lineBarsData: bars,
               lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipItems: (spots) => [
-                    for (final s in spots)
-                      LineTooltipItem(
-                        '${DateFormat('d MMM').format(DateTime.fromMillisecondsSinceEpoch(s.x.round()))}\n'
-                        '${normalized ? '${s.y.toStringAsFixed(1)}%' : NumberFormat('#,##0.00').format(s.y)}',
-                        TextStyle(
-                          color: s.bar.color ?? theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
+                handleBuiltInTouches: true,
+                touchSpotThreshold: 24,
+                getTouchedSpotIndicator: (barData, indexes) => indexes
+                    .map(
+                      (_) => TouchedSpotIndicator(
+                        FlLine(
+                          color: (barData.color ?? theme.colorScheme.primary)
+                              .withValues(alpha: 0.35),
+                          strokeWidth: 1.5,
+                          dashArray: [3, 3],
+                        ),
+                        FlDotData(
+                          getDotPainter: (spot, percent, bar, index) =>
+                              FlDotCirclePainter(
+                            radius: 4.5,
+                            color: bar.color ?? theme.colorScheme.primary,
+                            strokeWidth: 2,
+                            strokeColor: theme.colorScheme.surface,
+                          ),
                         ),
                       ),
-                  ],
+                    )
+                    .toList(),
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => Colors.transparent,
+                  tooltipPadding: EdgeInsets.zero,
+                  tooltipMargin: 0,
+                  getTooltipItems: (spots) => const [],
                 ),
+                touchCallback: (event, response) {
+                  final spots = response?.lineBarSpots;
+                  final spot = (spots != null && spots.isNotEmpty)
+                      ? spots.first
+                      : null;
+                  if (event is FlTapUpEvent || event is FlPanEndEvent) {
+                    if (mounted) setState(() => _activeIndex = null);
+                    return;
+                  }
+                  if (spot == null) return;
+                  var closest = 0;
+                  var best = double.infinity;
+                  for (var i = 0; i < series.length; i++) {
+                    final d = (series[i].time.millisecondsSinceEpoch - spot.x).abs();
+                    if (d < best) {
+                      best = d;
+                      closest = i;
+                    }
+                  }
+                  if (mounted && closest != _activeIndex) {
+                    setState(() => _activeIndex = closest);
+                  }
+                },
               ),
             ),
+            // The line grows from the left when the data first arrives.
+            duration: const Duration(milliseconds: 750),
+            curve: Curves.easeOutCubic,
           ),
         ),
       ],
@@ -227,4 +348,151 @@ class PortfolioChart extends StatelessWidget {
     if (base == 0) return raw;
     return [for (final p in raw) ChartPoint(p.time, (p.close / base - 1) * 100)];
   }
+}
+
+/// The value readout shown while the chart is being scrubbed.
+class _Readout extends StatelessWidget {
+  final ChartPoint point;
+  final ChartPoint? benchmarkPoint;
+  final bool normalized;
+  final String? currency;
+  final String Function(double)? valueFormatter;
+
+  const _Readout({
+    required this.point,
+    this.benchmarkPoint,
+    required this.normalized,
+    this.currency,
+    this.valueFormatter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final value = valueFormatter?.call(point.close) ??
+        NumberFormat('#,##0.00').format(point.close);
+    final date = DateFormat('d MMM yyyy').format(point.time);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              normalized ? '${point.close.toStringAsFixed(1)}%' : value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            Text(
+              date,
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+            ),
+          ],
+        ),
+        if (benchmarkPoint != null) ...[
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: colors.benchmark,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text('SPY',
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.hintColor)),
+                ],
+              ),
+              Text(
+                '${benchmarkPoint!.close.toStringAsFixed(1)}%',
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A tiny inline trend chart used inside list rows.
+class MiniSparkline extends StatelessWidget {
+  final List<double> points;
+  final Color color;
+  final double width;
+  final double height;
+
+  const MiniSparkline({
+    super.key,
+    required this.points,
+    required this.color,
+    this.width = 54,
+    this.height = 22,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: CustomPaint(painter: _MiniSparklinePainter(points, color)),
+    );
+  }
+}
+
+class _MiniSparklinePainter extends CustomPainter {
+  final List<double> points;
+  final Color color;
+
+  _MiniSparklinePainter(this.points, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    var min = points.first, max = points.first;
+    for (final p in points) {
+      if (p < min) min = p;
+      if (p > max) max = p;
+    }
+    final span = max - min;
+    final path = Path();
+    for (var i = 0; i < points.length; i++) {
+      final x = size.width * (i / (points.length - 1));
+      final y = span <= 0
+          ? size.height / 2
+          : size.height - ((points[i] - min) / span) * size.height;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MiniSparklinePainter oldDelegate) =>
+      oldDelegate.color != color || !identical(oldDelegate.points, points);
 }

@@ -5,10 +5,13 @@ import 'package:provider/provider.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../services/ad_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
+import '../widgets/ad_slot.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/portfolio_chart.dart';
+import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
 
@@ -53,44 +56,6 @@ class _HeroPill extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
         Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
-      ]),
-    );
-  }
-}
-
-class _IncomeCadence {
-  final String label;
-  final double value;
-  final IconData icon;
-  const _IncomeCadence({required this.label, required this.value, required this.icon});
-}
-
-class _CadenceCard extends StatelessWidget {
-  final _IncomeCadence data;
-  final String? currency;
-  const _CadenceCard({required this.data, required this.currency});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .10)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(data.icon, color: theme.colorScheme.primary, size: 22),
-        const Spacer(),
-        Text(data.label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-        const SizedBox(height: 4),
-        Text(
-          fmtMoney(data.value, currency: currency),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleLarge,
-        ),
       ]),
     );
   }
@@ -231,6 +196,10 @@ class _DividendsScreenState extends State<DividendsScreen> {
                     ),
                   ),
                 ),
+              const AdSlot(
+                placement: AdPlacement.dividendsNative,
+                native: true,
+              ),
             ],
           ),
           )),
@@ -277,24 +246,40 @@ class _DividendsScreenState extends State<DividendsScreen> {
 
   Widget _incomeFrequencyGrid(BuildContext context, PortfolioProvider provider, Portfolio portfolio,
       PortfolioTotals totals, String? currency) {
-    final cards = [
-      _IncomeCadence(label: 'Annual', value: totals.annualIncome, icon: Icons.calendar_month_outlined),
-      _IncomeCadence(label: 'Quarterly', value: provider.quarterlyDividendRateFor(portfolio), icon: Icons.view_week_outlined),
-      _IncomeCadence(label: 'Monthly', value: provider.monthlyDividendRateFor(portfolio), icon: Icons.today_outlined),
-      _IncomeCadence(label: 'Daily equivalent', value: provider.dailyDividendRateFor(portfolio), icon: Icons.bolt_outlined),
-    ];
-    return LayoutBuilder(builder: (context, constraints) {
-      final compact = constraints.maxWidth < 700;
-      return GridView.count(
-        crossAxisCount: compact ? 2 : 4,
-        childAspectRatio: compact ? 1.45 : 1.55,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [for (final c in cards) _CadenceCard(data: c, currency: currency)],
-      );
-    });
+    final colors = AppColors.of(context);
+    return KpiRow(
+      tiles: [
+        KpiTile(
+          label: 'Annual',
+          value: totals.annualIncome,
+          formatter: (v) => fmtMoney(v, currency: currency),
+          valueColor: colors.dividend,
+          icon: Icons.calendar_month_outlined,
+          sub: 'Per year, all payers',
+        ),
+        KpiTile(
+          label: 'Quarterly',
+          value: provider.quarterlyDividendRateFor(portfolio),
+          formatter: (v) => fmtMoney(v, currency: currency),
+          icon: Icons.view_week_outlined,
+          sub: 'Every 3 months',
+        ),
+        KpiTile(
+          label: 'Monthly',
+          value: provider.monthlyDividendRateFor(portfolio),
+          formatter: (v) => fmtMoney(v, currency: currency),
+          icon: Icons.today_outlined,
+          sub: 'Spread monthly',
+        ),
+        KpiTile(
+          label: 'Daily equivalent',
+          value: provider.dailyDividendRateFor(portfolio),
+          formatter: (v) => fmtMoney(v, currency: currency),
+          icon: Icons.bolt_outlined,
+          sub: 'If paid daily',
+        ),
+      ],
+    );
   }
 
   List<Widget> _eventsOn(List<UpcomingEvent> events, DateTime day, String? currency, AppColors colors) {

@@ -6,17 +6,19 @@ import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
+import '../services/app_navigation.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/market_identity.dart';
 import '../widgets/allocation_donut.dart';
-import '../widgets/portfolio_banner.dart';
+import '../widgets/ad_slot.dart';
 import '../widgets/pulse_logo.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/empty_state.dart';
+import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/page_transitions.dart';
 import '../widgets/ui/pulse_indicator.dart';
 import '../widgets/ui/section_header.dart';
@@ -117,6 +119,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ),
             _freshnessBanner(context, provider),
             _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
+            const SizedBox(height: 12),
+            _kpiRow(context, provider, totals, currency),
+            const SizedBox(height: 4),
             _dataProvenance(context, provider),
             const SizedBox(height: 12),
             SpCard(
@@ -140,7 +145,6 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             )),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
-            const PortfolioBanner(),
             const SizedBox(height: 12),
             if (events.isNotEmpty) ...[
               SectionHeader(title: 'Upcoming', subtitle: '${events.length} events in the next 90 days'),
@@ -195,7 +199,26 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               const SizedBox(height: 12),
               if (holdings.isEmpty) const Padding(
                 padding: EdgeInsets.all(24), child: Center(child: Text('No matching holdings'))),
-              ..._groupedHoldings(context, provider, portfolio.id, holdings),
+              ..._groupedHoldings(context, provider, portfolio.id, holdings).animate(
+                interval: 45.ms,
+                effects: [
+                  FadeEffect(duration: 320.ms),
+                  SlideEffect(
+                    begin: const Offset(0, 0.06),
+                    end: Offset.zero,
+                    duration: 320.ms,
+                    curve: Curves.easeOut,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // A native ad after the holdings, and a banner at the very end
+              // of the screen. Both sit below the content the user came for.
+              const AdSlot(
+                placement: AdPlacement.holdingsNative,
+                native: true,
+              ),
+              const AdSlot(placement: AdPlacement.portfolioBanner),
               const SizedBox(height: 20),
               Center(
                 child: Text(
@@ -391,6 +414,85 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         ],
       ),
     );
+  }
+
+  /// The at-a-glance metric row under the balance.
+  ///
+  /// Every tile is a live number from the quote data - no approximations -
+  /// and each one is tappable to drill into the screen that explains it.
+  Widget _kpiRow(
+    BuildContext context,
+    PortfolioProvider provider,
+    PortfolioTotals totals,
+    String? currency,
+  ) {
+    final colors = AppColors.of(context);
+    final dayUp = totals.dayChange >= 0;
+
+    return KpiRow(
+      tiles: [
+        KpiTile(
+          label: 'Today',
+          value: totals.hasDayChange ? totals.dayChange : 0,
+          formatter: (v) => fmtSignedMoney(v, currency: currency),
+          valueColor:
+              totals.hasDayChange ? (dayUp ? colors.gain : colors.loss) : null,
+          icon: dayUp ? Icons.trending_up : Icons.trending_down,
+          sub: totals.hasDayChange
+              ? '${fmtPct(totals.dayChangePercent)} vs yesterday'
+              : 'No quote yet',
+          onTap: () => _openTab(context, 1),
+        ),
+        KpiTile(
+          label: 'Total return',
+          value: totals.pnl,
+          formatter: (v) => fmtSignedMoney(v, currency: currency),
+          valueColor: totals.pnl >= 0 ? colors.gain : colors.loss,
+          icon: totals.pnl >= 0 ? Icons.savings_outlined : Icons.trending_down,
+          sub: '${fmtPct(totals.pnlPercent)} on cost',
+        ),
+        KpiTile(
+          label: 'Annual income',
+          value: totals.annualIncome,
+          formatter: (v) => fmtMoney(v, currency: currency),
+          valueColor: colors.dividend,
+          icon: Icons.payments_outlined,
+          sub: totals.incomeYield > 0
+              ? '${fmtPct(totals.incomeYield, signed: false)} yield'
+              : 'From dividends',
+          onTap: () => _openTab(context, 1),
+        ),
+        KpiTile(
+          label: 'Holdings',
+          value: provider.active.holdings.length,
+          formatter: (v) => '${v.round()}',
+          icon: Icons.pie_chart_outline,
+          sub: provider.active.holdings.isEmpty
+              ? 'Add your first'
+              : '${_marketCount(provider)} markets',
+        ),
+      ],
+    );
+  }
+
+  /// How many distinct markets the holdings span.
+  int _marketCount(PortfolioProvider provider) {
+    final markets = <String>{};
+    for (final h in provider.active.holdings.values) {
+      final q = provider.quoteOf(h.symbol);
+      markets.add(marketFor(
+        symbol: h.symbol,
+        exchangeCode: q?.exchange,
+        exchangeName: q?.fullExchangeName,
+        quoteType: q?.quoteType,
+      ) ??
+          'Other');
+    }
+    return markets.length;
+  }
+
+  void _openTab(BuildContext context, int index) {
+    context.read<AppNavigation>().goTo(index);
   }
 
   /// Shows where the numbers come from and how fresh they are.
