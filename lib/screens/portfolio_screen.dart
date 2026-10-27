@@ -135,7 +135,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     onSelected: (v) => setState(() => _compare = v)),
                 ]),
                 const SizedBox(height: 10),
-                _chart(context, portfolio, provider),
+                _chart(context, portfolio, provider, currency),
                 const SizedBox(height: 10),
                 _rangeChips(context),
                 const SizedBox(height: 2),
@@ -333,9 +333,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     if (portfolio.holdings.isEmpty) return const SizedBox.shrink();
     final slices = provider.allocationFor(portfolio, by: _allocBy);
     final theme = Theme.of(context);
-    final industryPending = _allocBy == 'industry' &&
-        provider.profilesLoading &&
-        slices.every((s) => s.label == 'Other');
+    final industryPending = _allocBy == 'industry' && provider.profilesLoading;
 
     return SpCard(
       child: Column(
@@ -704,7 +702,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
-  Widget _chart(BuildContext context, Portfolio portfolio, PortfolioProvider provider) {
+  Widget _chart(BuildContext context, Portfolio portfolio, PortfolioProvider provider,
+      String? currency) {
     final key = '${portfolio.id}|$_range|${portfolio.holdings.values.map((h) => '${h.symbol}:${h.quantity}').join(',')}|${provider.lastRefreshAt}';
     if (_historyKey != key) {
       _historyKey = key;
@@ -733,6 +732,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           points: points,
           benchmark: _compare ? benchmark : null,
           title: _compare ? 'Relative growth' : 'Value history',
+          currency: currency,
+          valueFormatter: (v) => fmtMoney(v, currency: currency),
         );
       },
     );

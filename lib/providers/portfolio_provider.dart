@@ -1090,9 +1090,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// Fetches the sector and industry for the given symbols.
   ///
-  /// Yahoo only answers one symbol per request, so this runs slowly and
-  /// only for symbols that can have an industry (equities and funds).
-  /// Results are cached inside the service for a week.
+  /// Yahoo only answers one symbol per request, so this runs in small
+  /// batches with a pause between them. Results are cached inside the
+  /// service for a week.
   Future<void> ensureProfiles(Set<String> symbols) async {
     if (_profilesLoading) return;
     final wanted = symbols
@@ -1104,24 +1104,19 @@ class PortfolioProvider extends ChangeNotifier {
 
     _profilesLoading = true;
     try {
-      var fetched = 0;
-      for (final symbol in wanted) {
-        if (fetched >= 12) break;
-        final q = _quotes[symbol];
-        final type = q?.quoteType;
-        // Crypto and cash have no industry.
-        if (q != null && type != null && type != 'EQUITY' && type != 'ETF') {
-          continue;
+      const batchSize = 3;
+      for (var i = 0; i < wanted.length; i += batchSize) {
+        final batch = wanted.skip(i).take(batchSize).toList();
+        final results = await Future.wait([
+          for (final symbol in batch)
+            _yahoo.companyProfile(symbol).catchError((_) => null),
+        ]);
+        for (final profile in results) {
+          if (profile != null) _profiles[profile.symbol] = profile;
         }
-        try {
-          final profile = await _yahoo.companyProfile(symbol);
-          if (profile != null) {
-            _profiles[symbol] = profile;
-            fetched++;
-            notifyListeners();
-          }
-        } catch (_) {
-          // skip this symbol
+        notifyListeners();
+        if (i + batchSize < wanted.length) {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
         }
       }
     } finally {
@@ -1136,6 +1131,14 @@ class PortfolioProvider extends ChangeNotifier {
   /// The industry Yahoo reports for a symbol ('Other' when unknown).
   String industryOf(String symbol) =>
       _profiles[symbol.toUpperCase()]?.industryLabel ?? 'Other';
+
+  /// The industry for a symbol, falling back to its type when Yahoo does
+  /// not describe one (funds, crypto).
+  String _industryKey(String symbol) {
+    final industry = industryOf(symbol);
+    if (industry != 'Other') return industry;
+    return typeLabelOf(symbol);
+  }
 
   /// The sector Yahoo reports for a symbol ('Other' when unknown).
   String sectorOf(String symbol) =>
@@ -1357,7 +1360,10 @@ class PortfolioProvider extends ChangeNotifier {
       final key = switch (by) {
         'type' => typeLabelOf(h.symbol),
         'currency' => h.currency,
-        'industry' => industryOf(h.symbol),
+        // Instruments Yahoo does not describe an industry for (funds,
+        // crypto) fall back to their type, so the chart still says
+        // something useful.
+        'industry' => _industryKey(h.symbol),
         'sector' => sectorOf(h.symbol),
         _ => h.currency,
       };

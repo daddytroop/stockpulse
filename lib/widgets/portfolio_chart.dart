@@ -204,6 +204,33 @@ class _PortfolioChartState extends State<PortfolioChart> {
                   child: readout,
                 ),
         ),
+        // The period summary: how the portfolio did against the benchmark.
+        if (normalized)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Row(
+              children: [
+                _periodChip(
+                  label: 'You',
+                  value: series.last.close - series.first.close,
+                  color: color,
+                ),
+                const SizedBox(width: 8),
+                _periodChip(
+                  label: 'SPY',
+                  value: benchSeries!.last.close - benchSeries.first.close,
+                  color: colors.benchmark,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _beatLabel(series.last.close - series.first.close,
+                      benchSeries.last.close - benchSeries.first.close),
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.hintColor),
+                ),
+              ],
+            ),
+          ),
         SizedBox(
           height: 200,
           child: LineChart(
@@ -328,7 +355,51 @@ class _PortfolioChartState extends State<PortfolioChart> {
         decoration: BoxDecoration(color: c, shape: BoxShape.circle),
       );
 
-  double _yInterval(double minY, double maxY) {
+  /// A small chip with the change over the whole period.
+  Widget _periodChip({
+    required String label,
+    required double value,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final up = value >= 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.hintColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '${up ? '+' : ''}${value.toStringAsFixed(1)}%',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: up ? colors.gain : colors.loss,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A plain-language summary of the difference against the benchmark.
+  String _beatLabel(double you, double spy) {
+    final diff = you - spy;
+    if (diff.abs() < 0.05) return 'in line with SPY';
+    return '${diff > 0 ? 'ahead of' : 'behind'} SPY by '
+        '${diff.abs().toStringAsFixed(1)} pts';
+  }  double _yInterval(double minY, double maxY) {
     final span = (maxY - minY).abs();
     final raw = span / 4;
     const candidates = [
