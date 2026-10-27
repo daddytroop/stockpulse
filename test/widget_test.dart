@@ -14,6 +14,9 @@ void main() {
       theme: ThemeData(useMaterial3: true),
       home: OnboardingScreen(onAction: (_) {}, onDone: () {}),
     ));
+    // Run the entrance animation through so no timers are left pending.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.text('Welcome to your money dashboard'), findsOneWidget);
     expect(find.text('Add your first holding'), findsOneWidget);
     expect(find.text('Or import everything at once'), findsOneWidget);
