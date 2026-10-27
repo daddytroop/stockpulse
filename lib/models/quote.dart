@@ -194,6 +194,56 @@ class SearchResult {
   const SearchResult({required this.symbol, required this.name, this.type, this.exchange});
 }
 
+/// A company profile: the sector and industry Yahoo reports for a symbol.
+///
+/// This is not part of the batched quote response, so it is fetched
+/// separately and cached for a long time - it rarely changes.
+@immutable
+class CompanyProfile {
+  final String symbol;
+  final String? sector;
+  final String? industry;
+  final String? website;
+  final String? summary;
+  const CompanyProfile({
+    required this.symbol,
+    this.sector,
+    this.industry,
+    this.website,
+    this.summary,
+  });
+
+  /// The industry label used for allocation grouping.
+  String get industryLabel {
+    final i = industry?.trim();
+    if (i == null || i.isEmpty) return 'Other';
+    return i;
+  }
+
+  /// The sector label used for allocation grouping.
+  String get sectorLabel {
+    final s = sector?.trim();
+    if (s == null || s.isEmpty) return 'Other';
+    return s;
+  }
+
+  Map<String, dynamic> toMap() => {
+        'symbol': symbol,
+        'sector': sector,
+        'industry': industry,
+        'website': website,
+        'summary': summary,
+      };
+
+  factory CompanyProfile.fromMap(Map<String, dynamic> m) => CompanyProfile(
+        symbol: (m['symbol'] ?? '') as String,
+        sector: m['sector'] as String?,
+        industry: m['industry'] as String?,
+        website: m['website'] as String?,
+        summary: m['summary'] as String?,
+      );
+}
+
 /// A news story related to a symbol.
 @immutable
 class NewsItem {
@@ -202,12 +252,21 @@ class NewsItem {
   final String link;
   final DateTime publishedAt;
   final List<String> relatedTickers;
+
+  /// Thumbnail image for the story, when Yahoo provides one.
+  final String? imageUrl;
+
+  /// Short summary of the story, when Yahoo provides one.
+  final String? summary;
+
   const NewsItem({
     required this.title,
     required this.publisher,
     required this.link,
     required this.publishedAt,
     this.relatedTickers = const [],
+    this.imageUrl,
+    this.summary,
   });
 }
 

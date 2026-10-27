@@ -38,6 +38,10 @@ object WidgetRenderer {
             prefs.getString("nd_line1", "Open Stock Pulse to refresh data")
         )
         views.setTextViewText(R.id.widget_next_sub, prefs.getString("nd_line2", ""))
+        views.setTextViewText(
+            R.id.widget_meta,
+            prefs.getString("widget_meta", "")
+        )
         return views
     }
 
@@ -45,7 +49,9 @@ object WidgetRenderer {
         val prefs = prefs(context)
         val views = RemoteViews(context.packageName, R.layout.widget_next_dividend)
         views.setTextViewText(R.id.nd_title, context.getString(R.string.widget_next_dividend_title))
-        views.setTextViewText(R.id.nd_line1, prefs.getString("nd_line1", "No upcoming dividends"))
+        views.setTextViewText(R.id.nd_symbol, prefs.getString("nd_symbol", "No dividends"))
+        views.setTextViewText(R.id.nd_amount, prefs.getString("nd_amount", ""))
+        views.setTextViewText(R.id.nd_when, prefs.getString("nd_when", ""))
         views.setTextViewText(R.id.nd_line2, prefs.getString("nd_line2", ""))
         return views
     }

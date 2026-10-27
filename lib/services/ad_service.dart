@@ -16,6 +16,9 @@ enum AdPlacement {
   /// A native card inside the news feed.
   newsNative('news_native'),
 
+  /// A native card inside an opened news story.
+  newsArticle('news_article'),
+
   /// A banner at the end of the portfolio screen.
   portfolioBanner('portfolio_banner'),
 
@@ -31,6 +34,7 @@ enum AdPlacement {
   String get label => switch (this) {
         AdPlacement.holdingsNative => 'Holdings list',
         AdPlacement.newsNative => 'News feed',
+        AdPlacement.newsArticle => 'Article view',
         AdPlacement.portfolioBanner => 'Portfolio footer',
         AdPlacement.dividendsNative => 'Dividends screen',
       };
@@ -56,6 +60,7 @@ class AdUnits {
   static const Map<AdPlacement, String> test = {
     AdPlacement.holdingsNative: 'ca-app-pub-3940256099942544/6300978111',
     AdPlacement.newsNative: 'ca-app-pub-3940256099942544/6300978111',
+    AdPlacement.newsArticle: 'ca-app-pub-3940256099942544/6300978111',
     AdPlacement.portfolioBanner: 'ca-app-pub-3940256099942544/6300978111',
     AdPlacement.dividendsNative: 'ca-app-pub-3940256099942544/6300978111',
   };
@@ -151,6 +156,7 @@ class AdService extends ChangeNotifier {
   static const Map<AdPlacement, int> dailyCap = {
     AdPlacement.holdingsNative: 4,
     AdPlacement.newsNative: 6,
+    AdPlacement.newsArticle: 4,
     AdPlacement.dividendsNative: 3,
     AdPlacement.portfolioBanner: 8,
   };

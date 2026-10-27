@@ -45,7 +45,9 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<PortfolioProvider>().ensureDividendInfo(symbolsIn: {widget.symbol});
+      final provider = context.read<PortfolioProvider>();
+      provider.ensureDividendInfo(symbolsIn: {widget.symbol});
+      provider.ensureProfiles({widget.symbol});
     });
   }
 
@@ -95,7 +97,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                   const SizedBox(height: 12),
                 ],
                 _header(context, holding, quote, currency),
+                const SizedBox(height: 10),
+                _contextStrip(context, provider, holding, quote),
                 const SizedBox(height: 12),
+                if ((quote?.fiftyTwoWeekLow ?? 0) > 0 &&
+                    (quote?.fiftyTwoWeekHigh ?? 0) > 0) ...[
+                  _yearRangeCard(context, quote!, currency),
+                  const SizedBox(height: 12),
+                ],
                 _rangeChips(context),
                 FutureBuilder(
                   key: ValueKey('${widget.symbol}|$_range|'
@@ -338,6 +347,153 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             onSelected: (_) => setState(() => _range = e.key),
           ),
       ],
+    );
+  }
+
+  /// A compact strip of the facts that describe the instrument: the market
+  /// it trades on, its currency, and the industry it belongs to.
+  Widget _contextStrip(BuildContext context, PortfolioProvider provider,
+      Holding holding, Quote? quote) {
+    final theme = Theme.of(context);
+    final market = marketFor(
+      symbol: holding.symbol,
+      exchangeCode: quote?.exchange,
+      exchangeName: quote?.fullExchangeName,
+      quoteType: quote?.quoteType,
+    );
+    final profile = provider.profileOf(holding.symbol);
+    final items = <(IconData, String)>[
+      if (market != null) (Icons.account_balance_outlined, market),
+      (Icons.payments_outlined, quote?.currency ?? holding.currency),
+      if (profile != null && profile.sector != null)
+        (Icons.category_outlined, profile.sector!),
+      if (profile != null && profile.industry != null)
+        (Icons.label_outline, profile.industry!),
+    ];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final it in items)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(it.$1, size: 12, color: theme.hintColor),
+                const SizedBox(width: 5),
+                Text(
+                  it.$2,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.hintColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Where the current price sits inside the 52-week range.
+  Widget _yearRangeCard(BuildContext context, Quote quote, String currency) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final low = quote.fiftyTwoWeekLow!;
+    final high = quote.fiftyTwoWeekHigh!;
+    final price = quote.price;
+    final span = high - low;
+    final position = span <= 0 ? 0.5 : ((price - low) / span).clamp(0.0, 1.0);
+    final fromHigh = high > 0 ? (price - high) / high * 100 : 0.0;
+
+    return SpCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('52-week range',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.hintColor)),
+              const Spacer(),
+              Text(
+                '${fromHigh <= 0 ? '' : '+'}${fromHigh.toStringAsFixed(1)}% from high',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: fromHigh <= 0 ? colors.gain : colors.loss,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              return SizedBox(
+                height: 8,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        gradient: LinearGradient(
+                          colors: [
+                            colors.loss.withValues(alpha: 0.55),
+                            theme.colorScheme.primary.withValues(alpha: 0.55),
+                            colors.gain.withValues(alpha: 0.75),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: (w * position - 7).clamp(0.0, w - 14),
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: theme.colorScheme.primary, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.18),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(fmtMoney(low, currency: currency),
+                  style: theme.textTheme.labelSmall),
+              Text(fmtMoney(high, currency: currency),
+                  style: theme.textTheme.labelSmall),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

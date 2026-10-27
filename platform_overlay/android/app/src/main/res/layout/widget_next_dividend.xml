@@ -4,27 +4,62 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="10dp"
+    android:padding="12dp"
     android:background="@drawable/widget_bg">
 
-    <TextView
-        android:id="@+id/nd_title"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="10sp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:src="@drawable/widget_dot"
+            android:contentDescription="@null"/>
+
+        <TextView
+            android:id="@+id/nd_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:textColor="#64EFAE"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+
+        <TextView
+            android:id="@+id/nd_when"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="#8AFFFFFF"
+            android:maxLines="1"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/nd_symbol"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#80FFFFFF"
+        android:textColor="#FFFFFFFF"
         android:maxLines="1"
         android:ellipsize="end"/>
 
     <TextView
-        android:id="@+id/nd_line1"
+        android:id="@+id/nd_amount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:textSize="15sp"
+        android:layout_marginTop="1dp"
+        android:textSize="13sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFFFF"
+        android:textColor="#64EFAE"
         android:maxLines="1"
         android:ellipsize="end"/>
 
@@ -32,8 +67,8 @@
         android:id="@+id/nd_line2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="11sp"
+        android:layout_marginTop="3dp"
+        android:textSize="10sp"
         android:textColor="#CCFFFFFF"
         android:maxLines="2"
         android:ellipsize="end"/>

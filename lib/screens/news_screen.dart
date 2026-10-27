@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
@@ -12,6 +11,7 @@ import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
+import 'news_detail_screen.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -140,8 +140,25 @@ class _NewsScreenState extends State<NewsScreen> {
                           final n = items[i];
                           return SpCard(
                             margin: const EdgeInsets.only(bottom: 6),
-                            onTap: () => _open(n.link),
+                            onTap: () => _openStory(context, n),
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              leading: n.imageUrl == null || n.imageUrl!.isEmpty
+                                  ? null
+                                  : ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        n.imageUrl!,
+                                        width: 62,
+                                        height: 62,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const SizedBox(
+                                          width: 62,
+                                          height: 62,
+                                        ),
+                                      ),
+                                    ),
                               title: Text(
                                 n.title,
                                 maxLines: 3,
@@ -196,12 +213,9 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Future<void> _open(String url) async {
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {}
+  Future<void> _openStory(BuildContext context, NewsItem item) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => NewsDetailScreen(item: item)),
+    );
   }
 }

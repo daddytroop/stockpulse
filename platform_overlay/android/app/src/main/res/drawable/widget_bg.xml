@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The widget surface: the same deep navy and mint accent the app uses. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <corners android:radius="16dp"/>
-    <solid android:color="#E6121417"/>
+    <corners android:radius="20dp"/>
+    <gradient
+        android:angle="270"
+        android:startColor="#0B2534"
+        android:endColor="#061620"/>
+    <stroke
+        android:width="1dp"
+        android:color="#1E3A4A"/>
 </shape>

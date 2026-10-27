@@ -140,13 +140,50 @@ class SettingsScreen extends StatelessWidget {
                   if (provider.fxLoading) ...[
                     const SizedBox(height: 8),
                     const LinearProgressIndicator(minHeight: 2),
-                  ],
-                  if (provider.converting && !provider.fxLoading) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      'Totals shown in ${_currencyLabel(provider.displayCurrency)}',
+                      'Fetching exchange rates…',
                       style: theme.textTheme.labelSmall
                           ?.copyWith(color: theme.hintColor),
+                    ),
+                  ] else if (provider.converting &&
+                      provider.fxRatesReady) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle_outline,
+                            size: 14, color: theme.colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Totals shown in '
+                            '${_currencyLabel(provider.displayCurrency)}',
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (provider.converting) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 14, color: theme.colorScheme.error),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Exchange rates are unavailable right now, so '
+                            'totals are shown in each holding’s own currency.',
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              provider.setDisplayCurrency(
+                                  provider.displayCurrency),
+                          child: const Text('Retry'),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -477,11 +514,16 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(children: [
-                    PulseLogo(size: 44),
-                    SizedBox(width: 12),
-                    Text('Stock Pulse v1.5.1', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ]),
+                  _DevUnlock(
+                    onUnlocked: () => _editAdUnits(
+                        context, context.read<AdService>()),
+                    child: const Row(children: [
+                      PulseLogo(size: 44),
+                      SizedBox(width: 12),
+                      Text('Stock Pulse v1.5.2',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     'A free, open-source replacement for paid portfolio trackers. '
@@ -521,6 +563,9 @@ class SettingsScreen extends StatelessWidget {
   }
 
   /// Lets each placement be pointed at a specific ad unit.
+  ///
+  /// This is a developer tool, not a user setting: it is only reachable
+  /// through the hidden gesture on the version number.
   Future<void> _editAdUnits(BuildContext context, AdService ads) async {
     final controllers = {
       for (final p in AdPlacement.values)
@@ -529,7 +574,7 @@ class SettingsScreen extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ad units'),
+        title: const Text('Ad units (developer)'),
         content: SizedBox(
           width: 420,
           child: SingleChildScrollView(
@@ -539,7 +584,8 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 Text(
                   'Each placement reports separately in AdMob, so you can see '
-                  'which one earns. A blank ID hides that placement.',
+                  'which one earns. Native ads need a native ad unit; a blank '
+                  'ID hides that placement.',
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -638,15 +684,6 @@ class SettingsScreen extends StatelessWidget {
               subtitle: const Text('Change what the ad SDK may share.'),
               onTap: () => ads.showPrivacyOptions(),
             ),
-          ListTile(
-            leading: const Icon(Icons.tune),
-            title: const Text('Ad unit per placement'),
-            subtitle: const Text(
-              'Native ads need their own ad unit in the AdMob console. '
-              'Paste the ID here; leave blank to hide that placement.',
-            ),
-            onTap: () => _editAdUnits(context, ads),
-          ),
           if (totalImpressions > 0) ...[
             const Divider(height: 1),
             Padding(
@@ -934,6 +971,49 @@ Future<String?> _askText(BuildContext context, String title, String initial) asy
     ),
   );
   return value;
+}
+
+/// Hides the developer tools behind a deliberate gesture.
+///
+/// Ad placement is the developer's decision, not the user's, so there is no
+/// visible setting for it. Five taps on the version number opens the
+/// developer panel for whoever is tuning the app.
+class _DevUnlock extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onUnlocked;
+
+  const _DevUnlock({required this.child, required this.onUnlocked});
+
+  @override
+  State<_DevUnlock> createState() => _DevUnlockState();
+}
+
+class _DevUnlockState extends State<_DevUnlock> {
+  int _taps = 0;
+
+  void _tap() {
+    _taps++;
+    if (_taps >= 5) {
+      _taps = 0;
+      widget.onUnlocked();
+      return;
+    }
+    if (_taps == 3) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Developer tools: 2 more taps on the version number'),
+        duration: Duration(seconds: 2),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _tap,
+      child: widget.child,
+    );
+  }
 }
 
 class _AccentChoice extends StatelessWidget {

@@ -332,6 +332,11 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       Portfolio portfolio, String? currency) {
     if (portfolio.holdings.isEmpty) return const SizedBox.shrink();
     final slices = provider.allocationFor(portfolio, by: _allocBy);
+    final theme = Theme.of(context);
+    final industryPending = _allocBy == 'industry' &&
+        provider.profilesLoading &&
+        slices.every((s) => s.label == 'Other');
+
     return SpCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,17 +353,42 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 segments: const [
                   ButtonSegment(value: 'type', label: Text('Type')),
                   ButtonSegment(value: 'currency', label: Text('Currency')),
+                  ButtonSegment(value: 'industry', label: Text('Industry')),
                 ],
                 selected: {_allocBy},
-                onSelectionChanged: (s) => setState(() => _allocBy = s.first),
+                onSelectionChanged: (s) => _selectAllocation(provider, s.first),
               ),
             ],
           ),
           const SizedBox(height: 8),
+          if (industryPending)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  const SizedBox(
+                      width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Looking up industries…',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.hintColor),
+                  ),
+                ],
+              ),
+            ),
           AllocationDonut(slices: slices, currency: currency),
         ],
       ),
     );
+  }
+
+  /// Switches the allocation view and loads the data it needs.
+  void _selectAllocation(PortfolioProvider provider, String by) {
+    setState(() => _allocBy = by);
+    if (by == 'industry' || by == 'sector') {
+      provider.ensureProfiles(provider.active.symbols.toSet());
+    }
   }
 
   Widget _errorBanner(BuildContext context, String message) {

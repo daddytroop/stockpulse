@@ -15,6 +15,7 @@ import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
+import 'holding_detail_screen.dart';
 
 class _SampleCallout extends StatelessWidget {
   const _SampleCallout();
@@ -72,9 +73,14 @@ class DividendsScreen extends StatefulWidget {
 class _DividendsScreenState extends State<DividendsScreen> {
   DateTime? _selectedDay;
 
+  /// The month the calendar is showing.
+  late DateTime _month;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _month = DateTime(now.year, now.month);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<PortfolioProvider>().ensureDividendInfo();
@@ -92,11 +98,10 @@ class _DividendsScreenState extends State<DividendsScreen> {
     final next30 = provider.incomeWithinDays(30);
     final colors = AppColors.of(context);
 
-    // Aggregate events per day of the CURRENT calendar month.
-    final now = DateTime.now();
+    // Aggregate events per day of the calendar month on screen.
     final eventsByDay = <int, CalendarDay>{};
     for (final e in events) {
-      if (e.date.year != now.year || e.date.month != now.month) continue;
+      if (e.date.year != _month.year || e.date.month != _month.month) continue;
       final d = eventsByDay[e.date.day] ??
           const CalendarDay(dividendTotal: 0, earningsCount: 0, eventCount: 0);
       if (e.kind == 'dividend' && !e.isPayDate) {
@@ -113,10 +118,6 @@ class _DividendsScreenState extends State<DividendsScreen> {
         );
       }
     }
-
-    final upcoming = [
-      for (final up in provider.upcomingDividendsFor(portfolio, horizonDays: 120)) up
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -151,24 +152,18 @@ class _DividendsScreenState extends State<DividendsScreen> {
                   eventsByDay: eventsByDay,
                   formatAmount: (a) => fmtMoney(a, currency: currency),
                   selectedDay: _selectedDay,
-                  onSelectDay: (d) => setState(() => _selectedDay = d),
+                  month: _month,
+                  onMonthChanged: (m) => setState(() => _month = m),
+                  onSelectDay: (d) => _showDay(context, d, events, currency, colors),
                 ),
               ),
-              const SizedBox(height: 12),
-              _growthCard(context, provider, portfolio, currency),
-              const SizedBox(height: 10),
-              _incomeByYear(context, provider, portfolio, currency),
-              if (_selectedDay != null) ...[
-                const SizedBox(height: 10),
-                SectionHeader(title: 'Events on ${fmtDate(_selectedDay)}'),
-                ..._eventsOn(events, _selectedDay!, currency, colors),
-              ],
-              if (_selectedDay == null) ...[
-                const SizedBox(height: 10),
-                SectionHeader(title: 'Upcoming dividends', subtitle: 'Next 120 days'),
-              ],
-              ..._upcomingTiles(context, upcoming, currency, colors),
-              if (!provider.dividendsLoading && upcoming.isEmpty)
+              const SizedBox(height: 14),
+              SectionHeader(
+                title: 'Upcoming events',
+                subtitle: 'Dividends and earnings · next 120 days',
+              ),
+              ..._upcomingEventList(context, events, currency, colors),
+              if (events.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Center(
@@ -183,7 +178,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
                     ),
                   ),
                 ),
-              if (upcoming.isNotEmpty)
+              if (events.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: Center(
@@ -197,6 +192,10 @@ class _DividendsScreenState extends State<DividendsScreen> {
                     ),
                   ),
                 ),
+              const SizedBox(height: 14),
+              _growthCard(context, provider, portfolio, currency),
+              const SizedBox(height: 10),
+              _incomeByYear(context, provider, portfolio, currency),
               const AdSlot(
                 placement: AdPlacement.dividendsNative,
                 native: true,
@@ -338,41 +337,203 @@ class _DividendsScreenState extends State<DividendsScreen> {
     ];
   }
 
-  List<Widget> _upcomingTiles(
-      BuildContext context, List<dynamic> upcoming, String? currency, AppColors colors) {
+  /// Shows everything scheduled on one calendar day.
+  ///
+  /// Tapping a day used to change a list far below the fold, so the answer
+  /// now appears right where the user tapped.
+  void _showDay(BuildContext context, DateTime day, List<UpcomingEvent> events,
+      String? currency, AppColors colors) {
+    setState(() => _selectedDay = day);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.45,
+        maxChildSize: 0.85,
+        builder: (ctx, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            Text(
+              fmtDate(day),
+              style: Theme.of(ctx)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'What is scheduled on this day',
+              style: Theme.of(ctx)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: Theme.of(ctx).hintColor),
+            ),
+            const SizedBox(height: 12),
+            ..._eventsOn(events, day, currency, colors),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      if (mounted) setState(() => _selectedDay = null);
+    });
+  }
+
+  /// The upcoming timeline: dividends and earnings, grouped by month.
+  List<Widget> _upcomingEventList(BuildContext context, List<UpcomingEvent> events,
+      String? currency, AppColors colors) {
     final theme = Theme.of(context);
-    return [
-      for (final up in upcoming.take(10))
-        SpCard(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-            dense: true,
-            leading: Icon(Icons.event_available_outlined, color: colors.dividend),
-            title: Row(
-              children: [
-                Text(up.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
-                if (up.estimated) ...[
-                  const SizedBox(width: 6),
-                  Text('*est.', style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-                ],
-              ],
-            ),
-            subtitle: Text(
-              'ex ${fmtShortDate(up.exDate)} · pays ${fmtShortDate(up.payDate)}'
-              ' · ${fmtMoney(up.amountPerShare, currency: currency)}/unit',
-              style: theme.textTheme.bodySmall,
-            ),
-            trailing: Text(
-              fmtMoney(up.total, currency: currency),
-              style: TextStyle(color: colors.dividend, fontWeight: FontWeight.w700),
-            ),
+    final groups = <String, List<UpcomingEvent>>{};
+    final order = <String>[];
+    for (final e in events) {
+      // The payment date is shown on the ex-dividend row, so it does not
+      // need its own entry.
+      if (e.kind == 'dividend' && e.isPayDate) continue;
+      final key = fmtMonthYear(DateTime(e.date.year, e.date.month));
+      groups.putIfAbsent(key, () => []).add(e);
+      if (!order.contains(key)) order.add(key);
+    }
+    if (groups.isEmpty) return const [];
+
+    final widgets = <Widget>[];
+    for (final key in order) {
+      final list = groups[key]!..sort((a, b) => a.date.compareTo(b.date));
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 4, left: 2),
+        child: Text(
+          key,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.hintColor,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
           ),
         ),
-    ].animate(
+      ));
+      for (final e in list) {
+        // The matching payment date, so both dates fit on one row.
+        DateTime? payDate;
+        if (e.kind == 'dividend') {
+          for (final other in events) {
+            if (other.kind == 'dividend' &&
+                other.isPayDate &&
+                other.symbol == e.symbol) {
+              payDate = other.date;
+              break;
+            }
+          }
+        }
+        final isDividend = e.kind == 'dividend';
+        widgets.add(SpCard(
+          margin: const EdgeInsets.only(bottom: 6),
+          onTap: () => _openHolding(context, e.symbol),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: (isDividend ? colors.dividend : colors.earnings)
+                      .withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '${e.date.day}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: isDividend ? colors.dividend : colors.earnings,
+                      ),
+                    ),
+                    Text(
+                      _shortMonth(e.date.month),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 9,
+                        color: theme.hintColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(e.symbol,
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(width: 6),
+                        Icon(
+                          isDividend
+                              ? Icons.payments_outlined
+                              : Icons.query_stats_outlined,
+                          size: 13,
+                          color: isDividend ? colors.dividend : colors.earnings,
+                        ),
+                        if (e.estimated) ...[
+                          const SizedBox(width: 4),
+                          Text('*',
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: theme.hintColor)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isDividend
+                          ? 'Ex-dividend'
+                              '${payDate != null ? ' · pays ${fmtShortDate(payDate)}' : ''}'
+                              ' · ${fmtMoney(e.amountPerShare ?? 0, currency: currency)}/unit'
+                          : 'Earnings report',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                ),
+              ),
+              if (isDividend && (e.total ?? 0) > 0)
+                Text(
+                  fmtMoney(e.total, currency: currency),
+                  style: TextStyle(
+                      color: colors.dividend, fontWeight: FontWeight.w700),
+                ),
+            ],
+          ),
+        ));
+      }
+    }
+    return widgets.animate(
       interval: 30.ms,
-      effects: [FadeEffect(duration: 250.ms), SlideEffect(begin: const Offset(0, 0.05), end: Offset.zero, duration: 250.ms)],
+      effects: [
+        FadeEffect(duration: 250.ms),
+        SlideEffect(
+            begin: const Offset(0, 0.05), end: Offset.zero, duration: 250.ms),
+      ],
     );
   }
+
+  void _openHolding(BuildContext context, String symbol) {
+    final provider = context.read<PortfolioProvider>();
+    for (final p in provider.portfolios) {
+      if (p.holdings.containsKey(symbol.toUpperCase())) {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => HoldingDetailScreen(
+              portfolioId: p.id, symbol: symbol.toUpperCase()),
+        ));
+        return;
+      }
+    }
+  }
+
+  static String _shortMonth(int month) => const [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ][(month - 1).clamp(0, 11)];
 
   Widget _growthCard(
       BuildContext context, PortfolioProvider provider, Portfolio portfolio, String? currency) {

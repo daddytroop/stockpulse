@@ -26,14 +26,22 @@ class StockPulseWidgetService {
     required int changeSign,
     required String nextDividendLine1,
     required String nextDividendLine2,
+    String meta = '',
+    String nextDividendSymbol = '',
+    String nextDividendAmount = '',
+    String nextDividendWhen = '',
   }) async {
     if (!supported) return false;
     try {
       await HomeWidget.saveWidgetData<String>('widget_total', total);
       await HomeWidget.saveWidgetData<String>('widget_change', change);
       await HomeWidget.saveWidgetData<int>('widget_change_sign', changeSign);
+      await HomeWidget.saveWidgetData<String>('widget_meta', meta);
       await HomeWidget.saveWidgetData<String>('nd_line1', nextDividendLine1);
       await HomeWidget.saveWidgetData<String>('nd_line2', nextDividendLine2);
+      await HomeWidget.saveWidgetData<String>('nd_symbol', nextDividendSymbol);
+      await HomeWidget.saveWidgetData<String>('nd_amount', nextDividendAmount);
+      await HomeWidget.saveWidgetData<String>('nd_when', nextDividendWhen);
       await HomeWidget.saveWidgetData<String>(
           'nd_updated', DateTime.now().millisecondsSinceEpoch.toString());
       final ok1 = await HomeWidget.updateWidget(

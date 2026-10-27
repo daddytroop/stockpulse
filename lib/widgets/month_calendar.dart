@@ -8,43 +8,46 @@ class CalendarDay {
   final double dividendTotal;
   final int earningsCount;
   final int eventCount;
-  const CalendarDay({required this.dividendTotal, required this.earningsCount, required this.eventCount});
+  const CalendarDay({
+    required this.dividendTotal,
+    required this.earningsCount,
+    required this.eventCount,
+  });
 }
 
 /// Month-view calendar with green dots on dividend days and orange dots on
-/// earnings days. Parents render the selected day's details below.
-class MonthCalendar extends StatefulWidget {
-  final Map<int, CalendarDay> eventsByDay; // day-of-month -> data
+/// earnings days.
+///
+/// The month is controlled by the parent, so the dots always match the
+/// month that is on screen.
+class MonthCalendar extends StatelessWidget {
+  /// Events for the displayed month, keyed by day of the month.
+  final Map<int, CalendarDay> eventsByDay;
+
+  /// Formats the dividend amount shown inside a day cell.
   final String Function(double amount) formatAmount;
+
+  /// Called when a day with events is tapped.
   final void Function(DateTime day)? onSelectDay;
+
+  /// The day that is currently highlighted.
   final DateTime? selectedDay;
+
+  /// The month on screen. Always the first day of that month.
+  final DateTime month;
+
+  /// Called when the user moves to another month.
+  final void Function(DateTime month)? onMonthChanged;
+
   const MonthCalendar({
     super.key,
     required this.eventsByDay,
     required this.formatAmount,
+    required this.month,
     this.onSelectDay,
     this.selectedDay,
+    this.onMonthChanged,
   });
-
-  @override
-  State<MonthCalendar> createState() => _MonthCalendarState();
-}
-
-class _MonthCalendarState extends State<MonthCalendar> {
-  late DateTime _month;
-
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    _month = DateTime(now.year, now.month);
-  }
-
-  void _shift(int months) {
-    setState(() {
-      _month = DateTime(_month.year, _month.month + months);
-    });
-  }
 
   static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -54,24 +57,35 @@ class _MonthCalendarState extends State<MonthCalendar> {
     final colors = AppColors.of(context);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final first = DateTime(_month.year, _month.month, 1);
+    final first = DateTime(month.year, month.month, 1);
     // Monday-based offset
     final lead = (first.weekday - 1) % 7;
-    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final cells = lead + daysInMonth;
     final rows = (cells / 7).ceil();
+    final isCurrentMonth = month.year == now.year && month.month == now.month;
 
     return Column(
       children: [
         Row(
           children: [
-            IconButton(onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left)),
+            IconButton(
+              onPressed: () => onMonthChanged?.call(
+                  DateTime(month.year, month.month - 1)),
+              icon: const Icon(Icons.chevron_left),
+              tooltip: 'Previous month',
+            ),
             Expanded(
               child: Center(
-                child: Text(fmtMonthYear(_month), style: theme.textTheme.titleSmall),
+                child: Text(fmtMonthYear(month), style: theme.textTheme.titleSmall),
               ),
             ),
-            IconButton(onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right)),
+            IconButton(
+              onPressed: () => onMonthChanged?.call(
+                  DateTime(month.year, month.month + 1)),
+              icon: const Icon(Icons.chevron_right),
+              tooltip: 'Next month',
+            ),
           ],
         ),
         Row(
@@ -93,7 +107,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
         GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
             childAspectRatio: 0.95,
             mainAxisSpacing: 2,
@@ -105,17 +119,17 @@ class _MonthCalendarState extends State<MonthCalendar> {
             if (dayNum < 1 || dayNum > daysInMonth) {
               return const SizedBox();
             }
-            final data = widget.eventsByDay[dayNum];
-            final date = DateTime(_month.year, _month.month, dayNum);
+            final data = eventsByDay[dayNum];
+            final date = DateTime(month.year, month.month, dayNum);
             final isToday = date == today;
-            final isSelected = widget.selectedDay != null &&
-                widget.selectedDay!.year == date.year &&
-                widget.selectedDay!.month == date.month &&
-                widget.selectedDay!.day == date.day;
+            final isSelected = selectedDay != null &&
+                selectedDay!.year == date.year &&
+                selectedDay!.month == date.month &&
+                selectedDay!.day == date.day;
 
             return InkWell(
               borderRadius: BorderRadius.circular(10),
-              onTap: data == null ? null : () => widget.onSelectDay?.call(date),
+              onTap: data == null ? null : () => onSelectDay?.call(date),
               child: Container(
                 decoration: BoxDecoration(
                   color: isSelected
@@ -131,7 +145,13 @@ class _MonthCalendarState extends State<MonthCalendar> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('$dayNum', style: theme.textTheme.bodySmall),
+                    Text(
+                      '$dayNum',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: isToday ? FontWeight.w800 : null,
+                        color: isToday ? theme.colorScheme.primary : null,
+                      ),
+                    ),
                     if (data != null) ...[
                       const SizedBox(height: 3),
                       Row(
@@ -148,7 +168,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
                       ),
                       if (data.dividendTotal > 0)
                         Text(
-                          widget.formatAmount(data.dividendTotal),
+                          formatAmount(data.dividendTotal),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
@@ -174,6 +194,14 @@ class _MonthCalendarState extends State<MonthCalendar> {
             Text(' earnings', style: theme.textTheme.labelSmall),
           ],
         ),
+        if (!isCurrentMonth) ...[
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: () =>
+                onMonthChanged?.call(DateTime(now.year, now.month)),
+            child: const Text('Back to this month'),
+          ),
+        ],
       ],
     );
   }

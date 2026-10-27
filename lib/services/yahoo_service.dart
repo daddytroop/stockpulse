@@ -80,10 +80,12 @@ class YahooService {
   final Map<String, _Cached<ChartHistory>> _chartCache = {};
   final Map<String, _Cached<CalendarData?>> _calendarCache = {};
   final Map<String, _Cached<List<NewsItem>>> _newsCache = {};
+  final Map<String, _Cached<CompanyProfile?>> _profileCache = {};
 
   static const Duration _chartTtl = Duration(minutes: 10);
   static const Duration _newsTtl = Duration(minutes: 15);
   static const Duration _calendarTtl = Duration(hours: 12);
+  static const Duration _profileTtl = Duration(days: 7);
 
   // ---------------------------------------------------------------------------
   // Low-level helpers
@@ -96,9 +98,16 @@ class YahooService {
   }
 
   /// GET with host failover; returns null if every attempt fails.
+  ///
+  /// [rawQuery] is used verbatim instead of building the query from
+  /// [params]. Some Yahoo endpoints (notably the batched quote endpoint)
+  /// need a comma to stay a literal comma and only the individual symbols
+  /// to be percent-encoded. `Uri(queryParameters:)` would encode the comma
+  /// as well, which Yahoo then reads as part of a symbol name, so those
+  /// calls pass the query string pre-built.
   Future<http.Response?> _get(String path, Map<String, String> params,
-      {bool withCookie = false}) async {
-    final query = Uri(queryParameters: params).query;
+      {bool withCookie = false, String? rawQuery}) async {
+    final query = rawQuery ?? Uri(queryParameters: params).query;
     for (final host in _hosts) {
       try {
         final uri = Uri.parse(_route('https://$host$path?$query'));
@@ -176,9 +185,14 @@ class YahooService {
         final list = symbols.toList();
         for (var i = 0; i < list.length; i += 25) {
           final end = (i + 25).clamp(0, list.length);
+          // Each symbol is percent-encoded on its own and the separator
+          // stays a literal comma. Encoding the whole list would turn the
+          // comma into %2C, which Yahoo refuses to split on.
           final chunk = list.sublist(i, end).map(Uri.encodeComponent).join(',');
-          final r = await _get('/v7/finance/quote',
-              {'symbols': chunk, 'crumb': _crumb!}, withCookie: true);
+          final r = await _get('/v7/finance/quote', const {},
+              withCookie: true,
+              rawQuery:
+                  'symbols=$chunk&crumb=${Uri.encodeQueryComponent(_crumb!)}');
           if (r == null) throw const YahooException('quote request failed');
           final body = jsonDecode(r.body) as Map<String, dynamic>;
           final qr = body['quoteResponse'] as Map<String, dynamic>?;
@@ -421,6 +435,7 @@ class YahooService {
               relatedTickers: [
                 for (final t in ((e['relatedTickers'] as List?) ?? const [])) t.toString()
               ],
+              imageUrl: _newsImage(e),
             );
           })
           .where((n) => n.title.isNotEmpty && n.link.isNotEmpty)
@@ -429,6 +444,72 @@ class YahooService {
       return items;
     } catch (_) {
       return const [];
+    }
+  }
+
+  /// Picks the best thumbnail for a news story.
+  ///
+  /// Yahoo's own image proxy can resize on the fly, so a small preview is
+  /// requested at a size that suits an in-app article header.
+  String? _newsImage(Map<String, dynamic> entry) {
+    final thumb = entry['thumbnail'];
+    if (thumb is! Map) return null;
+    final res = thumb['resolutions'];
+    if (res is! List || res.isEmpty) return null;
+    final urls = <String>[
+      for (final r in res.whereType<Map<String, dynamic>>())
+        if (r['url'] is String) r['url'] as String,
+    ];
+    if (urls.isEmpty) return null;
+    for (final u in urls) {
+      if (u.contains('s.yimg.com')) {
+        return u.replaceAll('resizefill_w140_h140', 'resizefill_w640_h360');
+      }
+    }
+    return urls.first;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Company profile (sector / industry)
+  // ---------------------------------------------------------------------------
+
+  /// Fetches the sector and industry Yahoo reports for a symbol.
+  ///
+  /// This endpoint only answers one symbol at a time, so the results are
+  /// cached for a long time - this data changes very rarely.
+  Future<CompanyProfile?> companyProfile(String symbol) async {
+    final key = symbol.toUpperCase();
+    final c = _profileCache[key];
+    if (c != null && c.fresh(_profileTtl)) return c.value;
+
+    await _ensureCrumb();
+    if (_crumb == null) return null;
+
+    final r = await _get(
+      '/v10/finance/quoteSummary/${Uri.encodeComponent(symbol)}',
+      {'modules': 'assetProfile'},
+      withCookie: true,
+    );
+    if (r == null) return null;
+    try {
+      final body = jsonDecode(r.body) as Map<String, dynamic>;
+      final results = (body['quoteSummary']?['result'] as List?) ?? const [];
+      if (results.isEmpty) return null;
+      final profile = ((results.first as Map<String, dynamic>)['assetProfile']
+          as Map<String, dynamic>?);
+      if (profile == null) return null;
+      final data = CompanyProfile(
+        symbol: key,
+        sector: profile['sectorDisp'] as String? ?? profile['sector'] as String?,
+        industry:
+            profile['industryDisp'] as String? ?? profile['industry'] as String?,
+        website: profile['website'] as String?,
+        summary: profile['longBusinessSummary'] as String?,
+      );
+      _profileCache[key] = _Cached(data, DateTime.now());
+      return data;
+    } catch (_) {
+      return null;
     }
   }
 }

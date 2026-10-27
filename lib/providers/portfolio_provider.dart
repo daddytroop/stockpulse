@@ -18,6 +18,7 @@ import '../services/diagnostics.dart';
 import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
 import '../utils/formatters.dart';
+import '../utils/market_identity.dart';
 
 /// Aggregate money stats for a portfolio (or all portfolios at once).
 @immutable
@@ -88,6 +89,10 @@ class PortfolioProvider extends ChangeNotifier {
   String _displayCurrency = '';
   final Map<String, double> _fxRates = {}; // 'CADUSD' -> rate
   bool _fxLoading = false;
+  DateTime? _fxLastAttempt;
+
+  /// How long to wait before retrying a failed FX lookup.
+  static const Duration _fxRetryCooldown = Duration(minutes: 5);
   bool _notifyDividends = true;
   bool _notifyEarnings = true;
   double _priceAlertPct = 0; // 0 = off
@@ -116,6 +121,10 @@ class PortfolioProvider extends ChangeNotifier {
   /// Short trend lines shown next to holdings.
   final Map<String, _CachedSparkline> _sparkCache = {};
   final Map<String, Future<List<double>>> _sparkInflight = {};
+
+  /// Sector / industry per symbol, filled in on demand.
+  final Map<String, CompanyProfile> _profiles = {};
+  bool _profilesLoading = false;
 
   // ---------------------------------------------------------------------------
   // Getters
@@ -147,6 +156,23 @@ class PortfolioProvider extends ChangeNotifier {
   String get displayCurrency => _displayCurrency;
   bool get fxLoading => _fxLoading;
   bool get converting => _displayCurrency.isNotEmpty;
+
+  /// Whether every currency used by the holdings has a rate into the
+  /// display currency.
+  ///
+  /// When this is false the totals are still shown, but in the native
+  /// currencies, and the UI says so rather than silently mixing them.
+  bool get fxRatesReady {
+    if (_displayCurrency.isEmpty) return true;
+    for (final p in _portfolios) {
+      for (final h in p.holdings.values) {
+        final c = h.currency.toUpperCase();
+        if (c.isEmpty || c == _displayCurrency) continue;
+        if ((_fxRates['$c$_displayCurrency'] ?? 0) <= 0) return false;
+      }
+    }
+    return true;
+  }
   bool get notifyDividends => _notifyDividends;
   bool get notifyEarnings => _notifyEarnings;
   double get priceAlertPct => _priceAlertPct;
@@ -250,7 +276,8 @@ class PortfolioProvider extends ChangeNotifier {
       _accentIndex = ((data['accentIndex'] as num?) ?? 0).toInt()
           .clamp(0, AppTheme.accents.length - 1);
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
-      _displayCurrency = data['displayCurrency']?.toString() ?? '';
+      _displayCurrency =
+          (data['displayCurrency']?.toString() ?? '').trim().toUpperCase();
       _notifyDividends = data['notifyDividends'] as bool? ?? true;
       _notifyEarnings = data['notifyEarnings'] as bool? ?? true;
       _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
@@ -813,9 +840,19 @@ class PortfolioProvider extends ChangeNotifier {
   /// per pair).
   Future<void> ensureFxRates({bool force = false}) async {
     if (_displayCurrency.isEmpty || _fxLoading) return;
+
+    // A failed lookup must not turn into a hot retry loop, because the
+    // totals rebuild on every frame.
+    final now = DateTime.now();
+    if (!force &&
+        _fxLastAttempt != null &&
+        now.difference(_fxLastAttempt!) < _fxRetryCooldown) {
+      return;
+    }
+
     final froms = {
       for (final p in _portfolios) ...[
-        for (final h in p.holdings.values) h.currency,
+        for (final h in p.holdings.values) h.currency.toUpperCase(),
       ]
     }..removeWhere((c) => c.isEmpty || c == _displayCurrency);
 
@@ -826,6 +863,7 @@ class PortfolioProvider extends ChangeNotifier {
     if (need.isEmpty) return;
 
     _fxLoading = true;
+    _fxLastAttempt = now;
     notifyListeners();
     try {
       final pairs = {
@@ -833,8 +871,7 @@ class PortfolioProvider extends ChangeNotifier {
       };
       final quotes = await _yahoo.quotes(pairs);
       for (final f in need) {
-        final q =
-            quotes['$f$_displayCurrency=X'] ?? quotes['${f.toUpperCase()}$_displayCurrency=X'];
+        final q = quotes['$f$_displayCurrency=X'];
         if (q != null && q.price > 0) {
           _fxRates['$f$_displayCurrency'] = q.price;
         }
@@ -1047,6 +1084,66 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Company profiles (sector / industry)
+  // ---------------------------------------------------------------------------
+
+  /// Fetches the sector and industry for the given symbols.
+  ///
+  /// Yahoo only answers one symbol per request, so this runs slowly and
+  /// only for symbols that can have an industry (equities and funds).
+  /// Results are cached inside the service for a week.
+  Future<void> ensureProfiles(Set<String> symbols) async {
+    if (_profilesLoading) return;
+    final wanted = symbols
+        .map((s) => s.toUpperCase())
+        .where((s) => s.isNotEmpty && !_profiles.containsKey(s))
+        .toSet()
+        .toList();
+    if (wanted.isEmpty) return;
+
+    _profilesLoading = true;
+    try {
+      var fetched = 0;
+      for (final symbol in wanted) {
+        if (fetched >= 12) break;
+        final q = _quotes[symbol];
+        final type = q?.quoteType;
+        // Crypto and cash have no industry.
+        if (q != null && type != null && type != 'EQUITY' && type != 'ETF') {
+          continue;
+        }
+        try {
+          final profile = await _yahoo.companyProfile(symbol);
+          if (profile != null) {
+            _profiles[symbol] = profile;
+            fetched++;
+            notifyListeners();
+          }
+        } catch (_) {
+          // skip this symbol
+        }
+      }
+    } finally {
+      _profilesLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// The cached company profile for a symbol, if one has been fetched.
+  CompanyProfile? profileOf(String symbol) => _profiles[symbol.toUpperCase()];
+
+  /// The industry Yahoo reports for a symbol ('Other' when unknown).
+  String industryOf(String symbol) =>
+      _profiles[symbol.toUpperCase()]?.industryLabel ?? 'Other';
+
+  /// The sector Yahoo reports for a symbol ('Other' when unknown).
+  String sectorOf(String symbol) =>
+      _profiles[symbol.toUpperCase()]?.sectorLabel ?? 'Other';
+
+  /// True while sector/industry data is still being fetched.
+  bool get profilesLoading => _profilesLoading;
+
   /// Portfolio value history merged from every holding's chart.
   Future<List<ChartPoint>> portfolioHistory(String portfolioId, String range) async {
     final key = '$portfolioId|$range';
@@ -1240,7 +1337,10 @@ class PortfolioProvider extends ChangeNotifier {
     return byYear;
   }
 
-  /// Allocation slices for the donut chart: [by] is 'type' or 'currency'.
+  /// Allocation slices for the donut chart.
+  ///
+  /// [by] is one of 'type', 'currency', 'industry' or 'sector'. Values are
+  /// FX-converted when a display currency is active.
   List<AllocationSlice> allocationFor(Portfolio p, {required String by}) {
     final display = _displayCurrency;
     final converting = display.isNotEmpty;
@@ -1254,7 +1354,13 @@ class PortfolioProvider extends ChangeNotifier {
       final q = _quotes[h.symbol];
       final fx = converting && ready ? (_fxRateFor(h.currency) == 0 ? 1 : _fxRateFor(h.currency)) : 1.0;
       final value = (q?.price ?? 0) * h.quantity * fx;
-      final key = by == 'type' ? typeLabelOf(h.symbol) : h.currency;
+      final key = switch (by) {
+        'type' => typeLabelOf(h.symbol),
+        'currency' => h.currency,
+        'industry' => industryOf(h.symbol),
+        'sector' => sectorOf(h.symbol),
+        _ => h.currency,
+      };
       groups[key] = (groups[key] ?? 0) + value;
     }
     final entries = groups.entries.where((e) => e.value > 0).toList()
@@ -1355,6 +1461,9 @@ class PortfolioProvider extends ChangeNotifier {
   Future<void> setDisplayCurrency(String code) async {
     _displayCurrency = code.trim().toUpperCase();
     if (_displayCurrency == 'NONE') _displayCurrency = '';
+    // A new display currency needs its own rates, so the retry cooldown
+    // from a previous failure must not block the first attempt.
+    _fxLastAttempt = null;
     notifyListeners();
     await _persistData();
     await ensureFxRates();
@@ -1441,16 +1550,47 @@ class PortfolioProvider extends ChangeNotifier {
         : '';
     final sign = t.hasDayChange ? (t.dayChange > 0 ? 1 : (t.dayChange < 0 ? -1 : 0)) : 0;
 
+    // A short summary of what the number is made of.
+    final holdingCount = _portfolios.fold<int>(
+        0, (sum, p) => sum + p.holdings.length);
+    final markets = <String>{};
+    for (final p in _portfolios) {
+      for (final h in p.holdings.values) {
+        final q = _quotes[h.symbol];
+        markets.add(marketFor(
+          symbol: h.symbol,
+          exchangeCode: q?.exchange,
+          exchangeName: q?.fullExchangeName,
+          quoteType: q?.quoteType,
+        ) ??
+            'Other');
+      }
+    }
+    final meta = holdingCount == 0
+        ? 'No holdings yet'
+        : '$holdingCount holding${holdingCount == 1 ? '' : 's'}'
+            '${markets.isEmpty ? '' : ' · ${markets.length} market${markets.length == 1 ? '' : 's'}'}';
+
     final next = nextUpcomingAcrossAll();
     String nd1;
     String nd2;
+    String ndSymbol;
+    String ndAmount;
+    String ndWhen;
     if (next == null) {
       nd1 = 'No upcoming dividends';
       nd2 = '';
+      ndSymbol = 'No dividends';
+      ndAmount = '';
+      ndWhen = '';
     } else {
       nd1 = '${next.symbol} ${fmtMoney(next.amountPerShare, currency: currency)}/share';
       nd2 = '${next.estimated ? 'Est. ' : ''}ex ${fmtShortDate(next.exDate)}'
           ' | pays ${fmtShortDate(next.payDate)}';
+      ndSymbol = next.symbol;
+      ndAmount = '${fmtMoney(next.amountPerShare, currency: currency)}/share';
+      final days = next.exDate.difference(DateTime.now()).inDays;
+      ndWhen = days <= 0 ? 'today' : 'in $days day${days == 1 ? '' : 's'}';
     }
 
     await StockPulseWidgetService.push(
@@ -1459,6 +1599,10 @@ class PortfolioProvider extends ChangeNotifier {
       changeSign: sign,
       nextDividendLine1: nd1,
       nextDividendLine2: nd2,
+      meta: meta,
+      nextDividendSymbol: ndSymbol,
+      nextDividendAmount: ndAmount,
+      nextDividendWhen: ndWhen,
     );
     await pushWorkerSnapshot();
   }
