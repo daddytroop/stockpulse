@@ -16,10 +16,10 @@ void main() {
   });
 
   group('AdUnits', () {
-    test('every placement resolves to an ad unit', () {
+    test('every placement resolves to a test unit in debug', () {
       for (final p in AdPlacement.values) {
-        expect(AdUnits.forPlacement(p), isNotEmpty);
-        expect(AdUnits.forPlacement(p), contains('ca-app-pub-'));
+        expect(AdUnits.forPlacement(p, const {}), isNotEmpty);
+        expect(AdUnits.forPlacement(p, const {}), contains('ca-app-pub-'));
       }
     });
 
@@ -28,6 +28,10 @@ void main() {
         AdUnits.test[AdPlacement.holdingsNative],
         startsWith('ca-app-pub-3940256099942544/'),
       );
+    });
+
+    test('the default banner unit is set', () {
+      expect(AdUnits.defaultBanner, contains('ca-app-pub-'));
     });
   });
 
@@ -69,6 +73,26 @@ void main() {
     test('revenue converts from micros to dollars', () {
       const stats = AdPlacementStats(impressions: 1, revenueMicros: 1500000);
       expect(stats.revenueDollars, closeTo(1.5, 0.0001));
+    });
+  });
+
+  group('frequency caps', () {
+    test('every placement has a daily cap', () {
+      for (final p in AdPlacement.values) {
+        expect(AdService.dailyCap[p], isNotNull);
+        expect(AdService.dailyCap[p]!, greaterThan(0));
+      }
+    });
+
+    test('native placements are capped lower than banners', () {
+      expect(
+        AdService.dailyCap[AdPlacement.holdingsNative]!,
+        lessThan(AdService.dailyCap[AdPlacement.portfolioBanner]!),
+      );
+    });
+
+    test('the session cap is a positive number', () {
+      expect(AdService.sessionCap, greaterThan(0));
     });
   });
 }

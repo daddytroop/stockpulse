@@ -38,23 +38,21 @@ enum AdPlacement {
 
 /// Ad unit identifiers.
 ///
-/// Release units are configured in the AdMob console. The debug units below
-/// are Google's public test units, so a debug build always exercises the same
-/// code path without spending real impressions.
+/// The banner unit below is the one this app has always used. Native ads
+/// need their own ad units in the AdMob console (Native ad unit type), so
+/// those start empty and can be pasted into Settings without a rebuild.
+///
+/// An empty unit simply means that placement shows nothing - it never
+/// causes a failed request.
 class AdUnits {
   AdUnits._();
 
   static const String _publisher = 'ca-app-pub-2085007206942111';
 
-  /// Ad unit for each placement in release builds.
-  static const Map<AdPlacement, String> release = {
-    AdPlacement.holdingsNative: '$_publisher/8657501940',
-    AdPlacement.newsNative: '$_publisher/8657501940',
-    AdPlacement.portfolioBanner: '$_publisher/8657501940',
-    AdPlacement.dividendsNative: '$_publisher/8657501940',
-  };
+  /// The banner ad unit that ships with the app.
+  static const String defaultBanner = '$_publisher/8657501940';
 
-  /// Google's test ad units, used in debug and profile builds.
+  /// Google's public test units, used in debug and profile builds.
   static const Map<AdPlacement, String> test = {
     AdPlacement.holdingsNative: 'ca-app-pub-3940256099942544/6300978111',
     AdPlacement.newsNative: 'ca-app-pub-3940256099942544/6300978111',
@@ -62,9 +60,17 @@ class AdUnits {
     AdPlacement.dividendsNative: 'ca-app-pub-3940256099942544/6300978111',
   };
 
-  static String forPlacement(AdPlacement placement) =>
-      (kReleaseMode ? release : test)[placement] ??
-      (kReleaseMode ? release : test)[AdPlacement.portfolioBanner]!;
+  /// The ad unit used for a placement in release builds.
+  static String forPlacement(
+    AdPlacement placement,
+    Map<AdPlacement, String> configured,
+  ) {
+    if (!kReleaseMode) return test[placement] ?? test[AdPlacement.portfolioBanner]!;
+    final custom = configured[placement];
+    if (custom != null && custom.trim().isNotEmpty) return custom.trim();
+    if (placement == AdPlacement.portfolioBanner) return defaultBanner;
+    return '';
+  }
 }
 
 /// A record of one ad impression, kept locally so the user can see how the
@@ -127,6 +133,8 @@ class AdPlacementStats {
 ///  * ads never block content, and a failed ad collapses to nothing,
 ///  * a placement is only shown once the user has scrolled past the content
 ///    it follows, so an ad is never pushed at someone,
+///  * a placement is capped per day and per session, so the app cannot
+///    turn into a slot machine,
 ///  * native ads are labelled as ads,
 ///  * the user can turn ads off entirely in Settings.
 class AdService extends ChangeNotifier {
@@ -135,6 +143,20 @@ class AdService extends ChangeNotifier {
 
   static const String _logFile = 'stockpulse_ads.json';
   static const int _maxLoggedImpressions = 400;
+
+  /// How many impressions a single placement may serve in one day.
+  ///
+  /// Native placements are capped lower because they are larger and more
+  /// noticeable than a small banner.
+  static const Map<AdPlacement, int> dailyCap = {
+    AdPlacement.holdingsNative: 4,
+    AdPlacement.newsNative: 6,
+    AdPlacement.dividendsNative: 3,
+    AdPlacement.portfolioBanner: 8,
+  };
+
+  /// How many impressions any placement may serve in one app session.
+  static const int sessionCap = 10;
 
   final StockPulseStore _store;
 
@@ -148,8 +170,30 @@ class AdService extends ChangeNotifier {
   bool _adsAllowed = true;
   bool _privacyRequired = false;
 
+  /// Impressions served during this app session.
+  int _sessionImpressions = 0;
+
   /// Set by the user in Settings.
   bool _enabled = true;
+
+  /// Ad units the user has configured per placement.
+  final Map<AdPlacement, String> _adUnits = {};
+
+  /// The ad unit configured for a placement, if any.
+  String adUnitFor(AdPlacement placement) =>
+      AdUnits.forPlacement(placement, _adUnits);
+
+  /// Configures the ad unit for a placement. An empty value clears it.
+  Future<void> setAdUnit(AdPlacement placement, String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      _adUnits.remove(placement);
+    } else {
+      _adUnits[placement] = trimmed;
+    }
+    await _persist();
+    notifyListeners();
+  }
 
   AdPlacementStats statsFor(AdPlacement placement) {
     var impressions = 0, clicks = 0;
@@ -181,6 +225,26 @@ class AdService extends ChangeNotifier {
   /// Whether ads are supported at all on this platform.
   bool get supported => isAndroidPlatform;
 
+  /// Impressions served in this app session.
+  int get sessionImpressions => _sessionImpressions;
+
+  /// How many impressions each placement may still serve today.
+  int remainingToday(AdPlacement placement) {
+    final now = DateTime.now();
+    var served = 0;
+    for (final i in _log) {
+      if (i.placement != placement) continue;
+      if (i.at.year == now.year &&
+          i.at.month == now.month &&
+          i.at.day == now.day) {
+        served++;
+      }
+    }
+    final cap = dailyCap[placement] ?? 4;
+    final left = cap - served;
+    return left < 0 ? 0 : left;
+  }
+
   Future<void> load() async {
     final data = await _store.load(_logFile);
     if (data != null) {
@@ -188,7 +252,20 @@ class AdService extends ChangeNotifier {
       for (final raw in (data['log'] as List? ?? const [])) {
         if (raw is Map<String, dynamic>) _log.add(AdImpression.fromMap(raw));
       }
+      final units = data['adUnits'] as Map<String, dynamic>?;
+      if (units != null) {
+        for (final entry in units.entries) {
+          final placement = AdPlacement.values.where((p) => p.id == entry.key);
+          if (placement.isEmpty) continue;
+          final value = entry.value as String?;
+          if (value != null && value.trim().isNotEmpty) {
+            _adUnits[placement.first] = value.trim();
+          }
+        }
+      }
     }
+    // A new session starts with a fresh impression budget.
+    _sessionImpressions = 0;
     if (isAndroidPlatform) await _initAds();
     notifyListeners();
   }
@@ -202,6 +279,7 @@ class AdService extends ChangeNotifier {
   Future<void> _persist() async {
     await _store.save(_logFile, {
       'enabled': _enabled,
+      'adUnits': {for (final e in _adUnits.entries) e.key.id: e.value},
       'log': [for (final i in _log) i.toMap()],
     });
   }
@@ -256,10 +334,29 @@ class AdService extends ChangeNotifier {
   ///
   /// [minGap] keeps the same placement from appearing twice in quick
   /// succession, which is the fastest way to make an app feel ad-ridden.
-  bool canShow(AdPlacement placement, {Duration minGap = const Duration(minutes: 3)}) {
+  /// The daily and session caps stop the app from showing ads on every
+  /// visit.
+  bool canShow(
+    AdPlacement placement, {
+    Duration minGap = const Duration(minutes: 3),
+  }) {
     if (!supported || !canRequestAds) return false;
+    if (_sessionImpressions >= sessionCap) return false;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var servedToday = 0;
+    for (final i in _log) {
+      if (i.placement != placement) continue;
+      final at = i.at;
+      if (at.year == today.year && at.month == today.month && at.day == today.day) {
+        servedToday++;
+      }
+    }
+    if (servedToday >= (dailyCap[placement] ?? 4)) return false;
+
     final last = _lastShown[placement];
-    if (last != null && DateTime.now().difference(last) < minGap) return false;
+    if (last != null && now.difference(last) < minGap) return false;
     return true;
   }
 
@@ -270,6 +367,7 @@ class AdService extends ChangeNotifier {
     bool clicked = false,
   }) {
     _lastShown[placement] = DateTime.now();
+    _sessionImpressions++;
     _log.add(AdImpression(
       placement: placement,
       at: DateTime.now(),

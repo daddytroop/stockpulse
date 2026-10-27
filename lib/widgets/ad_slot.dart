@@ -71,11 +71,14 @@ class _AdSlotState extends State<AdSlot> {
     if (!_service.canRequestAds) return;
     if (!_service.canShow(widget.placement)) return;
 
+    final unitId = _service.adUnitFor(widget.placement);
+    if (unitId.isEmpty) return;
+
     final generation = ++_generation;
     try {
       if (widget.native) {
         final ad = NativeAd(
-          adUnitId: AdUnits.forPlacement(widget.placement),
+          adUnitId: unitId,
           request: const AdRequest(),
           nativeTemplateStyle: _templateStyle(),
           listener: NativeAdListener(
@@ -111,7 +114,7 @@ class _AdSlotState extends State<AdSlot> {
         await ad.load();
       } else {
         final ad = BannerAd(
-          adUnitId: AdUnits.forPlacement(widget.placement),
+          adUnitId: unitId,
           size: AdSize.banner,
           request: const AdRequest(),
           listener: BannerAdListener(

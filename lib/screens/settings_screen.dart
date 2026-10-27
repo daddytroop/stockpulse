@@ -520,6 +520,69 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  /// Lets each placement be pointed at a specific ad unit.
+  Future<void> _editAdUnits(BuildContext context, AdService ads) async {
+    final controllers = {
+      for (final p in AdPlacement.values)
+        p: TextEditingController(text: ads.adUnitFor(p)),
+    };
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ad units'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Each placement reports separately in AdMob, so you can see '
+                  'which one earns. A blank ID hides that placement.',
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                for (final p in AdPlacement.values)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                      controller: controllers[p],
+                      decoration: InputDecoration(
+                        labelText: p.label,
+                        hintText: p == AdPlacement.portfolioBanner
+                            ? AdUnits.defaultBanner
+                            : 'ca-app-pub-.../...',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              for (final e in controllers.entries) {
+                ads.setAdUnit(e.key, e.value.text);
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+  }
+
   Widget _section(BuildContext context, String title) {
     return SectionHeader(
       title: title,
@@ -575,6 +638,15 @@ class SettingsScreen extends StatelessWidget {
               subtitle: const Text('Change what the ad SDK may share.'),
               onTap: () => ads.showPrivacyOptions(),
             ),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: const Text('Ad unit per placement'),
+            subtitle: const Text(
+              'Native ads need their own ad unit in the AdMob console. '
+              'Paste the ID here; leave blank to hide that placement.',
+            ),
+            onTap: () => _editAdUnits(context, ads),
+          ),
           if (totalImpressions > 0) ...[
             const Divider(height: 1),
             Padding(
@@ -634,7 +706,9 @@ class SettingsScreen extends StatelessWidget {
                       '$totalClicks clicks, '
                       'est. \$${(totalRevenue / 1000000).toStringAsFixed(4)} earned.\n'
                       'Revenue figures come from the ad SDK\'s own paid-event '
-                      'reporting and are an estimate. Nothing is sent to a server.',
+                      'reporting and are an estimate. Nothing is sent to a server.\n\n'
+                      'Each placement is capped per day so the app stays '
+                      'pleasant: ${AdService.dailyCap.entries.map((e) => '${e.key.label} ${e.value}').join(' · ')}.',
                       style: theme.textTheme.labelSmall
                           ?.copyWith(color: theme.hintColor, height: 1.4),
                     ),
