@@ -71,12 +71,13 @@ void main() {
     expect(isMark(offset + 88 * unit, offset + 31 * unit), isTrue,
         reason: 'The arrow head is missing.');
 
-    // The stroke colour is the brand mark colour.
+    // The stroke colour is the brand mark colour. Flutter colour channels are
+    // 0.0-1.0 while the raw bytes are 0-255.
     final arrowX = (offset + 88 * unit).round();
     final arrowY = (offset + 31 * unit).round();
     final i = (arrowY * size + arrowX) * 4;
-    expect(data[i], PulseBrand.mark.r);
-    expect(data[i + 1], PulseBrand.mark.g);
-    expect(data[i + 2], PulseBrand.mark.b);
+    expect(data[i], (PulseBrand.mark.r * 255).round());
+    expect(data[i + 1], (PulseBrand.mark.g * 255).round());
+    expect(data[i + 2], (PulseBrand.mark.b * 255).round());
   });
 }
