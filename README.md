@@ -23,7 +23,9 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 🖼️ **Real company logos** — each holding shows the issuer's own logo, served by Wikimedia Commons. A ticker is only matched when it maps to a single company, otherwise a letter badge is used.
 - ⏱️ **Visible data freshness** — the exchange timestamp Yahoo reports is shown next to each quote, alongside the fetch time, so a delayed price is never presented as a live one.
 - 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
-- 📅 **Dividend calendar** — a month view you can page through, with a tap on any day opening exactly what is scheduled that day. Below it, a month-by-month timeline of every upcoming dividend and earnings date.
+- 📅 **Dividend calendar** — a month view you can page through, with a tap on any day opening exactly what is scheduled that day. Below it, a month-by-month timeline of every upcoming dividend and earnings date, and a one-tap **export to your own calendar** (.ics).
+- 🆕 **What's new** — dividends paid this month, paid so far this year, the biggest mover today, and the next event, in one card.
+- 🕶️ **Hide balances** — one switch turns every amount into dots, for when you are not meant to be showing your screen.
 - 🏭 **Industry breakdown** — allocation can be split by type, currency or industry, using the sector and industry Yahoo reports for each holding.
 - 📊 **Interactive charts** — drag across the chart to scrub the exact value and date; the line draws itself in, the area is a soft gradient, and a **SPY benchmark overlay** stays legible but clearly secondary.
 - 🧮 **Live KPI tiles** — today, total return, annual income and holdings, all counted up from real quote data, each one tappable through to the screen that explains it.
@@ -60,6 +62,8 @@ Portfolios are stored locally unless you enable Gist sync. Android includes a Go
 
 Debug/profile builds use Google's test ads. Release builds use the AdMob placements below. Consent information is refreshed before requesting ads; when required, the app exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
 
+**Live ads are opt-in.** A release build serves Google's *test* ads unless it is built with `--dart-define=ADS_LIVE=true` (the CI release build turns them on only when the `ADS_LIVE` repository secret is set to `true`). AdMob asks for test ads while an app is under review, and it means an accidental click on a live ad cannot flag the account. See [`docs/PLAY_LAUNCH.md`](docs/PLAY_LAUNCH.md) for the full order of steps.
+
 **Placements.** Each placement has its own ad unit so AdMob reports revenue per placement, which is what makes it possible to tell which one actually earns:
 
 | Placement | Where it appears | Format | Ad unit |
@@ -92,6 +96,10 @@ Ad placement is a developer's decision, so there is no ad-unit setting in the ap
 4. For US and EEA users, publish a **consent message** in AdMob's Privacy & messaging console. Canadian users do not normally see one.
 5. Test the **placement report** in Settings → Advertising after a few days of real use; that is the number to judge placements by.
 6. Never click your own live ads - that is a policy violation and can suspend the account.
+
+### Publishing on the Play Store
+
+[`docs/PLAY_LAUNCH.md`](docs/PLAY_LAUNCH.md) walks through it: creating an upload keystore, giving CI the signing secrets, building a signed `.aab` alongside the APK, creating the Play listing, linking the app in AdMob (which is what lifts "Limited ad serving"), and hosting `app-ads.txt` on the domain listed in the store listing. The repository already contains `app-ads.txt`, and the web build publishes it at its root.
 
 The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
 

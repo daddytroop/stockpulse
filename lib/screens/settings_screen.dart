@@ -531,7 +531,7 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.5.3',
+                      Text('Stock Pulse v1.5.4',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
@@ -598,6 +598,20 @@ class SettingsScreen extends StatelessWidget {
                   'which one earns. Native ads need a native ad unit; a blank '
                   'ID hides that placement.',
                   style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  kAdsLive
+                      ? 'Live ads are on in this build.'
+                      : 'This build serves Google test ads. Live ads are '
+                          'switched on with the ADS_LIVE build flag, so an '
+                          'unapproved app cannot serve (or be clicked on) '
+                          'real ads.',
+                  style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                        color: kAdsLive
+                            ? Theme.of(ctx).colorScheme.primary
+                            : Theme.of(ctx).hintColor,
+                      ),
                 ),
                 const SizedBox(height: 12),
                 for (final p in AdPlacement.values)

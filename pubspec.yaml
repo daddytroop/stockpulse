@@ -3,7 +3,7 @@ description: >-
   Stock Pulse - a free, open-source portfolio & dividend tracker for
   Android (APK + home-screen widgets) and Windows desktop.
 publish_to: 'none'
-version: 1.5.3+12
+version: 1.5.4+13
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
