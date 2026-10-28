@@ -6,6 +6,8 @@ import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/ad_service.dart';
+import '../services/calendar_service.dart';
+import '../services/export_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/ad_slot.dart';
@@ -162,6 +164,15 @@ class _DividendsScreenState extends State<DividendsScreen> {
                 title: 'Upcoming events',
                 subtitle: 'Dividends and earnings · next 120 days',
               ),
+              if (events.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.event_available_outlined, size: 18),
+                    label: const Text('Add to my calendar'),
+                    onPressed: () => _exportCalendar(context, events, currency),
+                  ),
+                ),
               ..._upcomingEventList(context, events, currency, colors),
               if (events.isEmpty)
                 Padding(
@@ -515,6 +526,33 @@ class _DividendsScreenState extends State<DividendsScreen> {
             begin: const Offset(0, 0.05), end: Offset.zero, duration: 250.ms),
       ],
     );
+  }
+
+  /// Writes the upcoming events to a calendar file the user can open with
+  /// their own calendar app.
+  Future<void> _exportCalendar(BuildContext context, List<UpcomingEvent> events,
+      String? currency) async {
+    final ics = CalendarService.buildIcs(events: events, currency: currency);
+    if (ics.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No upcoming events to export.'),
+      ));
+      return;
+    }
+    final ok = await ExportService.saveOrShare(
+      fileName: CalendarService.fileName(),
+      content: ics,
+      mimeType: 'text/calendar',
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok
+          ? (ExportService.clipboardFallbackUsed
+              ? 'Calendar copied to the clipboard - paste it into a .ics file.'
+              : 'Calendar file ready - open it with your calendar app.')
+          : 'Could not export the calendar file.'),
+    ));
   }
 
   void _openHolding(BuildContext context, String symbol) {

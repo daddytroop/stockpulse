@@ -251,6 +251,17 @@ class SettingsScreen extends StatelessWidget {
                   value: provider.autoRefreshOnStart,
                   onChanged: (v) => provider.setAutoRefreshOnStart(v),
                 ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.visibility_off_outlined),
+                  title: const Text('Hide balances'),
+                  subtitle: const Text(
+                    'Show every amount as dots. Percentages, holdings and '
+                    'the app layout stay the same.',
+                  ),
+                  value: provider.hideBalances,
+                  onChanged: (v) => provider.setHideBalances(v),
+                ),
               ],
             ),
           ),

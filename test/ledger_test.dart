@@ -102,6 +102,55 @@ void main() {
     });
   });
 
+  group('dividendsReceivedInRange', () {
+    final payments = [
+      DividendPayment(exDate: d(90), amount: 0.5),
+      DividendPayment(exDate: d(40), amount: 0.6),
+      DividendPayment(exDate: d(1), amount: 0.7),
+    ];
+
+    test('only the payments inside the window count', () {
+      final got = dividendsReceivedInRange(
+        txns: const [],
+        payments: payments,
+        currentQty: 10,
+        holdingStart: d(100),
+        from: d(50),
+        to: d(0),
+      );
+      expect(got, closeTo((0.6 + 0.7) * 10, 0.0001));
+    });
+
+    test('a window with no payments is zero', () {
+      final got = dividendsReceivedInRange(
+        txns: const [],
+        payments: payments,
+        currentQty: 10,
+        holdingStart: d(100),
+        from: d(500),
+        to: d(400),
+      );
+      expect(got, 0);
+    });
+
+    test('the share count at the ex-date is used', () {
+      final txns = [
+        Txn(kind: 'buy', quantity: 10, unitPrice: 20, date: d(100)),
+        Txn(kind: 'sell', quantity: 4, unitPrice: 25, date: d(50)),
+      ];
+      final got = dividendsReceivedInRange(
+        txns: txns,
+        payments: payments,
+        currentQty: 6,
+        holdingStart: d(100),
+        from: d(50),
+        to: d(0),
+      );
+      // At -40d: 10 shares x 0.6 = 6 ; at -1d: 6 shares x 0.7 = 4.2
+      expect(got, closeTo(6 + 4.2, 0.0001));
+    });
+  });
+
   group('dripProjection', () {
     test('5 years of compounding at 5%', () {
       final v = dripProjection(100, 5);

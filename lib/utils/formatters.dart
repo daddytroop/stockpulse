@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../theme/app_colors.dart';
+import 'privacy.dart';
 
 /// Number & date formatting helpers shared across screens.
 
+/// The text shown instead of a currency amount while balances are hidden.
+const String hiddenAmount = '••••';
+
 String fmtMoney(num? v, {required String? currency, int decimals = 2}) {
   if (v == null) return '–';
+  if (PrivacyMode.hideBalances) return hiddenAmount;
   final f = NumberFormat.currency(locale: 'en_US', symbol: '', decimalDigits: decimals);
   final body = f.format(v);
   final sym = currencySymbol(currency);
@@ -26,6 +31,7 @@ String currencySymbol(String? code) {
 
 String fmtSignedMoney(num? v, {required String? currency}) {
   if (v == null) return '–';
+  if (PrivacyMode.hideBalances) return hiddenAmount;
   final sign = v > 0 ? '+' : '';
   return '$sign${fmtMoney(v, currency: currency)}';
 }

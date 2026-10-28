@@ -19,6 +19,7 @@ import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
 import '../utils/formatters.dart';
 import '../utils/market_identity.dart';
+import '../utils/privacy.dart';
 
 /// Aggregate money stats for a portfolio (or all portfolios at once).
 @immutable
@@ -97,6 +98,9 @@ class PortfolioProvider extends ChangeNotifier {
   bool _notifyEarnings = true;
   double _priceAlertPct = 0; // 0 = off
   bool _lockEnabled = false;
+
+  /// When true, every currency amount is shown as dots.
+  bool _hideBalances = false;
   String _gistId = '';
   String _gistToken = '';
   DateTime? _lastSyncAt;
@@ -177,6 +181,9 @@ class PortfolioProvider extends ChangeNotifier {
   bool get notifyEarnings => _notifyEarnings;
   double get priceAlertPct => _priceAlertPct;
   bool get lockEnabled => _lockEnabled;
+
+  /// Whether currency amounts are hidden across the app.
+  bool get hideBalances => _hideBalances;
   String get gistId => _gistId;
   String get gistToken => _gistToken;
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -216,6 +223,20 @@ class PortfolioProvider extends ChangeNotifier {
     _lockEnabled = v;
     notifyListeners();
     await _persistData();
+  }
+
+  /// Hides or shows every currency amount.
+  ///
+  /// The formatter switch is applied immediately so no screen can show a
+  /// balance in between, and the home-screen widgets are refreshed so they
+  /// match.
+  Future<void> setHideBalances(bool v) async {
+    if (_hideBalances == v) return;
+    _hideBalances = v;
+    PrivacyMode.hideBalances = v;
+    notifyListeners();
+    await _persistData();
+    await _pushWidget();
   }
 
   Future<void> completeOnboarding() async {
@@ -282,6 +303,10 @@ class PortfolioProvider extends ChangeNotifier {
       _notifyEarnings = data['notifyEarnings'] as bool? ?? true;
       _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
       _lockEnabled = data['lockEnabled'] as bool? ?? false;
+      _hideBalances = data['hideBalances'] as bool? ?? false;
+      // Applied before any quote arrives, so a balance is never on screen
+      // while the mode is on.
+      PrivacyMode.hideBalances = _hideBalances;
       _onboardingComplete = data['onboardingComplete'] as bool? ?? false;
       Diagnostics.setEnabled(data['crashDiagnostics'] as bool? ?? false);
       _crashDiagnostics = data['crashDiagnostics'] as bool? ?? false;
@@ -362,6 +387,7 @@ class PortfolioProvider extends ChangeNotifier {
       'notifyEarnings': _notifyEarnings,
       'priceAlertPct': _priceAlertPct,
       'lockEnabled': _lockEnabled,
+      'hideBalances': _hideBalances,
       'gistId': _gistId,
       'gistToken': _gistToken,
       'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
@@ -1255,6 +1281,42 @@ class PortfolioProvider extends ChangeNotifier {
         currentQty: h.quantity,
         holdingStart: h.addedAt,
       );
+
+  /// Dividend cash collected across a portfolio between two dates.
+  double dividendsReceivedBetween(Portfolio p, DateTime from, DateTime to) {
+    var total = 0.0;
+    for (final h in p.holdings.values) {
+      total += ledger.dividendsReceivedInRange(
+        txns: p.txnsFor(h.symbol),
+        payments: _dividendInfo[h.symbol]?.payments ?? const [],
+        currentQty: h.quantity,
+        holdingStart: h.addedAt,
+        from: from,
+        to: to,
+      );
+    }
+    return total;
+  }
+
+  /// Dividend cash collected so far this calendar year.
+  double dividendsReceivedThisYear(Portfolio p) {
+    final now = DateTime.now();
+    return dividendsReceivedBetween(
+        p, DateTime(now.year, 1, 1), DateTime(now.year, 12, 31, 23, 59, 59));
+  }
+
+  /// The holding that moved the most today, if any quote is available.
+  ({String symbol, double percent})? biggestMoverToday(Portfolio p) {
+    ({String symbol, double percent})? best;
+    for (final h in p.holdings.values) {
+      final pct = _quotes[h.symbol]?.dayChangePercent;
+      if (pct == null) continue;
+      if (best == null || pct.abs() > best.percent.abs()) {
+        best = (symbol: h.symbol, percent: pct);
+      }
+    }
+    return best;
+  }
 
   /// Realized P/L from the transaction history, or null when the history is
   /// incomplete (no recorded buys).

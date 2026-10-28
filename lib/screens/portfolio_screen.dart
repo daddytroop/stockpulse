@@ -25,6 +25,7 @@ import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
 import '../widgets/ui/text_prompt.dart';
+import '../widgets/ui/whats_new_card.dart';
 import 'add_edit_holding_sheet.dart';
 import 'holding_detail_screen.dart';
 import 'import_screen.dart';
@@ -121,6 +122,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
             const SizedBox(height: 12),
             _kpiRow(context, provider, totals, currency),
+            const SizedBox(height: 10),
+            WhatsNewCard(
+              provider: provider,
+              portfolio: portfolio,
+              currency: currency,
+            ),
             const SizedBox(height: 4),
             _dataProvenance(context, provider),
             const SizedBox(height: 12),

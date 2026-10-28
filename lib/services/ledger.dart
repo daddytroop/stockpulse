@@ -73,6 +73,31 @@ double dividendsReceived({
   return total;
 }
 
+/// Dividend cash collected for a position between two dates.
+///
+/// Same rules as [dividendsReceived], but only the payments that fall
+/// inside the window are counted - used for "received this month" and
+/// "received so far this year".
+double dividendsReceivedInRange({
+  required List<Txn> txns,
+  required List<DividendPayment> payments,
+  required double currentQty,
+  required DateTime? holdingStart,
+  required DateTime from,
+  required DateTime to,
+}) {
+  if (payments.isEmpty) return 0;
+  final start = holdingStart ?? DateTime.fromMillisecondsSinceEpoch(0);
+  var total = 0.0;
+  for (final p in payments) {
+    if (p.exDate.isBefore(from) || p.exDate.isAfter(to)) continue;
+    if (!p.exDate.isAfter(start)) continue;
+    final qty = txns.isEmpty ? currentQty : sharesAt(p.exDate, txns);
+    if (qty > 0) total += qty * p.amount;
+  }
+  return total;
+}
+
 /// Estimated 5-year dividend income if payments are reinvested (DRIP) at
 /// [annualYieldPct]. Straight compounding approximation.
 double dripProjection(double annualIncome, double annualYieldPct, {int years = 5}) {
