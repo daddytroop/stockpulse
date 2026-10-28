@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart' show DateFormat;
+
 import '../providers/portfolio_provider.dart';
 import '../utils/formatters.dart';
 
@@ -21,6 +23,16 @@ class CalendarService {
     final now = DateTime.now();
     final stamp = _stamp(now.toUtc());
     final limit = now.add(Duration(days: horizonDays));
+
+    // The payment date belongs on the ex-dividend entry, not as a second
+    // event of its own.
+    final payDates = <String, DateTime>{};
+    for (final e in events) {
+      if (e.kind == 'dividend' && e.isPayDate) {
+        payDates[e.symbol] = e.date;
+      }
+    }
+
     final lines = <String>[
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -32,6 +44,7 @@ class CalendarService {
 
     var count = 0;
     for (final e in events) {
+      if (e.isPayDate) continue;
       if (e.date.isBefore(now) || e.date.isAfter(limit)) continue;
       final day = DateTime(e.date.year, e.date.month, e.date.day);
       final isDividend = e.kind == 'dividend';
@@ -41,10 +54,12 @@ class CalendarService {
       final amount = isDividend && (e.amountPerShare ?? 0) > 0
           ? '${fmtMoney(e.amountPerShare, currency: currency)}/share'
           : '';
+      final payDate = isDividend ? payDates[e.symbol] : null;
       final notes = isDividend
           ? 'Ex-dividend date'
               '${e.estimated ? ' (estimated from payment cadence)' : ''}'
               '${amount.isEmpty ? '' : ' · $amount'}'
+              '${payDate == null ? '' : ' · pays ${DateFormat('d MMM yyyy').format(payDate)}'}'
           : 'Earnings report date';
 
       lines

@@ -1,0 +1,24 @@
+# Release signing for the Android app.
+#
+# Copy this file to `android/key.properties` (after the platform folders
+# have been generated with `scripts/setup_platforms`) and fill in the
+# values. The file is never committed - see .gitignore.
+#
+# Generate an upload keystore once, with:
+#
+#   keytool -genkey -v -keystore ~/stockpulse-upload.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Then set:
+# storeFile=/absolute/path/to/stockpulse-upload.jks
+# storePassword=the-store-password
+# keyAlias=upload
+# keyPassword=the-key-password
+#
+# With this file present, `flutter build appbundle --release` produces a
+# properly signed bundle for the Play Console. Without it, the release
+# build falls back to debug signing so the APK can still be sideloaded.
+storeFile=
+storePassword=
+keyAlias=
+keyPassword=

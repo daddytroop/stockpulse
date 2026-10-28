@@ -26,3 +26,8 @@ coverage/
 *.apk
 *.aab
 export/
+
+# Signing material - never commit a keystore or its passwords
+*.jks
+*.keystore
+key.properties

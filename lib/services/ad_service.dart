@@ -40,6 +40,18 @@ enum AdPlacement {
       };
 }
 
+/// Whether a release build should serve live ads.
+///
+/// AdMob asks that only test ads are served until the app has been
+/// approved and linked to a store listing, and clicking a live ad by
+/// mistake can flag the account. So live ads are opt-in: a build enables
+/// them with `--dart-define=ADS_LIVE=true`.
+///
+/// The CI release build turns them on only when the `ADS_LIVE` repository
+/// secret is set to `true`, so the published build follows the account's
+/// state without anyone editing code.
+const bool kAdsLive = bool.fromEnvironment('ADS_LIVE', defaultValue: false);
+
 /// Ad unit identifiers.
 ///
 /// The banner and the native unit below belong to this app's AdMob
@@ -80,7 +92,9 @@ class AdUnits {
     AdPlacement placement,
     Map<AdPlacement, String> configured,
   ) {
-    if (!kReleaseMode) return test[placement] ?? test[AdPlacement.portfolioBanner]!;
+    if (!kReleaseMode || !kAdsLive) {
+      return test[placement] ?? test[AdPlacement.portfolioBanner]!;
+    }
     return releaseUnitFor(placement, configured);
   }
 

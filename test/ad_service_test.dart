@@ -30,6 +30,12 @@ void main() {
       );
     });
 
+    test('live ads are opt-in', () {
+      // Until the app is approved in AdMob, only test ads may be served,
+      // so the flag is off by default.
+      expect(kAdsLive, isFalse);
+    });
+
     test('the default banner unit is set', () {
       expect(AdUnits.defaultBanner, contains('ca-app-pub-'));
     });

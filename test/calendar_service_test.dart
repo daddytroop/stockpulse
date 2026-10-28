@@ -67,6 +67,8 @@ void main() {
         currency: 'CAD',
       );
       expect('BEGIN:VEVENT'.allMatches(ics).length, 1);
+      // The payment date is described on the ex-dividend entry.
+      expect(ics, contains('pays 20 Nov 2026'));
     });
 
     test('special characters are escaped', () {

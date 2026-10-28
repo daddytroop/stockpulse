@@ -5,6 +5,22 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Release signing.
+//
+// `key.properties` holds the path to the upload keystore and its
+// passwords. It is never committed - copy `key.properties.example` and
+// fill it in, or let CI create it from the KEYSTORE_* secrets.
+//
+// When the file is missing the release build falls back to debug signing,
+// so the published APK stays directly sideloadable for people who install
+// it by hand.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "app.stockpulse"
     compileSdk flutter.compileSdkVersion
@@ -28,11 +44,22 @@ android {
         versionName flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
             // Debug-signed release builds so the APK is directly sideloadable.
             // Add a production signing config before publishing to a store.
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 }

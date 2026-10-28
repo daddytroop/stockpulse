@@ -146,8 +146,9 @@ void main() {
         from: d(50),
         to: d(0),
       );
-      // At -40d: 10 shares x 0.6 = 6 ; at -1d: 6 shares x 0.7 = 4.2
-      expect(got, closeTo(6 + 4.2, 0.0001));
+      // At -40d: 6 shares (10 bought, 4 sold on -50d) x 0.6 = 3.6
+      // At -1d: 6 shares x 0.7 = 4.2
+      expect(got, closeTo(3.6 + 4.2, 0.0001));
     });
   });
 
