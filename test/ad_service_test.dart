@@ -33,6 +33,44 @@ void main() {
     test('the default banner unit is set', () {
       expect(AdUnits.defaultBanner, contains('ca-app-pub-'));
     });
+
+    test('the default native unit is set', () {
+      expect(AdUnits.defaultNative, contains('ca-app-pub-'));
+    });
+
+    test('every placement has a release unit', () {
+      for (final p in AdPlacement.values) {
+        final unit = AdUnits.releaseUnitFor(p, const {});
+        expect(unit, isNotEmpty, reason: '${p.id} has no release ad unit');
+        expect(unit, contains('ca-app-pub-'));
+        // An ad unit is publisher/slash-id, never the app id form.
+        expect(unit, isNot(contains('~')));
+      }
+    });
+
+    test('native placements use the native unit', () {
+      for (final p in [
+        AdPlacement.holdingsNative,
+        AdPlacement.newsNative,
+        AdPlacement.newsArticle,
+        AdPlacement.dividendsNative,
+      ]) {
+        expect(AdUnits.releaseUnitFor(p, const {}), AdUnits.defaultNative);
+      }
+      expect(
+        AdUnits.releaseUnitFor(AdPlacement.portfolioBanner, const {}),
+        AdUnits.defaultBanner,
+      );
+    });
+
+    test('a configured unit overrides the default', () {
+      const custom = 'ca-app-pub-1234567890/1111111111';
+      expect(
+        AdUnits.releaseUnitFor(
+            AdPlacement.newsArticle, const {AdPlacement.newsArticle: custom}),
+        custom,
+      );
+    });
   });
 
   group('AdImpression', () {

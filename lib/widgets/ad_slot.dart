@@ -97,14 +97,12 @@ class _AdSlotState extends State<AdSlot> {
                 _ad = ad as AdWithView;
                 _ready = true;
               });
+              _service.clearError(widget.placement);
               _service.recordImpression(widget.placement);
             },
             onAdFailedToLoad: (ad, error) {
               ad.dispose();
-              if (kDebugMode) {
-                debugPrint('Native ad failed (${widget.placement.id}): '
-                    '${error.code} ${error.message}');
-              }
+              _service.reportError(widget.placement, _describe(error));
             },
             onAdClicked: (ad) => _service.recordImpression(
               widget.placement,
@@ -133,14 +131,12 @@ class _AdSlotState extends State<AdSlot> {
                 _ad = ad as AdWithView;
                 _ready = true;
               });
+              _service.clearError(widget.placement);
               _service.recordImpression(widget.placement);
             },
             onAdFailedToLoad: (ad, error) {
               ad.dispose();
-              if (kDebugMode) {
-                debugPrint('Banner failed (${widget.placement.id}): '
-                    '${error.code} ${error.message}');
-              }
+              _service.reportError(widget.placement, _describe(error));
             },
             onAdClicked: (ad) => _service.recordImpression(
               widget.placement,
@@ -158,6 +154,18 @@ class _AdSlotState extends State<AdSlot> {
     } catch (e) {
       if (kDebugMode) debugPrint('Ad request error: $e');
     }
+  }
+
+  /// A short, readable description of a load failure.
+  ///
+  /// Error code 3 is "no fill", which is normal from time to time and
+  /// usually means there was no ad to serve rather than a broken setup.
+  String _describe(LoadAdError error) {
+    if (error.code == 3) return 'No fill - no ad to serve right now';
+    final message = error.message.trim();
+    return message.isEmpty
+        ? 'Error ${error.code}'
+        : 'Error ${error.code}: $message';
   }
 
   NativeTemplateStyle _templateStyle() {

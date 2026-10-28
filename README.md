@@ -62,15 +62,17 @@ Debug/profile builds use Google's test ads. Release builds use the AdMob placeme
 
 **Placements.** Each placement has its own ad unit so AdMob reports revenue per placement, which is what makes it possible to tell which one actually earns:
 
-| Placement | Where it appears | Format |
-|---|---|---|
-| `holdings_native` | Below the holdings list | Native |
-| `news_native` | Every sixth story in the news feed | Native |
-| `news_article` | Inside an opened story | Native |
-| `dividends_native` | End of the dividends screen | Native |
-| `portfolio_banner` | Very end of the portfolio screen | Banner |
+| Placement | Where it appears | Format | Ad unit |
+|---|---|---|---|
+| `holdings_native` | Below the holdings list | Native | `…/4150586198` |
+| `news_native` | Every sixth story in the news feed | Native | `…/4150586198` |
+| `news_article` | Inside an opened story | Native | `…/4150586198` |
+| `dividends_native` | End of the dividends screen | Native | `…/4150586198` |
+| `portfolio_banner` | Very end of the portfolio screen | Banner | `…/8657501940` |
 
-Native ads need **native ad units** in the AdMob console; the banner unit ships with the app. Ad placement is a developer's decision, so there is no ad-unit setting in the app's normal settings — the unit editor is hidden behind five taps on the version number in **Settings → About**, and a blank ID simply hides that placement.
+All units belong to the app's AdMob account (`ca-app-pub-2085007206942111`, app `…~5871556500`). The native unit is shared by the four native placements: AdMob then reports them together, while the app's own placement report still separates them. **Separate native units per placement are better for ranking them** - create more in the console and point each placement at one from the developer panel.
+
+Ad placement is a developer's decision, so there is no ad-unit setting in the app's normal settings — the unit editor is hidden behind five taps on the version number in **Settings → About**, and a blank ID simply hides that placement. The editor also shows the last load failure for each placement, so a blank slot can be explained without guessing.
 
 **Why it does not feel like an ad app.** The rules are in `lib/services/ad_service.dart`:
 
@@ -81,6 +83,15 @@ Native ads need **native ad units** in the AdMob console; the banner unit ships 
 - Native ads are labelled "Sponsored", and the whole app can be ad-free from Settings.
 
 **Measuring it.** Settings → Advertising shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
+
+**Going live checklist.** Everything the app needs is in the build; the rest is in the AdMob console:
+
+1. The **app id** (`ca-app-pub-2085007206942111~5871556500`) is in `AndroidManifest.xml`, and the ad units are compiled into `lib/services/ad_service.dart`.
+2. The app needs a **privacy policy URL** and completed **app privacy details** in AdMob, or the account will not serve.
+3. The app's **readiness status** in AdMob must allow serving. An app that is still "Under review" only serves test ads.
+4. For US and EEA users, publish a **consent message** in AdMob's Privacy & messaging console. Canadian users do not normally see one.
+5. Test the **placement report** in Settings → Advertising after a few days of real use; that is the number to judge placements by.
+6. Never click your own live ads - that is a policy violation and can suspend the account.
 
 The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
 

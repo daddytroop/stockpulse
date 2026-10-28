@@ -520,7 +520,7 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.5.2',
+                      Text('Stock Pulse v1.5.3',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
@@ -598,11 +598,25 @@ class SettingsScreen extends StatelessWidget {
                         labelText: p.label,
                         hintText: p == AdPlacement.portfolioBanner
                             ? AdUnits.defaultBanner
-                            : 'ca-app-pub-.../...',
+                            : AdUnits.defaultNative,
                         isDense: true,
                       ),
                     ),
                   ),
+                const SizedBox(height: 4),
+                // The last failure for each placement, so a blank slot can
+                // be explained without guessing.
+                for (final p in AdPlacement.values)
+                  if (ads.lastErrorFor(p) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '${p.label}: ${ads.lastErrorFor(p)}',
+                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(ctx).colorScheme.error,
+                            ),
+                      ),
+                    ),
               ],
             ),
           ),

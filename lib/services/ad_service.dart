@@ -42,9 +42,10 @@ enum AdPlacement {
 
 /// Ad unit identifiers.
 ///
-/// The banner unit below is the one this app has always used. Native ads
-/// need their own ad units in the AdMob console (Native ad unit type), so
-/// those start empty and can be pasted into Settings without a rebuild.
+/// The banner and the native unit below belong to this app's AdMob
+/// account. A different unit can be pointed at any placement from the
+/// hidden developer panel in Settings, which is how a new placement is
+/// tested without a rebuild.
 ///
 /// An empty unit simply means that placement shows nothing - it never
 /// causes a failed request.
@@ -55,6 +56,15 @@ class AdUnits {
 
   /// The banner ad unit that ships with the app.
   static const String defaultBanner = '$_publisher/8657501940';
+
+  /// The native ad unit used by every native placement.
+  ///
+  /// One unit can serve several placements; AdMob then reports them
+  /// together, while the app's own placement report still separates them.
+  /// Separate units per placement are better for ranking them, so create
+  /// more in the console and point the placements at them when you have
+  /// them.
+  static const String defaultNative = '$_publisher/4150586198';
 
   /// Google's public test units, used in debug and profile builds.
   static const Map<AdPlacement, String> test = {
@@ -71,10 +81,28 @@ class AdUnits {
     Map<AdPlacement, String> configured,
   ) {
     if (!kReleaseMode) return test[placement] ?? test[AdPlacement.portfolioBanner]!;
+    return releaseUnitFor(placement, configured);
+  }
+
+  /// The release-build unit for a placement.
+  ///
+  /// A configured unit always wins, so a placement can be pointed at a
+  /// different ad unit without a rebuild.
+  static String releaseUnitFor(
+    AdPlacement placement,
+    Map<AdPlacement, String> configured,
+  ) {
     final custom = configured[placement];
     if (custom != null && custom.trim().isNotEmpty) return custom.trim();
-    if (placement == AdPlacement.portfolioBanner) return defaultBanner;
-    return '';
+    switch (placement) {
+      case AdPlacement.portfolioBanner:
+        return defaultBanner;
+      case AdPlacement.holdingsNative:
+      case AdPlacement.newsNative:
+      case AdPlacement.newsArticle:
+      case AdPlacement.dividendsNative:
+        return defaultNative;
+    }
   }
 }
 
@@ -185,9 +213,24 @@ class AdService extends ChangeNotifier {
   /// Ad units the user has configured per placement.
   final Map<AdPlacement, String> _adUnits = {};
 
+  /// The last load failure per placement, for the developer panel.
+  final Map<AdPlacement, String> _lastErrors = {};
+
   /// The ad unit configured for a placement, if any.
   String adUnitFor(AdPlacement placement) =>
       AdUnits.forPlacement(placement, _adUnits);
+
+  /// The last error a placement reported, if any.
+  String? lastErrorFor(AdPlacement placement) => _lastErrors[placement];
+
+  /// Records a load failure so the developer panel can explain a blank slot.
+  void reportError(AdPlacement placement, String message) {
+    _lastErrors[placement] = message;
+    if (kDebugMode) debugPrint('Ad failed (${placement.id}): $message');
+  }
+
+  /// Clears the recorded failure for a placement.
+  void clearError(AdPlacement placement) => _lastErrors.remove(placement);
 
   /// Configures the ad unit for a placement. An empty value clears it.
   Future<void> setAdUnit(AdPlacement placement, String value) async {
@@ -197,6 +240,7 @@ class AdService extends ChangeNotifier {
     } else {
       _adUnits[placement] = trimmed;
     }
+    _lastErrors.remove(placement);
     await _persist();
     notifyListeners();
   }
