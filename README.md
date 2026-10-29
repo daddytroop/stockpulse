@@ -77,16 +77,17 @@ Debug/profile builds use Google's test ads. Release builds use the AdMob placeme
 All units belong to the app's AdMob account (`ca-app-pub-2085007206942111`, app `…~5871556500`). The native unit is shared by the four native placements: AdMob then reports them together, while the app's own placement report still separates them. **Separate native units per placement are better for ranking them** - create more in the console and point each placement at one from the developer panel.
 
 Ad placement is a developer's decision, so there is no ad-unit setting in the app's normal settings — the unit editor is hidden behind five taps on the version number in **Settings → About**, and a blank ID simply hides that placement. The editor also shows the last load failure for each placement, so a blank slot can be explained without guessing.
-
 **Why it does not feel like an ad app.** The rules are in `lib/services/ad_service.dart`:
 
 - Ads sit *after* the content the user came for, never in front of it.
 - A failed ad collapses to nothing, so the layout never shows a hole.
 - Each placement is capped per day (native 3–6, banner 8) and all placements together are capped per session, so the app cannot turn into a slot machine.
 - A placement never repeats within three minutes.
-- Native ads are labelled "Sponsored", and the whole app can be ad-free from Settings.
+- Native ads are labelled "Sponsored".
 
-**Measuring it.** Settings → Advertising shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
+**There is no ad switch, and that is deliberate.** Stock Pulse is free because it carries ads - there is no paid tier to upgrade to, so an "ad-free" toggle would be a lie. What the user *can* do is consent: **Settings → Advertising → Ad privacy choices** opens Google's privacy form, which decides what the ad SDK may share about the device. That is a different thing from turning ads off, and it is required for users in the EEA, the UK, Switzerland and the US states. Ads are still shown; they just carry less information.
+
+**Measuring it.** The developer panel (five taps on the version number in **Settings → About**) shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
 
 **Going live checklist.** Everything the app needs is in the build; the rest is in the AdMob console:
 

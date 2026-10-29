@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 
+import '../widgets/widget_sparkline.dart';
 import 'platform_check.dart' show isAndroidPlatform;
 
 /// Bridges portfolio data into the Android home-screen widgets.
@@ -30,6 +32,11 @@ class StockPulseWidgetService {
     String nextDividendSymbol = '',
     String nextDividendAmount = '',
     String nextDividendWhen = '',
+    String nextDividendPaid = '',
+    String nextDividendEx = '',
+    String nextLabel = '',
+    String nextAmount = '',
+    String nextWhen = '',
   }) async {
     if (!supported) return false;
     try {
@@ -42,6 +49,12 @@ class StockPulseWidgetService {
       await HomeWidget.saveWidgetData<String>('nd_symbol', nextDividendSymbol);
       await HomeWidget.saveWidgetData<String>('nd_amount', nextDividendAmount);
       await HomeWidget.saveWidgetData<String>('nd_when', nextDividendWhen);
+      await HomeWidget.saveWidgetData<String>('nd_paid', nextDividendPaid);
+      await HomeWidget.saveWidgetData<String>('nd_ex', nextDividendEx);
+      // The portfolio widget shows the next dividend in its own words.
+      await HomeWidget.saveWidgetData<String>('widget_next', nextLabel);
+      await HomeWidget.saveWidgetData<String>('widget_next_amount', nextAmount);
+      await HomeWidget.saveWidgetData<String>('widget_next_when', nextWhen);
       await HomeWidget.saveWidgetData<String>(
           'nd_updated', DateTime.now().millisecondsSinceEpoch.toString());
       final ok1 = await HomeWidget.updateWidget(
@@ -53,6 +66,33 @@ class StockPulseWidgetService {
       return false;
     }
   }
+
+  /// Renders the trend line that sits inside the portfolio widget.
+  ///
+  /// The widget is drawn by Android, so the line is rendered here as a
+  /// small transparent PNG and the widget picks it up by path.
+  static Future<bool> pushSparkline({
+    required List<double> points,
+    required int colorValue,
+    double width = 280,
+    double height = 26,
+  }) async {
+    if (!supported) return false;
+    try {
+      await HomeWidget.renderFlutterWidget(
+        WidgetSparkline(points: points, color: Color(colorValue)),
+        key: sparklineKey,
+        logicalSize: Size(width, height),
+        pixelRatio: 3.0,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The preferences key the rendered sparkline is stored under.
+  static const String sparklineKey = 'widget_sparkline';
 
   /// Writes the compact snapshot the Kotlin background worker consumes:
   /// aggregated positions, FX rates into the display currency, the next

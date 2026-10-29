@@ -221,9 +221,6 @@ class AdService extends ChangeNotifier {
   /// Impressions served during this app session.
   int _sessionImpressions = 0;
 
-  /// Set by the user in Settings.
-  bool _enabled = true;
-
   /// Ad units the user has configured per placement.
   final Map<AdPlacement, String> _adUnits = {};
 
@@ -277,11 +274,13 @@ class AdService extends ChangeNotifier {
 
   List<AdImpression> get log => List.unmodifiable(_log);
 
-  /// Whether the user has switched ads off.
-  bool get adsEnabled => _enabled;
-
   /// Whether the SDK currently allows ad requests.
-  bool get canRequestAds => _adsAllowed && _enabled;
+  ///
+  /// There is deliberately no user-facing switch: the app is free because
+  /// it carries ads, so they are part of it. What the user *can* control
+  /// is consent - the privacy options form - which is a different thing
+  /// and is required.
+  bool get canRequestAds => _adsAllowed;
 
   /// Whether the user must be offered a privacy-options form.
   bool get privacyOptionsRequired => _privacyRequired;
@@ -312,7 +311,9 @@ class AdService extends ChangeNotifier {
   Future<void> load() async {
     final data = await _store.load(_logFile);
     if (data != null) {
-      _enabled = data['enabled'] as bool? ?? true;
+      // An old "enabled" flag is ignored on purpose: ads are part of the
+      // app, and a file written by an earlier build must not be able to
+      // switch them off.
       for (final raw in (data['log'] as List? ?? const [])) {
         if (raw is Map<String, dynamic>) _log.add(AdImpression.fromMap(raw));
       }
@@ -334,17 +335,10 @@ class AdService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setEnabled(bool value) async {
-    _enabled = value;
-    await _persist();
-    notifyListeners();
-  }
-
   Future<void> _persist() async {
     await _store.save(_logFile, {
-      'enabled': _enabled,
       'adUnits': {for (final e in _adUnits.entries) e.key.id: e.value},
-      'log': [for (final i in _log) i.toMap()],
+      'log': [for (final i in _log) i.toMap()},
     });
   }
 

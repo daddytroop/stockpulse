@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The portfolio widget.
+
+  The headline is the number, the trend line gives it context, and the
+  bottom line says what is coming next. Everything is drawn in the app's
+  own colours so it looks like part of Stock Pulse rather than a system
+  card with numbers in it.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -7,7 +15,7 @@
     android:padding="14dp"
     android:background="@drawable/widget_bg">
 
-    <!-- Brand row -->
+    <!-- Brand row: the label on the left, the day's change on the right -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -34,9 +42,40 @@
             android:ellipsize="end"/>
 
         <TextView
+            android:id="@+id/widget_meta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textSize="10sp"
+            android:textColor="#8AFFFFFF"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+    </LinearLayout>
+
+    <!-- The headline number and the day's change -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:gravity="bottom">
+
+        <TextView
+            android:id="@+id/widget_value"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFFFF"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+
+        <TextView
             android:id="@+id/widget_change"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFEEEEEE"
@@ -44,52 +83,52 @@
             android:ellipsize="end"/>
     </LinearLayout>
 
-    <!-- The headline number -->
-    <TextView
-        android:id="@+id/widget_value"
+    <!-- The trend line, rendered by the app -->
+    <ImageView
+        android:id="@+id/widget_sparkline"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFFFF"
-        android:maxLines="1"
-        android:ellipsize="end"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:adjustViewBounds="false"
+        android:scaleType="fitXY"
+        android:contentDescription="@null"/>
 
     <!-- A hairline that separates the number from the details -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:background="#1E3A4A"/>
 
-    <TextView
-        android:id="@+id/widget_next"
+    <!-- What is coming next -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:textSize="11sp"
-        android:textColor="#E6FFFFFF"
-        android:maxLines="1"
-        android:ellipsize="end"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/widget_next_sub"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="10sp"
-        android:textColor="#8AFFFFFF"
-        android:maxLines="1"
-        android:ellipsize="end"/>
+        <TextView
+            android:id="@+id/widget_next"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFFFF"
+            android:maxLines="1"
+            android:ellipsize="end"/>
 
-    <TextView
-        android:id="@+id/widget_meta"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="10sp"
-        android:textColor="#8AFFFFFF"
-        android:maxLines="1"
-        android:ellipsize="end"/>
+        <TextView
+            android:id="@+id/widget_next_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#64EFAE"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+    </LinearLayout>
 </LinearLayout>

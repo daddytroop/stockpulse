@@ -1192,6 +1192,71 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  /// The value history of every portfolio combined.
+  ///
+  /// The home-screen widget shows the total across all portfolios, so its
+  /// trend line has to be the total too - the two must agree.
+  Future<List<ChartPoint>> totalHistory(String range) async {
+    final key = '__all__|$range';
+    final cached = _historyCache[key];
+    if (cached != null && cached.fresh) return cached.points;
+    final inflight = _historyInflight[key];
+    if (inflight != null) return inflight;
+
+    final future = _buildTotalHistory(range);
+    _historyInflight[key] = future;
+    try {
+      final points = await future;
+      _historyCache[key] = _CachedHistory(points);
+      return points;
+    } finally {
+      _historyInflight.remove(key);
+    }
+  }
+
+  Future<List<ChartPoint>> _buildTotalHistory(String range) async {
+    if (_portfolios.isEmpty) return [];
+    final series = <List<ChartPoint>>[];
+    for (final p in _portfolios) {
+      final points = await portfolioHistory(p.id, range);
+      if (points.isNotEmpty) series.add(points);
+    }
+    if (series.isEmpty) return [];
+
+    // Every portfolio is valued on the same trading days, so the series
+    // line up closely; the union of timestamps is used so a day only one
+    // portfolio traded on still shows up.
+    final union = <int>{
+      for (final pts in series) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
+    }.toList()
+      ..sort();
+
+    final pointers = {for (var i = 0; i < series.length; i++) i};
+    final out = <ChartPoint>[];
+    for (final tMs in union) {
+      var total = 0.0;
+      var any = false;
+      for (var i = 0; i < series.length; i++) {
+        final pts = series[i];
+        var j = pointers[i]!;
+        while (j < pts.length && pts[j].time.millisecondsSinceEpoch <= tMs) {
+          j++;
+        }
+        pointers[i] = j;
+        if (j > 0) {
+          total += pts[j - 1].close;
+          any = true;
+        }
+      }
+      if (!any) continue;
+      out.add(ChartPoint(DateTime.fromMillisecondsSinceEpoch(tMs), total));
+    }
+    while (out.isNotEmpty && out.first.close <= 0) {
+      out.removeAt(0);
+    }
+    return out;
+  }
+
   Future<List<ChartPoint>> _buildHistory(String portfolioId, String range) async {
     final p = byId(portfolioId);
     if (p == null || p.holdings.isEmpty) return [];
@@ -1645,20 +1710,40 @@ class PortfolioProvider extends ChangeNotifier {
     String ndSymbol;
     String ndAmount;
     String ndWhen;
+    String ndPaid;
+    String ndEx;
+    String nextLabel;
+    String nextAmount;
+    String nextWhen;
     if (next == null) {
       nd1 = 'No upcoming dividends';
       nd2 = '';
       ndSymbol = 'No dividends';
       ndAmount = '';
       ndWhen = '';
+      ndPaid = '';
+      ndEx = '';
+      nextLabel = 'No upcoming dividends';
+      nextAmount = '';
+      nextWhen = '';
     } else {
-      nd1 = '${next.symbol} ${fmtMoney(next.amountPerShare, currency: currency)}/share';
+      final perShare = '${fmtMoney(next.amountPerShare, currency: currency)}/share';
+      nd1 = '${next.symbol} $perShare';
       nd2 = '${next.estimated ? 'Est. ' : ''}ex ${fmtShortDate(next.exDate)}'
           ' | pays ${fmtShortDate(next.payDate)}';
       ndSymbol = next.symbol;
-      ndAmount = '${fmtMoney(next.amountPerShare, currency: currency)}/share';
+      ndAmount = perShare;
       final days = next.exDate.difference(DateTime.now()).inDays;
       ndWhen = days <= 0 ? 'today' : 'in $days day${days == 1 ? '' : 's'}';
+      ndPaid = next.payDate == null ? '' : 'Paid ${fmtShortDate(next.payDate)}';
+      ndEx = '${next.estimated ? 'Est. ' : ''}ex-dividend ${fmtShortDate(next.exDate)}';
+
+      nextLabel = 'Next dividend  ${next.symbol}';
+      nextAmount = '$perShare · $ndWhen';
+      nextWhen = [
+        ndWhen,
+        if (next.payDate != null) 'paid ${fmtShortDate(next.payDate)}',
+      ].join(' · ');
     }
 
     await StockPulseWidgetService.push(
@@ -1671,7 +1756,28 @@ class PortfolioProvider extends ChangeNotifier {
       nextDividendSymbol: ndSymbol,
       nextDividendAmount: ndAmount,
       nextDividendWhen: ndWhen,
+      nextDividendPaid: ndPaid,
+      nextDividendEx: ndEx,
+      nextLabel: nextLabel,
+      nextAmount: nextAmount,
+      nextWhen: nextWhen,
     );
+
+    // The trend line for the widget, drawn from the same history the app's
+    // own chart uses.
+    try {
+      final history = await totalHistory('1mo');
+      if (history.length > 1) {
+        final values = [for (final p in history) p.close];
+        await StockPulseWidgetService.pushSparkline(
+          points: values,
+          colorValue: 0xFF64EFAE,
+        );
+      }
+    } catch (_) {
+      // A missing trend line is not worth failing the update over.
+    }
+
     await pushWorkerSnapshot();
   }
 

@@ -1,15 +1,22 @@
 package app.stockpulse
 
-import android.content.ComponentName
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.widget.RemoteViews
 
 /// Shared RemoteViews rendering for both widgets, used by the providers
 /// AND by the background worker so visuals stay identical.
 object WidgetRenderer {
 
-    const val PREFS_KEY = "HomeWidgetPlugin"
+    /// The shared-preferences file the home_widget plugin writes to.
+    /// It has to match `HomeWidgetPlugin.PREFERENCES` exactly, otherwise
+    /// the widget reads an empty file and shows placeholder text.
+    const val PREFS_KEY = "HomeWidgetPreferences"
+
+    /// The key the rendered trend line is stored under.
+    const val SPARKLINE_KEY = "widget_sparkline"
 
     val GREEN = 0xFF66BB6A.toInt()
     val RED = 0xFFEF5350.toInt()
@@ -33,15 +40,25 @@ object WidgetRenderer {
                 else -> GREY
             }
         )
+        views.setTextViewText(R.id.widget_meta, prefs.getString("widget_meta", ""))
         views.setTextViewText(
             R.id.widget_next,
-            prefs.getString("nd_line1", "Open Stock Pulse to refresh data")
+            prefs.getString("widget_next", "Open Stock Pulse to refresh data")
         )
-        views.setTextViewText(R.id.widget_next_sub, prefs.getString("nd_line2", ""))
-        views.setTextViewText(
-            R.id.widget_meta,
-            prefs.getString("widget_meta", "")
-        )
+        views.setTextViewText(R.id.widget_next_amount, prefs.getString("widget_next_amount", ""))
+
+        // The trend line is rendered by the app and stored as a small PNG.
+        val spark = prefs.getString(SPARKLINE_KEY, null)
+        if (!spark.isNullOrEmpty()) {
+            try {
+                val bitmap = BitmapFactory.decodeFile(spark)
+                if (bitmap != null) {
+                    views.setImageViewBitmap(R.id.widget_sparkline, bitmap)
+                }
+            } catch (_: Exception) {
+                // A missing trend line just leaves the space empty.
+            }
+        }
         return views
     }
 
@@ -52,7 +69,8 @@ object WidgetRenderer {
         views.setTextViewText(R.id.nd_symbol, prefs.getString("nd_symbol", "No dividends"))
         views.setTextViewText(R.id.nd_amount, prefs.getString("nd_amount", ""))
         views.setTextViewText(R.id.nd_when, prefs.getString("nd_when", ""))
-        views.setTextViewText(R.id.nd_line2, prefs.getString("nd_line2", ""))
+        views.setTextViewText(R.id.nd_ex, prefs.getString("nd_ex", ""))
+        views.setTextViewText(R.id.nd_paid, prefs.getString("nd_paid", ""))
         return views
     }
 

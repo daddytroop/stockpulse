@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The next-dividend widget: what is coming, how much, and when.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/nd_root"
     android:layout_width="match_parent"
@@ -36,8 +39,10 @@
             android:id="@+id/nd_when"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="10sp"
-            android:textColor="#8AFFFFFF"
+            android:layout_marginStart="6dp"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:textColor="#64EFAE"
             android:maxLines="1"/>
     </LinearLayout>
 
@@ -45,8 +50,8 @@
         android:id="@+id/nd_symbol"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="18sp"
+        android:layout_marginTop="8dp"
+        android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="#FFFFFFFF"
         android:maxLines="1"
@@ -64,12 +69,28 @@
         android:ellipsize="end"/>
 
     <TextView
-        android:id="@+id/nd_line2"
+        android:id="@+id/nd_ex"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="6dp"
         android:textSize="10sp"
         android:textColor="#CCFFFFFF"
-        android:maxLines="2"
+        android:maxLines="1"
+        android:ellipsize="end"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:background="#1E3A4A"/>
+
+    <TextView
+        android:id="@+id/nd_paid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="10sp"
+        android:textColor="#8AFFFFFF"
+        android:maxLines="1"
         android:ellipsize="end"/>
 </LinearLayout>
