@@ -689,24 +689,6 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
-  Widget _inlineStat(String label, String value, String? sub, Color? color) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, letterSpacing: 0.7)),
-        const SizedBox(height: 2),
-        Text(
-          sub == null ? value : '$value  $sub',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _rangeChips(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),

@@ -1297,7 +1297,7 @@ class PortfolioProvider extends ChangeNotifier {
         if (i == 0) continue;
         total += (p.holdings[symbol]?.quantity ?? 0) * pts[i - 1].close;
         // Add back the cash that was paid out by this date.
-        total += _cumulativeDividendsAt(timelines[symbol], when);
+        total += _cumulativeDividendsAt(timelines[symbol] ?? const [], when);
       }
       out.add(ChartPoint(when, total));
     }
