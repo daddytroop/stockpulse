@@ -29,6 +29,9 @@ class PortfolioTotals {
   final double dayChange;
   final bool hasDayChange;
   final double annualIncome;
+
+  /// Dividend cash actually collected so far, in the display currency.
+  final double dividendsReceived;
   final bool converted;
   final String? displayCurrency;
   const PortfolioTotals({
@@ -37,12 +40,22 @@ class PortfolioTotals {
     required this.dayChange,
     required this.hasDayChange,
     required this.annualIncome,
+    this.dividendsReceived = 0,
     this.converted = false,
     this.displayCurrency,
   });
 
+  /// The gain on the price alone.
   double get pnl => marketValue - costBasis;
   double get pnlPercent => costBasis > 0 ? pnl / costBasis * 100 : 0;
+
+  /// The gain including the dividends that were paid out.
+  ///
+  /// A dividend tracker that only counts the price misses a large part of
+  /// what the position actually earned.
+  double get totalReturn => pnl + dividendsReceived;
+  double get totalReturnPercent =>
+      costBasis > 0 ? totalReturn / costBasis * 100 : 0;
   double get dayChangePercent =>
       hasDayChange && (marketValue - dayChange) > 0 ? dayChange / (marketValue - dayChange) * 100 : 0;
   double get incomeYield => marketValue > 0 ? annualIncome / marketValue * 100 : 0;
@@ -828,6 +841,7 @@ class PortfolioProvider extends ChangeNotifier {
     var cost = 0.0;
     var day = 0.0;
     var income = 0.0;
+    var received = 0.0;
     var hasDay = false;
     for (final h in p.holdings.values) {
       final q = _quotes[h.symbol];
@@ -845,6 +859,8 @@ class PortfolioProvider extends ChangeNotifier {
           ? (info.ttmPerShare > 0 ? info.ttmPerShare : (q?.dividendRate ?? 0))
           : (q?.dividendRate ?? 0);
       income += rate * h.quantity * fx;
+      // What the position has actually paid out so far.
+      received += _dividendsReceivedForHolding(p, h) * fx;
     }
 
     // Kick off the FX fetch so the next frame can show converted values.
@@ -856,8 +872,21 @@ class PortfolioProvider extends ChangeNotifier {
       dayChange: day,
       hasDayChange: hasDay,
       annualIncome: income,
+      dividendsReceived: received,
       converted: effectiveConvert,
       displayCurrency: effectiveConvert ? display : null,
+    );
+  }
+
+  /// The dividend cash a single holding has collected, in its own currency.
+  double _dividendsReceivedForHolding(Portfolio p, Holding h) {
+    final info = _dividendInfo[h.symbol];
+    if (info == null || info.payments.isEmpty) return 0;
+    return ledger.dividendsReceived(
+      txns: p.txnsFor(h.symbol),
+      payments: info.payments,
+      currentQty: h.quantity,
+      holdingStart: h.addedAt,
     );
   }
 
@@ -915,6 +944,7 @@ class PortfolioProvider extends ChangeNotifier {
     var cost = 0.0;
     var day = 0.0;
     var income = 0.0;
+    var received = 0.0;
     var hasDay = false;
     for (final p in _portfolios) {
       final t = totalsFor(p);
@@ -922,6 +952,7 @@ class PortfolioProvider extends ChangeNotifier {
       cost += t.costBasis;
       day += t.dayChange;
       income += t.annualIncome;
+      received += t.dividendsReceived;
       hasDay |= t.hasDayChange;
     }
     return PortfolioTotals(
@@ -930,6 +961,7 @@ class PortfolioProvider extends ChangeNotifier {
       dayChange: day,
       hasDayChange: hasDay,
       annualIncome: income,
+      dividendsReceived: received,
     );
   }
 
@@ -1192,6 +1224,101 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  /// The portfolio's total-return history: the value plus every dividend
+  /// that was paid out along the way.
+  ///
+  /// A price-only chart understates a dividend portfolio by the amount it
+  /// has been handed, which is often most of the return.
+  Future<List<ChartPoint>> portfolioTotalReturn(String portfolioId, String range) async {
+    final key = '$portfolioId|$range|total';
+    final cached = _historyCache[key];
+    if (cached != null && cached.fresh) return cached.points;
+    final inflight = _historyInflight[key];
+    if (inflight != null) return inflight;
+
+    final future = _buildTotalReturnHistory(portfolioId, range);
+    _historyInflight[key] = future;
+    try {
+      final points = await future;
+      _historyCache[key] = _CachedHistory(points);
+      return points;
+    } finally {
+      _historyInflight.remove(key);
+    }
+  }
+
+  Future<List<ChartPoint>> _buildTotalReturnHistory(
+      String portfolioId, String range) async {
+    final p = byId(portfolioId);
+    if (p == null || p.holdings.isEmpty) return [];
+    final interval = range == '5y' ? '1wk' : '1d';
+
+    final series = <String, List<ChartPoint>>{};
+    final timelines = <String, List<(DateTime, double)>>{};
+    for (final symbol in p.symbols) {
+      try {
+        final h = await _yahoo.chartHistory(symbol, range: range, interval: interval);
+        if (h == null || h.points.isEmpty) continue;
+        series[symbol] =
+            h.points.length > 1 ? h.points.sublist(0, h.points.length - 1) : h.points;
+        final holding = p.holdings[symbol];
+        if (holding != null) {
+          timelines[symbol] = ledger.dividendsReceivedTimeline(
+            txns: p.txnsFor(symbol),
+            payments: h.dividends,
+            currentQty: holding.quantity,
+            holdingStart: holding.addedAt,
+          );
+        }
+      } catch (_) {
+        // symbol skipped
+      }
+    }
+    if (series.isEmpty) return [];
+
+    final union = <int>{
+      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
+    }.toList()
+      ..sort();
+
+    final pointers = {for (final k in series.keys) k: 0};
+    final out = <ChartPoint>[];
+    for (final tMs in union) {
+      final when = DateTime.fromMillisecondsSinceEpoch(tMs);
+      var total = 0.0;
+      for (final e in series.entries) {
+        final symbol = e.key;
+        final pts = e.value;
+        var i = pointers[symbol]!;
+        while (i < pts.length && pts[i].time.millisecondsSinceEpoch <= tMs) {
+          i++;
+        }
+        pointers[symbol] = i;
+        if (i == 0) continue;
+        total += (p.holdings[symbol]?.quantity ?? 0) * pts[i - 1].close;
+        // Add back the cash that was paid out by this date.
+        total += _cumulativeDividendsAt(timelines[symbol], when);
+      }
+      out.add(ChartPoint(when, total));
+    }
+
+    while (out.isNotEmpty && out.first.close <= 0) {
+      out.removeAt(0);
+    }
+    return out;
+  }
+
+  /// The dividend cash collected by [when].
+  double _cumulativeDividendsAt(List<(DateTime, double)> timeline, DateTime when) {
+    if (timeline.isEmpty) return 0;
+    var total = 0.0;
+    for (final entry in timeline) {
+      if (entry.$1.isAfter(when)) break;
+      total = entry.$2;
+    }
+    return total;
+  }
+
   /// The value history of every portfolio combined.
   ///
   /// The home-screen widget shows the total across all portfolios, so its
@@ -1268,7 +1395,8 @@ class PortfolioProvider extends ChangeNotifier {
         final h = await _yahoo.chartHistory(symbol, range: range, interval: interval);
         if (h == null || h.points.isEmpty) continue;
         // Drop the live (incomplete) last bar to keep history stable.
-        series[symbol] = h.points.length > 1 ? h.points.sublist(0, h.points.length - 1) : h.points;
+        series[symbol] =
+            h.points.length > 1 ? h.points.sublist(0, h.points.length - 1) : h.points;
       } catch (_) {
         // symbol skipped
       }

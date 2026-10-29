@@ -98,6 +98,35 @@ double dividendsReceivedInRange({
   return total;
 }
 
+/// The dividend cash collected for a position over time.
+///
+/// Each entry is the payment date and the running total collected by that
+/// date. It is what a total-return series is built from: the price on its
+/// own never shows the cash that was paid out.
+List<(DateTime date, double total)> dividendsReceivedTimeline({
+  required List<Txn> txns,
+  required List<DividendPayment> payments,
+  required double currentQty,
+  required DateTime? holdingStart,
+}) {
+  if (payments.isEmpty) return const [];
+  final start = holdingStart ?? DateTime.fromMillisecondsSinceEpoch(0);
+  final entries = <(DateTime, double)>[];
+  for (final p in payments) {
+    if (!p.exDate.isAfter(start)) continue;
+    final qty = txns.isEmpty ? currentQty : sharesAt(p.exDate, txns);
+    if (qty <= 0) continue;
+    entries.add((p.exDate, qty * p.amount));
+  }
+  if (entries.isEmpty) return const [];
+  entries.sort((a, b) => a.$1.compareTo(b.$1));
+
+  var running = 0.0;
+  return [
+    for (final e in entries) (e.$1, running += e.$2),
+  ];
+}
+
 /// Estimated 5-year dividend income if payments are reinvested (DRIP) at
 /// [annualYieldPct]. Straight compounding approximation.
 double dripProjection(double annualIncome, double annualYieldPct, {int years = 5}) {

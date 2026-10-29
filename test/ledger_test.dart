@@ -152,6 +152,60 @@ void main() {
     });
   });
 
+  group('dividendsReceivedTimeline', () {
+    test('each entry is the running total collected by that date', () {
+      final timeline = dividendsReceivedTimeline(
+        txns: [
+          Txn(kind: 'buy', quantity: 10, unitPrice: 20, date: d(100)),
+        ],
+        payments: [
+          DividendPayment(exDate: d(90), amount: 0.5),
+          DividendPayment(exDate: d(40), amount: 0.6),
+          DividendPayment(exDate: d(1), amount: 0.7),
+        ],
+        currentQty: 10,
+        holdingStart: d(100),
+      );
+      expect(timeline.length, 3);
+      // 10 shares throughout: 5, then 11, then 18.
+      expect(timeline[0].$2, closeTo(5, 0.0001));
+      expect(timeline[1].$2, closeTo(11, 0.0001));
+      expect(timeline[2].$2, closeTo(18, 0.0001));
+      // The dates come back in order.
+      expect(timeline[0].$1.isBefore(timeline[1].$1), isTrue);
+    });
+
+    test('the share count at each ex-date is used', () {
+      final timeline = dividendsReceivedTimeline(
+        txns: [
+          Txn(kind: 'buy', quantity: 10, unitPrice: 20, date: d(100)),
+          Txn(kind: 'sell', quantity: 4, unitPrice: 25, date: d(50)),
+        ],
+        payments: [
+          DividendPayment(exDate: d(90), amount: 0.5),
+          DividendPayment(exDate: d(40), amount: 0.6),
+        ],
+        currentQty: 6,
+        holdingStart: d(100),
+      );
+      // 10 x 0.5 = 5, then 6 x 0.6 = 3.6 on top.
+      expect(timeline[0].$2, closeTo(5, 0.0001));
+      expect(timeline[1].$2, closeTo(8.6, 0.0001));
+    });
+
+    test('no payments means no timeline', () {
+      expect(
+        dividendsReceivedTimeline(
+          txns: const [],
+          payments: const [],
+          currentQty: 10,
+          holdingStart: null,
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   group('dripProjection', () {
     test('5 years of compounding at 5%', () {
       final v = dripProjection(100, 5);

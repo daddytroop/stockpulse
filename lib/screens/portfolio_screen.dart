@@ -43,6 +43,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   String _query = '';
   String _sort = 'symbol';
   bool _compare = false;
+
+  /// Whether the chart shows the total return (value + dividends) instead
+  /// of the price alone.
+  bool _totalReturn = false;
   bool _groupByMarket = true;
   String? _historyKey;
   Future<List<List<ChartPoint>?>>? _history;
@@ -136,18 +140,27 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   Text('Performance', style: Theme.of(context).textTheme.titleLarge),
                   FilterChip(label: const Text('Compare SPY'), selected: _compare,
                     onSelected: (v) => setState(() => _compare = v)),
+                  FilterChip(
+                    label: const Text('Total return'),
+                    selected: _totalReturn,
+                    onSelected: (v) => setState(() => _totalReturn = v),
+                  ),
                 ]),
                 const SizedBox(height: 10),
                 _chart(context, portfolio, provider, currency),
                 const SizedBox(height: 10),
                 _rangeChips(context),
                 const SizedBox(height: 2),
-                Text('Based on current holdings · drag the chart',
-                  style: Theme.of(context).textTheme.labelSmall),
+                Text(
+                  _totalReturn
+                      ? 'Value plus every dividend received · drag the chart'
+                      : 'Price only · drag the chart',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ],
             )),
             const SizedBox(height: 12),
@@ -480,11 +493,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         ),
         KpiTile(
           label: 'Total return',
-          value: totals.pnl,
+          value: totals.totalReturn,
           formatter: (v) => fmtSignedMoney(v, currency: currency),
-          valueColor: totals.pnl >= 0 ? colors.gain : colors.loss,
-          icon: totals.pnl >= 0 ? Icons.savings_outlined : Icons.trending_down,
-          sub: '${fmtPct(totals.pnlPercent)} on cost',
+          valueColor: totals.totalReturn >= 0 ? colors.gain : colors.loss,
+          icon: totals.totalReturn >= 0 ? Icons.savings_outlined : Icons.trending_down,
+          sub: totals.dividendsReceived > 0
+              ? '${fmtPct(totals.totalReturnPercent)} · incl. '
+                  '${fmtMoney(totals.dividendsReceived, currency: currency)} dividends'
+              : '${fmtPct(totals.totalReturnPercent)} on cost',
         ),
         KpiTile(
           label: 'Annual income',
@@ -711,11 +727,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
   Widget _chart(BuildContext context, Portfolio portfolio, PortfolioProvider provider,
       String? currency) {
-    final key = '${portfolio.id}|$_range|${portfolio.holdings.values.map((h) => '${h.symbol}:${h.quantity}').join(',')}|${provider.lastRefreshAt}';
+    final key = '${portfolio.id}|$_range|${portfolio.holdings.values.map((h) => '${h.symbol}:${h.quantity}').join(',')}|${provider.lastRefreshAt}|$_totalReturn';
     if (_historyKey != key) {
       _historyKey = key;
       _history = Future.wait([
-        provider.portfolioHistory(portfolio.id, _range),
+        _totalReturn
+            ? provider.portfolioTotalReturn(portfolio.id, _range)
+            : provider.portfolioHistory(portfolio.id, _range),
         provider.benchmarkHistory(_range),
       ]);
     }
@@ -738,7 +756,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         return PortfolioChart(
           points: points,
           benchmark: _compare ? benchmark : null,
-          title: _compare ? 'Relative growth' : 'Value history',
+          title: _totalReturn
+              ? 'Total return'
+              : (_compare ? 'Relative growth' : 'Value history'),
           currency: currency,
           valueFormatter: (v) => fmtMoney(v, currency: currency),
         );
