@@ -1231,7 +1231,7 @@ class PortfolioProvider extends ChangeNotifier {
     }.toList()
       ..sort();
 
-    final pointers = {for (var i = 0; i < series.length; i++) i};
+    final pointers = <int, int>{for (var i = 0; i < series.length; i++) i: 0};
     final out = <ChartPoint>[];
     for (final tMs in union) {
       var total = 0.0;

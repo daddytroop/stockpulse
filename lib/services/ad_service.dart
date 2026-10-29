@@ -338,7 +338,7 @@ class AdService extends ChangeNotifier {
   Future<void> _persist() async {
     await _store.save(_logFile, {
       'adUnits': {for (final e in _adUnits.entries) e.key.id: e.value},
-      'log': [for (final i in _log) i.toMap()},
+      'log': [for (final i in _log) i.toMap()],
     });
   }
 
