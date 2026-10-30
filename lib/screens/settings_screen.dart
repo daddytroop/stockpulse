@@ -15,6 +15,7 @@ import '../services/widget_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/pulse_logo.dart';
+import 'privacy_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -564,6 +565,8 @@ class SettingsScreen extends StatelessWidget {
                     'and its prices are live, but it is not advice.',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                   ),
+                  const SizedBox(height: 6),
+                  const PrivacyLink(),
                 ],
               ),
             ),

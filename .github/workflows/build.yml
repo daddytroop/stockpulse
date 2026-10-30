@@ -215,12 +215,15 @@ jobs:
         run: flutter pub get
       - name: Build web (release)
         run: flutter build web --release
-      - name: Publish app-ads.txt with the web build
+      - name: Publish app-ads.txt and the privacy policy with the web build
         run: |
           # AdMob reads app-ads.txt from the developer's website. Serving it
           # from the web build means the same domain can be listed in the
           # Play Console and already answers the file.
           cp app-ads.txt build/web/app-ads.txt
+          # The privacy policy URL in the Play and AdMob consoles can point
+          # at this page.
+          node tools/md_to_html.js PRIVACY.md build/web/privacy.html
       - name: Upload web artifact
         uses: actions/upload-artifact@v4
         with:

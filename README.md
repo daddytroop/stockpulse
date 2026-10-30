@@ -26,6 +26,7 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 📅 **Dividend calendar** — a month view you can page through, with a tap on any day opening exactly what is scheduled that day. Below it, a month-by-month timeline of every upcoming dividend and earnings date, and a one-tap **export to your own calendar** (.ics).
 - 🆕 **What's new** — dividends paid this month, paid so far this year, the biggest mover today, and the next event, in one card.
 - 🕶️ **Hide balances** — one switch turns every amount into dots, for when you are not meant to be showing your screen.
+- 📄 **Privacy policy in the app** — the full policy is readable under Settings → About, and published as a web page with the web build.
 - 🏭 **Industry breakdown** — allocation can be split by type, currency or industry, using the sector and industry Yahoo reports for each holding.
 - 📊 **Interactive charts** — drag across the chart to scrub the exact value and date; the line draws itself in, the area is a soft gradient, and a **SPY benchmark overlay** stays legible but clearly secondary.
 - 🧮 **Total return, honestly** — the return figure includes the dividends that were actually paid out, not just the price, and the chart has a **Total return** toggle that adds them back over time.
@@ -101,7 +102,7 @@ Ad placement is a developer's decision, so there is no ad-unit setting in the ap
 
 ### Publishing on the Play Store
 
-[`docs/PLAY_LAUNCH.md`](docs/PLAY_LAUNCH.md) walks through it: creating an upload keystore, giving CI the signing secrets, building a signed `.aab` alongside the APK, creating the Play listing, linking the app in AdMob (which is what lifts "Limited ad serving"), and hosting `app-ads.txt` on the domain listed in the store listing. The repository already contains `app-ads.txt`, and the web build publishes it at its root.
+[`docs/PLAY_LAUNCH.md`](docs/PLAY_LAUNCH.md) is the full guide to getting approved: the privacy policy and `app-ads.txt` URLs, every App content form in the Play Console with the answers, the Data safety table, linking the app in AdMob, the reasons AdMob rejects apps, and switching live ads on. The short version: publish to a **closed testing** track, link the listing in AdMob, wait a few days for the review, then set the `ADS_LIVE` secret to `true` and tag a new version.
 
 The launcher/splash artwork is generated from `tools/icon.ps1` into `assets/icon/`. Run that script, `dart run flutter_launcher_icons`, and `dart run flutter_native_splash:create` after changing the artwork.
 
