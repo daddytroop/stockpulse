@@ -63,6 +63,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   /// and bold text. The policy is written in this subset on purpose, so
   /// nothing needs a full Markdown library.
   List<Widget> _parse(String source) {
+    final theme = Theme.of(context);
     final blocks = <Widget>[];
     final lines = source.split('\n');
     var paragraph = <String>[];
