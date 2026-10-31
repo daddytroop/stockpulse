@@ -40,6 +40,7 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
 - 🔲 **Android home-screen widgets** — a value widget with a live trend line and a compact next-dividend widget, both in the app's own colours, updated hourly by a native WorkManager worker even when the app is closed. `tools/widget_preview.ps1` renders a picture of them so the design can be reviewed without a phone.
 - 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
+- 🎨 **Six themes, one tap away** — a theme button in the app bar of every screen opens a picker with a preview of each palette, and the accent colour is separate.
 
 ## Getting the app
 

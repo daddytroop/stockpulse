@@ -587,7 +587,7 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.5.8',
+                      Text('Stock Pulse v1.5.9',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
