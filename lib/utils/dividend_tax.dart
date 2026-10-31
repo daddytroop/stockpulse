@@ -95,8 +95,7 @@ double withholdingRate(String home, String issuer) {
   if (issuer == 'CA') {
     // Canada withholds 25% unless a treaty applies.
     return canadaTreaty[home] ?? 0.25;
-  }
-  return 0;
+  }  return 0;
 }
 
 /// The rate as a percentage, for display.

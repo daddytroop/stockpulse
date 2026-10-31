@@ -36,8 +36,13 @@ void main() {
       expect(withholdingRate('CA', 'US'), closeTo(0.15, 0.0001));
     });
 
-    test('a US resident is taxed 25% on Canadian dividends', () {
-      expect(withholdingRate('US', 'CA'), closeTo(0.25, 0.0001));
+    test('a US resident is taxed 15% on Canadian dividends', () {
+      // The Canada-US treaty reduces Canada's 25% statutory rate to 15%.
+      expect(withholdingRate('US', 'CA'), closeTo(0.15, 0.0001));
+    });
+
+    test('without a treaty Canada withholds 25%', () {
+      expect(withholdingRate('BR', 'CA'), closeTo(0.25, 0.0001));
     });
 
     test('without a treaty the US withholds 30%', () {
