@@ -125,7 +125,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             _freshnessBanner(context, provider),
             _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
             const SizedBox(height: 12),
-            _kpiRow(context, provider, totals, currency),
+            _kpiRow(context, provider, portfolio, totals, currency),
             const SizedBox(height: 10),
             WhatsNewCard(
               provider: provider,
@@ -471,6 +471,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   Widget _kpiRow(
     BuildContext context,
     PortfolioProvider provider,
+    Portfolio portfolio,
     PortfolioTotals totals,
     String? currency,
   ) {
