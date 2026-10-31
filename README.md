@@ -34,11 +34,12 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 📈 **Per-holding sparklines** — a real one-month price trend next to every holding, from the same price history the charts use.
 - 📰 **In-app news** — read a story inside the app with its image and the tickers it mentions (with live prices), then open the original with one tap.
 - 📍 **52-week range bar** — on every holding, a marker shows exactly where today's price sits between the 52-week low and high.
+- 💱 **FX display currency** — every conversion goes through the dollar, because Yahoo only quotes a direct cross for some currencies. It works for every currency Yahoo supports, and the settings name the one currency it cannot convert if there ever is one.
+- 🔒 **Biometric lock**, ☁️ **private Gist sync**, 🔔 **local notifications** for dividends, earnings and price moves.
 - 🧾 **Bulk CSV import** — paste rows from your broker or open a `.csv` file. Column mapping is auto-detected and can be overridden. No more adding holdings one-by-one.
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
 - 🔲 **Android home-screen widgets** — a value widget with a live trend line and a compact next-dividend widget, both in the app's own colours, updated hourly by a native WorkManager worker even when the app is closed. `tools/widget_preview.ps1` renders a picture of them so the design can be reviewed without a phone.
 - 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
-- 💱 **FX display currency**, 🔒 **biometric lock**, ☁️ **private Gist sync**, 🔔 **local notifications** for dividends/earnings/price moves.
 
 ## Getting the app
 
