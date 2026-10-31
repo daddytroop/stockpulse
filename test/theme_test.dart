@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:stock_pulse/app.dart';
 import 'package:stock_pulse/providers/portfolio_provider.dart';
 import 'package:stock_pulse/screens/settings_screen.dart';
+import 'package:stock_pulse/services/ad_service.dart';
 import 'package:stock_pulse/services/store.dart';
 import 'package:stock_pulse/theme/app_theme.dart';
 
@@ -21,14 +21,25 @@ class _MemoryStore extends StockPulseStore {
 }
 
 void main() {
+  /// The settings screen reads both the portfolio and the ad service.
+  Widget wrap(Widget child, PortfolioProvider provider) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<PortfolioProvider>.value(value: provider),
+        ChangeNotifierProvider<AdService>.value(value: AdService()),
+      ],
+      child: child,
+    );
+  }
+
   group('theme', () {
     testWidgets('tapping a theme in the settings changes the theme', (tester) async {
       final provider = PortfolioProvider(store: _MemoryStore());
       await provider.load();
 
-      await tester.pumpWidget(ChangeNotifierProvider<PortfolioProvider>.value(
-        value: provider,
-        child: const MaterialApp(home: SettingsScreen()),
+      await tester.pumpWidget(wrap(
+        const MaterialApp(home: SettingsScreen()),
+        provider,
       ));
       await tester.pumpAndSettle();
 
@@ -45,15 +56,15 @@ void main() {
       await provider.load();
 
       late BuildContext captured;
-      await tester.pumpWidget(ChangeNotifierProvider<PortfolioProvider>.value(
-        value: provider,
-        child: MaterialApp(
+      await tester.pumpWidget(wrap(
+        MaterialApp(
           builder: (context, child) {
             captured = context;
             return child!;
           },
           home: const Scaffold(body: SizedBox.shrink()),
         ),
+        provider,
       ));
       await tester.pumpAndSettle();
       expect(Theme.of(captured).brightness, Brightness.light);
@@ -68,9 +79,9 @@ void main() {
       final provider = PortfolioProvider(store: _MemoryStore());
       await provider.load();
 
-      await tester.pumpWidget(ChangeNotifierProvider<PortfolioProvider>.value(
-        value: provider,
-        child: const MaterialApp(home: SettingsScreen()),
+      await tester.pumpWidget(wrap(
+        const MaterialApp(home: SettingsScreen()),
+        provider,
       ));
       await tester.pumpAndSettle();
 
