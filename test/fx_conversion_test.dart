@@ -111,10 +111,11 @@ void main() {
         store: _MemoryStore(),
       );
       await provider.load();
-      // Remove the demo portfolio so the test controls every holding.
-      for (final p in provider.portfolios.where((p) => p.name.contains('Sample'))) {
-        provider.deletePortfolio(p.id);
-      }
+      // The demo portfolio is seeded on a fresh install; swap it for an
+      // empty one so the test controls every holding.
+      final sampleId = provider.active.id;
+      provider.addPortfolio('Test');
+      provider.deletePortfolio(sampleId);
     });
 
     test('a portfolio converts into the display currency', () async {
