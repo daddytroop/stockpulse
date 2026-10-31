@@ -11,6 +11,7 @@ import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
+import '../widgets/ui/theme_toggle.dart';
 import 'news_detail_screen.dart';
 
 class NewsScreen extends StatefulWidget {
@@ -49,6 +50,7 @@ class _NewsScreenState extends State<NewsScreen> {
       appBar: AppBar(
         title: const Text('News for your holdings'),
         actions: [
+          const ThemeToggleButton(),
           if (provider.quotesLoading)
             const Padding(
               padding: EdgeInsets.all(14),

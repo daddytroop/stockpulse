@@ -15,6 +15,7 @@ import '../services/widget_service.dart';
 import '../utils/dividend_tax.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
+import '../widgets/ui/theme_toggle.dart';
 import '../widgets/pulse_logo.dart';
 import 'privacy_screen.dart';
 
@@ -50,10 +51,51 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: const [ThemeToggleButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
         children: [
+          // Appearance comes first: it is the setting people reach for most
+          // often, and it used to be a long way down the list.
+          _section(context, 'Appearance'),
+          Card(
+            child: Column(
+              children: [
+                for (final mode in AppThemeId.values)
+                  RadioAdaptiveTile(
+                    groupValue: provider.themeMode,
+                    value: mode,
+                    title: mode.label,
+                    onChanged: (v) => provider.setThemeMode(v),
+                  ),
+              ],
+            ),
+          ),
+          Card(
+            margin: const EdgeInsets.only(top: 10),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Accent color', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 6),
+                Text('Use the same accent across both light and dark palettes.',
+                  style: theme.textTheme.bodySmall),
+                const SizedBox(height: 12),
+                Wrap(spacing: 12, runSpacing: 12, children: [
+                  for (var i = 0; i < AppTheme.accents.length; i++)
+                    _AccentChoice(
+                      color: AppTheme.accents[i],
+                      selected: provider.accentIndex == i,
+                      onTap: () => provider.setAccentIndex(i),
+                    ),
+                ]),
+              ]),
+            ),
+          ),
+
           _section(context, 'Portfolios'),
           for (final p in provider.portfolios)
             Card(
@@ -238,42 +280,6 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ),
-
-          _section(context, 'Appearance'),
-          Card(
-            child: Column(
-              children: [
-                for (final mode in AppThemeId.values)
-                  RadioAdaptiveTile(
-                    groupValue: provider.themeMode,
-                    value: mode,
-                    title: mode.label,
-                    onChanged: (v) => provider.setThemeMode(v),
-                  ),
-              ],
-            ),
-          ),
-          Card(
-            margin: const EdgeInsets.only(top: 10),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Accent color', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 6),
-                Text('Use the same accent across both light and dark palettes.',
-                  style: theme.textTheme.bodySmall),
-                const SizedBox(height: 12),
-                Wrap(spacing: 12, runSpacing: 12, children: [
-                  for (var i = 0; i < AppTheme.accents.length; i++)
-                    _AccentChoice(
-                      color: AppTheme.accents[i],
-                      selected: provider.accentIndex == i,
-                      onTap: () => provider.setAccentIndex(i),
-                    ),
-                ]),
-              ]),
             ),
           ),
 

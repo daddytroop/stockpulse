@@ -18,6 +18,7 @@ import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
+import '../widgets/ui/theme_toggle.dart';
 import 'holding_detail_screen.dart';
 
 class _SampleCallout extends StatelessWidget {
@@ -130,6 +131,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
           Text('Income dashboard', style: Theme.of(context).textTheme.labelSmall),
           Text(portfolio.name),
         ]),
+        actions: const [ThemeToggleButton()],
       ),
       body: Stack(
         children: [

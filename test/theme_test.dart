@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:stock_pulse/app.dart';
 import 'package:stock_pulse/providers/portfolio_provider.dart';
 import 'package:stock_pulse/screens/settings_screen.dart';
 import 'package:stock_pulse/services/ad_service.dart';
 import 'package:stock_pulse/services/store.dart';
 import 'package:stock_pulse/theme/app_theme.dart';
+import 'package:stock_pulse/widgets/ui/theme_toggle.dart';
 
 /// A store that keeps everything in memory.
 class _MemoryStore extends StockPulseStore {
@@ -43,8 +45,9 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Appearance'), findsOneWidget);
-
+      // The theme section is near the top now, but a long list can still
+      // push it off the first screen.
+      await tester.scrollUntilVisible(find.text('Dark'), 120);
       await tester.tap(find.text('Dark'));
       await tester.pumpAndSettle();
 
@@ -57,22 +60,39 @@ void main() {
 
       late BuildContext captured;
       await tester.pumpWidget(wrap(
-        MaterialApp(
-          builder: (context, child) {
-            captured = context;
-            return child!;
-          },
-          home: const Scaffold(body: SizedBox.shrink()),
-        ),
+        StockPulseApp(),
         provider,
       ));
       await tester.pumpAndSettle();
+
+      captured = tester.element(find.byType(Scaffold).first);
       expect(Theme.of(captured).brightness, Brightness.light);
 
       await provider.setThemeMode(AppThemeId.dark);
       await tester.pumpAndSettle();
 
       expect(Theme.of(captured).brightness, Brightness.dark);
+    });
+
+    testWidgets('the theme button opens the picker and applies a theme',
+        (tester) async {
+      final provider = PortfolioProvider(store: _MemoryStore());
+      await provider.load();
+
+      await tester.pumpWidget(wrap(
+        const MaterialApp(home: Scaffold(body: ThemeToggleButton())),
+        provider,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.light_mode_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('AMOLED black'), findsOneWidget);
+      await tester.tap(find.text('AMOLED black'));
+      await tester.pumpAndSettle();
+
+      expect(provider.themeMode, AppThemeId.amoled);
     });
 
     testWidgets('every theme can be selected', (tester) async {

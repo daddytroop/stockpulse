@@ -25,6 +25,7 @@ import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
 import '../widgets/ui/text_prompt.dart';
+import '../widgets/ui/theme_toggle.dart';
 import '../widgets/ui/whats_new_card.dart';
 import 'add_edit_holding_sheet.dart';
 import 'holding_detail_screen.dart';
@@ -90,6 +91,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             ]),          ],
         ),
         actions: [
+          const ThemeToggleButton(),
           _refreshButton(context, provider),
           _moreMenu(context, provider, portfolio),
         ],
