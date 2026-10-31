@@ -100,21 +100,18 @@ AdMob emails the reason. In practice it is nearly always one of these:
 
 ---
 
-## 4. Switch live ads on
+## 4. The ads start by themselves
 
-Until the app is approved, keep the `ADS_LIVE` repository secret set to `false`: the build then serves Google's **test ads**, which is what AdMob asks for while an app is under review, and it means an accidental click on a live ad cannot flag the account.
+A release build uses the real AdMob units, so **the ads begin serving the moment AdMob approves the app**. There is no flag to flip and no rebuild to make.
 
-When AdMob approves the app:
+Before approval, AdMob simply serves nothing from those units - an unapproved app shows no ads at all, which is why there is nothing to worry about during the Play review.
 
-1. Set the `ADS_LIVE` secret to `true`.
-2. Tag a new version (`git tag v1.5.7 && git push origin v1.5.7`).
-3. The new build serves live ads.
+The one thing to do is protect your own phone, because clicking a real ad is what can get an account flagged:
 
-You can also build a live-ads APK yourself at any time:
+1. **Register your device in AdMob** - AdMob → Device management → Register device. The SDK then serves Google's test ads to that device automatically, and a real ad can never appear on it.
+2. Or flip the **"test ads on this device"** switch in the developer panel (five taps on the version number in Settings → About). It affects that device only.
 
-```bash
-flutter build apk --release --dart-define=ADS_LIVE=true
-```
+A build can also be forced to test ads everywhere with `--dart-define=ADS_LIVE=false`, or by setting the `ADS_LIVE` repository secret to `false` for one release.
 
 ---
 
@@ -128,7 +125,7 @@ Add these as **repository secrets** (Settings → Secrets and variables → Acti
 | `STORE_PASSWORD` | the keystore password |
 | `KEY_ALIAS` | `upload` |
 | `KEY_PASSWORD` | the key password |
-| `ADS_LIVE` | `false` for now, `true` after approval |
+| `ADS_LIVE` | leave unset (live ads are the default); set it to `false` only for a release that must serve test ads |
 
 Create the keystore once and keep it safe - losing it means you cannot update the app:
 

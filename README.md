@@ -22,7 +22,7 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 🏛️ **Grouped by market** — holdings are split into exchange sections (NYSE, NASDAQ, TSX, TSX Venture, NYSE Arca, Crypto, …) using the venue each quote actually reports, so Canadian and US listings are never mixed up.
 - 🖼️ **Real company logos** — each holding shows the issuer's own logo, served by Wikimedia Commons. A ticker is only matched when it maps to a single company, otherwise a letter badge is used.
 - ⏱️ **Visible data freshness** — the exchange timestamp Yahoo reports is shown next to each quote, alongside the fetch time, so a delayed price is never presented as a live one.
-- 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data.
+- 💵 **Dividend tracking** — trailing-12-months income, annual income projection, portfolio yield & yield-on-cost, per-holding dividend history from 2 years of Yahoo data, and an optional **withholding tax** estimate so you can see what you actually keep after tax on US and Canadian dividends.
 - 📅 **Dividend calendar** — a month view you can page through, with a tap on any day opening exactly what is scheduled that day. Below it, a month-by-month timeline of every upcoming dividend and earnings date, and a one-tap **export to your own calendar** (.ics).
 - 🆕 **What's new** — dividends paid this month, paid so far this year, the biggest mover today, and the next event, in one card.
 - 🕶️ **Hide balances** — one switch turns every amount into dots, for when you are not meant to be showing your screen.
@@ -64,7 +64,7 @@ Portfolios are stored locally unless you enable Gist sync. Android includes a Go
 
 Debug/profile builds use Google's test ads. Release builds use the AdMob placements below. Consent information is refreshed before requesting ads; when required, the app exposes **Ad privacy choices**. Configure the app's privacy policy and applicable consent messages in AdMob's **Privacy & messaging** console before distribution. Windows and web do not request mobile ads.
 
-**Live ads are opt-in.** A release build serves Google's *test* ads unless it is built with `--dart-define=ADS_LIVE=true` (the CI release build turns them on only when the `ADS_LIVE` repository secret is set to `true`). AdMob asks for test ads while an app is under review, and it means an accidental click on a live ad cannot flag the account. See [`docs/PLAY_LAUNCH.md`](docs/PLAY_LAUNCH.md) for the full order of steps.
+**Live ads start on their own.** A release build uses the real AdMob units, so the ads begin serving the moment AdMob approves the app - no rebuild, no flag to flip. Before approval AdMob serves nothing from those units, so an unapproved build shows no ads at all. The one precaution worth taking is to **register your own device in AdMob** (AdMob → Device management → Register device): the SDK then serves Google's test ads to your phone, so a real ad can never be clicked by accident. There is also a "test ads on this device" switch in the developer panel that does the same thing from inside the app.
 
 **Placements.** Each placement has its own ad unit so AdMob reports revenue per placement, which is what makes it possible to tell which one actually earns:
 
