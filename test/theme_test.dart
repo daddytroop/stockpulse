@@ -34,6 +34,13 @@ void main() {
     );
   }
 
+  /// Loading the provider starts background fetches with short delays.
+  /// They have to be flushed before a widget test ends.
+  Future<void> settle(WidgetTester tester) async {
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  }
+
   group('theme', () {
     testWidgets('tapping a theme in the settings changes the theme', (tester) async {
       final provider = PortfolioProvider(store: _MemoryStore());
@@ -43,7 +50,7 @@ void main() {
         const MaterialApp(home: SettingsScreen()),
         provider,
       ));
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       // The theme section is near the top now, but a long list can still
       // push it off the first screen.
@@ -58,14 +65,10 @@ void main() {
       final provider = PortfolioProvider(store: _MemoryStore());
       await provider.load();
 
-      late BuildContext captured;
-      await tester.pumpWidget(wrap(
-        StockPulseApp(),
-        provider,
-      ));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(wrap(StockPulseApp(), provider));
+      await settle(tester);
 
-      captured = tester.element(find.byType(Scaffold).first);
+      final captured = tester.element(find.byType(Scaffold).first);
       expect(Theme.of(captured).brightness, Brightness.light);
 
       await provider.setThemeMode(AppThemeId.dark);
@@ -83,7 +86,7 @@ void main() {
         const MaterialApp(home: Scaffold(body: ThemeToggleButton())),
         provider,
       ));
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       await tester.tap(find.byIcon(Icons.light_mode_outlined));
       await tester.pumpAndSettle();
@@ -103,9 +106,10 @@ void main() {
         const MaterialApp(home: SettingsScreen()),
         provider,
       ));
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       for (final mode in AppThemeId.values) {
+        await tester.scrollUntilVisible(find.text(mode.label), 120);
         await tester.tap(find.text(mode.label));
         await tester.pumpAndSettle();
         expect(provider.themeMode, mode);

@@ -30,35 +30,46 @@ Future<void> showThemeSheet(BuildContext context) async {
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(
-              'Theme',
-              style: Theme.of(ctx)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
+      child: ConstrainedBox(
+        // The sheet is scrollable so it never overflows on a short screen.
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  'Theme',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              for (final mode in AppThemeId.values)
+                RadioListTile<AppThemeId>(
+                  value: mode,
+                  groupValue: provider.themeMode,
+                  title: Text(mode.label),
+                  secondary: _Preview(mode: mode),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    // Close first: applying the theme rebuilds the tree, and
+                    // the sheet's context would be gone by then.
+                    Navigator.of(ctx).pop();
+                    provider.setThemeMode(v);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
           ),
-          for (final mode in AppThemeId.values)
-            RadioListTile<AppThemeId>(
-              value: mode,
-              groupValue: provider.themeMode,
-              title: Text(mode.label),
-              secondary: _Preview(mode: mode),
-              onChanged: (v) {
-                if (v == null) return;
-                provider.setThemeMode(v);
-                Navigator.of(ctx).pop();
-              },
-            ),
-          const SizedBox(height: 8),
-        ],
+        ),
       ),
     ),
   );
