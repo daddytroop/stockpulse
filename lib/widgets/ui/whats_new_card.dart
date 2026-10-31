@@ -31,9 +31,13 @@ class WhatsNewCard extends StatelessWidget {
     final monthStart = DateTime(now.year, now.month, 1);
     final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-    final thisMonth = provider.dividendsReceivedBetween(
-        portfolio, monthStart, monthEnd);
-    final thisYear = provider.dividendsReceivedThisYear(portfolio);
+    final thisMonth = provider.withholdingCountry.isNotEmpty
+        ? provider.netDividendsReceivedBetween(portfolio, monthStart, monthEnd)
+        : provider.dividendsReceivedBetween(portfolio, monthStart, monthEnd);
+    final thisYear = provider.withholdingCountry.isNotEmpty
+        ? provider.netDividendsReceivedBetween(
+            portfolio, DateTime(now.year, 1, 1), DateTime(now.year, 12, 31, 23, 59, 59))
+        : provider.dividendsReceivedThisYear(portfolio);
     final mover = provider.biggestMoverToday(portfolio);
     final next = provider.nextUpcomingAcrossAll();
 
@@ -60,7 +64,9 @@ class WhatsNewCard extends StatelessWidget {
                 child: _Block(
                   label: 'Paid this month',
                   value: fmtMoney(thisMonth, currency: currency),
-                  hint: thisMonth > 0 ? 'dividends received' : 'nothing received yet',
+                  hint: provider.withholdingCountry.isNotEmpty
+                      ? 'after withholding tax'
+                      : (thisMonth > 0 ? 'dividends received' : 'nothing received yet'),
                   color: colors.dividend,
                 ),
               ),

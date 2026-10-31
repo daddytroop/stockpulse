@@ -12,6 +12,7 @@ import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
 import '../services/widget_service.dart';
+import '../utils/dividend_tax.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/pulse_logo.dart';
@@ -187,6 +188,48 @@ class SettingsScreen extends StatelessWidget {
                       ],
                     ),
                   ],
+                ],
+              ),
+            ),
+          ),
+
+          _section(context, 'Dividend tax'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dividends paid by a company in one country to a resident '
+                    'of another are usually taxed before they are paid. Pick '
+                    'where you live and the app shows what you actually keep.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: provider.withholdingCountry.isEmpty
+                        ? ''
+                        : provider.withholdingCountry,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      labelText: 'Country of residence',
+                    ),
+                    items: [
+                      for (final c in taxCountries)
+                        DropdownMenuItem(value: c.code, child: Text(c.label)),
+                    ],
+                    onChanged: (v) => provider.setWithholdingCountry(v ?? ''),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'US and Canadian dividends are estimated with the treaty '
+                    'rates; other markets are shown gross. This is an '
+                    'estimate to compare income with, not tax advice.',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.hintColor),
+                  ),
                 ],
               ),
             ),
@@ -680,6 +723,16 @@ class SettingsScreen extends StatelessWidget {
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Test ads on this device'),
+                  subtitle: const Text(
+                    'Serves Google test ads here only, so a real ad can never '
+                    'be clicked by accident. Other devices are unaffected.',
+                  ),
+                  value: ads.useTestAds,
+                  onChanged: (v) => ads.setUseTestAds(v),
+                ),
                 Text(
                   kAdsLive
                       ? 'Live ads are on in this build.'

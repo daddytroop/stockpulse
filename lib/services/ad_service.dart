@@ -42,15 +42,16 @@ enum AdPlacement {
 
 /// Whether a release build should serve live ads.
 ///
-/// AdMob asks that only test ads are served until the app has been
-/// approved and linked to a store listing, and clicking a live ad by
-/// mistake can flag the account. So live ads are opt-in: a build enables
-/// them with `--dart-define=ADS_LIVE=true`.
+/// Live ads are the default, because AdMob does not serve ads to an app it
+/// has not approved yet - the real ad units simply come back empty until
+/// the review passes, and then they start working on their own with no new
+/// build.
 ///
-/// The CI release build turns them on only when the `ADS_LIVE` repository
-/// secret is set to `true`, so the published build follows the account's
-/// state without anyone editing code.
-const bool kAdsLive = bool.fromEnvironment('ADS_LIVE', defaultValue: false);
+/// The one thing to avoid is clicking a real ad on your own phone. Either
+/// register the device in AdMob (AdMob → Device management → Register
+/// device), which makes the SDK serve test ads to it automatically, or use
+/// the "test ads on this device" switch in the developer panel.
+const bool kAdsLive = bool.fromEnvironment('ADS_LIVE', defaultValue: true);
 
 /// Ad unit identifiers.
 ///
@@ -228,8 +229,26 @@ class AdService extends ChangeNotifier {
   final Map<AdPlacement, String> _lastErrors = {};
 
   /// The ad unit configured for a placement, if any.
-  String adUnitFor(AdPlacement placement) =>
-      AdUnits.forPlacement(placement, _adUnits);
+  String adUnitFor(AdPlacement placement) {
+    if (useTestAds) return AdUnits.test[placement] ?? AdUnits.test[AdPlacement.portfolioBanner]!;
+    return AdUnits.forPlacement(placement, _adUnits);
+  }
+
+  /// Whether this device is served Google's test ads instead of live ones.
+  ///
+  /// Useful on the developer's own phone: it means a real ad can never be
+  /// clicked by accident, which is the one thing that can get an AdMob
+  /// account flagged. Other devices are unaffected.
+  bool get useTestAds => _useTestAds;
+  bool _useTestAds = false;
+
+  /// Turns the test ads on or off for this device only.
+  Future<void> setUseTestAds(bool value) async {
+    if (_useTestAds == value) return;
+    _useTestAds = value;
+    await _persist();
+    notifyListeners();
+  }
 
   /// The last error a placement reported, if any.
   String? lastErrorFor(AdPlacement placement) => _lastErrors[placement];
@@ -314,6 +333,7 @@ class AdService extends ChangeNotifier {
       // An old "enabled" flag is ignored on purpose: ads are part of the
       // app, and a file written by an earlier build must not be able to
       // switch them off.
+      _useTestAds = data['useTestAds'] as bool? ?? false;
       for (final raw in (data['log'] as List? ?? const [])) {
         if (raw is Map<String, dynamic>) _log.add(AdImpression.fromMap(raw));
       }
@@ -337,6 +357,7 @@ class AdService extends ChangeNotifier {
 
   Future<void> _persist() async {
     await _store.save(_logFile, {
+      'useTestAds': _useTestAds,
       'adUnits': {for (final e in _adUnits.entries) e.key.id: e.value},
       'log': [for (final i in _log) i.toMap()],
     });

@@ -9,6 +9,7 @@ import '../services/ad_service.dart';
 import '../services/calendar_service.dart';
 import '../services/export_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/dividend_tax.dart';
 import '../utils/formatters.dart';
 import '../widgets/ad_slot.dart';
 import '../widgets/month_calendar.dart';
@@ -251,6 +252,18 @@ class _DividendsScreenState extends State<DividendsScreen> {
           '${fmtPct(totals.incomeYield, signed: false)} yield · about ${fmtMoney(monthly, currency: currency)} each month',
           style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
         ),
+        if (provider.withholdingCountry.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '≈ ${fmtMoney(provider.netAnnualIncomeFor(portfolio), currency: currency)} '
+              'after withholding tax in ${countryLabel(provider.withholdingCountry)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         const SizedBox(height: 18),
         Wrap(spacing: 10, runSpacing: 10, children: [
           _HeroPill(label: 'Next 30 days', value: fmtMoney(next30, currency: currency)),

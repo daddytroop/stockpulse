@@ -31,9 +31,9 @@ void main() {
     });
 
     test('live ads are opt-in', () {
-      // Until the app is approved in AdMob, only test ads may be served,
-      // so the flag is off by default.
-      expect(kAdsLive, isFalse);
+      // Live ads are the default so they start on their own once AdMob
+      // approves the app; a build can still force test ads.
+      expect(kAdsLive, isTrue);
     });
 
     test('the default banner unit is set', () {

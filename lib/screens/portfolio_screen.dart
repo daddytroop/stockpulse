@@ -508,9 +508,11 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           formatter: (v) => fmtMoney(v, currency: currency),
           valueColor: colors.dividend,
           icon: Icons.payments_outlined,
-          sub: totals.incomeYield > 0
-              ? '${fmtPct(totals.incomeYield, signed: false)} yield'
-              : 'From dividends',
+          sub: provider.withholdingCountry.isNotEmpty
+              ? '≈ ${fmtMoney(provider.netAnnualIncomeFor(portfolio), currency: currency)} after tax'
+              : (totals.incomeYield > 0
+                  ? '${fmtPct(totals.incomeYield, signed: false)} yield'
+                  : 'From dividends'),
           onTap: () => _openTab(context, 1),
         ),
         KpiTile(

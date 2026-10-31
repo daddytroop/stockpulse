@@ -18,6 +18,7 @@ import '../services/diagnostics.dart';
 import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
 import '../utils/formatters.dart';
+import '../utils/dividend_tax.dart';
 import '../utils/market_identity.dart';
 import '../utils/privacy.dart';
 
@@ -114,6 +115,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// When true, every currency amount is shown as dots.
   bool _hideBalances = false;
+
+  /// Country of residence, used for dividend withholding tax.
+  String _withholdingCountry = '';
   String _gistId = '';
   String _gistToken = '';
   DateTime? _lastSyncAt;
@@ -197,6 +201,48 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// Whether currency amounts are hidden across the app.
   bool get hideBalances => _hideBalances;
+
+  /// The country the user lives in, for dividend withholding.
+  String get withholdingCountry => _withholdingCountry;
+
+  /// Sets the country of residence used for dividend withholding.
+  Future<void> setWithholdingCountry(String code) async {
+    _withholdingCountry = code.trim().toUpperCase();
+    notifyListeners();
+    await _persistData();
+  }
+
+  /// The withholding rate that applies to a holding's dividends.
+  double withholdingForHolding(Holding h) {
+    if (_withholdingCountry.isEmpty) return 0;
+    final q = _quotes[h.symbol];
+    final market = marketFor(
+      symbol: h.symbol,
+      exchangeCode: q?.exchange,
+      exchangeName: q?.fullExchangeName,
+      quoteType: q?.quoteType,
+    );
+    final issuer = countryForMarket(market);
+    if (issuer.isEmpty) return 0;
+    return withholdingRate(_withholdingCountry, issuer);
+  }
+
+  /// The annual income a portfolio keeps after withholding tax.
+  double netAnnualIncomeFor(Portfolio p) {
+    var gross = 0.0;
+    var net = 0.0;
+    for (final h in p.holdings.values) {
+      final q = _quotes[h.symbol];
+      final info = _dividendInfo[h.symbol];
+      final rate = info != null && info.ttmPerShare > 0
+          ? info.ttmPerShare
+          : (q?.dividendRate ?? 0);
+      final amount = rate * h.quantity;
+      gross += amount;
+      net += amount * (1 - withholdingForHolding(h));
+    }
+    return net;
+  }
   String get gistId => _gistId;
   String get gistToken => _gistToken;
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -317,6 +363,8 @@ class PortfolioProvider extends ChangeNotifier {
       _priceAlertPct = (data['priceAlertPct'] as num? ?? 0).toDouble();
       _lockEnabled = data['lockEnabled'] as bool? ?? false;
       _hideBalances = data['hideBalances'] as bool? ?? false;
+      _withholdingCountry =
+          (data['withholdingCountry'] as String? ?? '').trim().toUpperCase();
       // Applied before any quote arrives, so a balance is never on screen
       // while the mode is on.
       PrivacyMode.hideBalances = _hideBalances;
@@ -401,6 +449,7 @@ class PortfolioProvider extends ChangeNotifier {
       'priceAlertPct': _priceAlertPct,
       'lockEnabled': _lockEnabled,
       'hideBalances': _hideBalances,
+      'withholdingCountry': _withholdingCountry,
       'gistId': _gistId,
       'gistToken': _gistToken,
       'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
@@ -1487,6 +1536,23 @@ class PortfolioProvider extends ChangeNotifier {
         from: from,
         to: to,
       );
+    }
+    return total;
+  }
+
+  /// The same, after withholding tax.
+  double netDividendsReceivedBetween(Portfolio p, DateTime from, DateTime to) {
+    var total = 0.0;
+    for (final h in p.holdings.values) {
+      final gross = ledger.dividendsReceivedInRange(
+        txns: p.txnsFor(h.symbol),
+        payments: _dividendInfo[h.symbol]?.payments ?? const [],
+        currentQty: h.quantity,
+        holdingStart: h.addedAt,
+        from: from,
+        to: to,
+      );
+      total += gross * (1 - withholdingForHolding(h));
     }
     return total;
   }

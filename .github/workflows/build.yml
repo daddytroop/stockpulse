@@ -71,11 +71,11 @@ jobs:
         env:
           ADS_LIVE: ${{ secrets.ADS_LIVE }}
         run: |
-          # Live ads are opt-in: they only run when the ADS_LIVE secret is
-          # set, because AdMob asks that only test ads are served until the
-          # app is approved and linked to a store listing.
-          if [ "$ADS_LIVE" = "true" ]; then
-            flutter build apk --release --dart-define=ADS_LIVE=true
+          # Live ads are the default: AdMob serves nothing until the app is
+          # approved, and then it starts on its own with no new build. The
+          # secret only exists for the cautious case of forcing test ads.
+          if [ "$ADS_LIVE" = "false" ]; then
+            flutter build apk --release --dart-define=ADS_LIVE=false
           else
             flutter build apk --release
           fi
@@ -134,8 +134,8 @@ jobs:
           ADS_LIVE: ${{ secrets.ADS_LIVE }}
         run: |
           if [ "$SKIP_AAB" = "1" ]; then exit 0; fi
-          if [ "$ADS_LIVE" = "true" ]; then
-            flutter build appbundle --release --dart-define=ADS_LIVE=true
+          if [ "$ADS_LIVE" = "false" ]; then
+            flutter build appbundle --release --dart-define=ADS_LIVE=false
           else
             flutter build appbundle --release
           fi
