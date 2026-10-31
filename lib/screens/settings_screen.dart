@@ -174,8 +174,14 @@ class SettingsScreen extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Exchange rates are unavailable right now, so '
-                            'totals are shown in each holding’s own currency.',
+                            provider.fxMissingCurrencies.isEmpty
+                                ? 'Exchange rates are unavailable right now, so '
+                                    'totals are shown in each holding’s own '
+                                    'currency.'
+                                : 'No exchange rate for '
+                                    '${provider.fxMissingCurrencies.join(', ')}, '
+                                    'so totals are shown in each holding’s own '
+                                    'currency.',
                             style: theme.textTheme.labelSmall,
                           ),
                         ),

@@ -19,6 +19,7 @@ import '../services/widget_service.dart';
 import '../services/yahoo_service.dart';
 import '../utils/formatters.dart';
 import '../utils/dividend_tax.dart';
+import '../utils/fx_currency.dart';
 import '../utils/market_identity.dart';
 import '../utils/privacy.dart';
 
@@ -118,6 +119,9 @@ class PortfolioProvider extends ChangeNotifier {
 
   /// Country of residence, used for dividend withholding tax.
   String _withholdingCountry = '';
+
+  /// The currencies whose exchange rate could not be found.
+  List<String> _fxMissing = const [];
   String _gistId = '';
   String _gistToken = '';
   DateTime? _lastSyncAt;
@@ -939,9 +943,13 @@ class PortfolioProvider extends ChangeNotifier {
     );
   }
 
-  /// Fetches FX conversion rates (Yahoo `[FROM][TO]=X` pairs) for every
-  /// portfolio currency into the chosen display currency (one cached quote
-  /// per pair).
+  /// Fetches FX conversion rates for every portfolio currency into the
+  /// chosen display currency.
+  ///
+  /// Every rate goes through the dollar: Yahoo quotes a cross against the
+  /// dollar for every currency it supports, but only some of them have a
+  /// direct cross against any other currency. Asking for `SGDCAD=X` returns
+  /// nothing, which used to leave the whole portfolio unconverted.
   Future<void> ensureFxRates({bool force = false}) async {
     if (_displayCurrency.isEmpty || _fxLoading) return;
 
@@ -970,16 +978,41 @@ class PortfolioProvider extends ChangeNotifier {
     _fxLastAttempt = now;
     notifyListeners();
     try {
-      final pairs = {
-        for (final f in need) '$f$_displayCurrency=X',
+      // Ask for the dollar rate of every currency involved.
+      final codes = <String>{
+        for (final f in need) f,
+        if (_displayCurrency != 'USD') _displayCurrency,
       };
-      final quotes = await _yahoo.quotes(pairs);
-      for (final f in need) {
-        final q = quotes['$f$_displayCurrency=X'];
-        if (q != null && q.price > 0) {
-          _fxRates['$f$_displayCurrency'] = q.price;
-        }
+      final pairs = {
+        for (final c in codes)
+          if (c != 'USD') fxSymbol(c),
+      };
+
+      final quotes = pairs.isEmpty ? <String, Quote>{} : await _yahoo.quotes(pairs);
+
+      // One unit of the currency, in dollars.
+      double? toDollar(String code) {
+        if (code == 'USD') return 1;
+        final q = quotes[fxSymbol(code)];
+        if (q == null || q.price <= 0) return null;
+        return q.price * fxUnitFactor(code);
       }
+
+      // One dollar, in the display currency.
+      final displayToDollar = toDollar(_displayCurrency);
+      final dollarToDisplay =
+          displayToDollar == null || displayToDollar <= 0 ? null : 1 / displayToDollar;
+
+      final missing = <String>[];
+      for (final f in need) {
+        final rate = toDollar(f);
+        if (rate == null || dollarToDisplay == null) {
+          missing.add(f);
+          continue;
+        }
+        _fxRates['$f$_displayCurrency'] = rate * dollarToDisplay;
+      }
+      _fxMissing = missing;
     } catch (_) {
       // rates stay missing; totals fall back to native currencies
     } finally {
@@ -987,6 +1020,12 @@ class PortfolioProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// The currencies whose exchange rate could not be found.
+  ///
+  /// Shown in the settings so it is clear which holding is holding the
+  /// conversion back.
+  List<String> get fxMissingCurrencies => List.unmodifiable(_fxMissing);
 
   PortfolioTotals totalsForAll() {
     var value = 0.0;
