@@ -107,7 +107,14 @@ class YahooService {
   /// calls pass the query string pre-built.
   Future<http.Response?> _get(String path, Map<String, String> params,
       {bool withCookie = false, String? rawQuery}) async {
-    final query = rawQuery ?? Uri(queryParameters: params).query;
+    // Cookie-protected endpoints also need the crumb, or Yahoo answers 401.
+    // Raw queries (the batched quotes) already carry it.
+    final query = rawQuery ??
+        Uri(queryParameters: {
+          ...params,
+          if (withCookie && _crumb != null && !params.containsKey('crumb'))
+            'crumb': _crumb!,
+        }).query;
     for (final host in _hosts) {
       try {
         final uri = Uri.parse(_route('https://$host$path?$query'));
