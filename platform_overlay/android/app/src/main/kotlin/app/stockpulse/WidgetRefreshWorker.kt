@@ -48,6 +48,8 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) :
     private suspend fun refreshWidgetsAndAlerts() {
         val context = applicationContext
         val prefs = WidgetRenderer.prefs(context)
+        // Watchlist targets do not depend on owning anything.
+        checkWatchTargets(context, prefs)
         val symbolsJson = prefs.getString("bg_symbols", null) ?: return
         val symbols = JSONArray(symbolsJson)
         if (symbols.length() == 0) return
@@ -151,6 +153,43 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) :
         }
     }
 
+    /// Notifies when a watched stock reaches one of the user's price
+    /// targets (a Pro feature; the app only writes targets when unlocked).
+    private fun checkWatchTargets(context: Context, prefs: android.content.SharedPreferences) {
+        val watch = prefs.getString("bg_watch", null)?.let {
+            runCatching { JSONArray(it) }.getOrNull()
+        } ?: return // [{"s":"NVDA","above":150.0,"below":90.0,"name":"NVIDIA","cur":"USD"}]
+        for (i in 0 until watch.length()) {
+            val item = watch.optJSONObject(i) ?: continue
+            val symbol = item.optString("s")
+            if (symbol.isEmpty()) continue
+            val above = if (item.has("above")) item.optDouble("above") else Double.NaN
+            val below = if (item.has("below")) item.optDouble("below") else Double.NaN
+            if (above.isNaN() && below.isNaN()) continue
+            val price = fetchLastTwoCloses(symbol)?.get(0) ?: continue
+            val cur = item.optString("cur", "USD")
+            val name = item.optString("name", "").ifEmpty { symbol }
+            if (!above.isNaN() && price >= above) {
+                notifyOnce(
+                    context,
+                    "target:$symbol:above:$above",
+                    "$name hit your target",
+                    "$symbol is at ${formatMoney(price, cur)}, at or above your "
+                        + "${formatMoney(above, cur)} target."
+                )
+            } else if (!below.isNaN() && price <= below) {
+                notifyOnce(
+                    context,
+                    "target:$symbol:below:$below",
+                    "$name dropped to your price",
+                    "$symbol is at ${formatMoney(price, cur)}, at or below your "
+                        + "${formatMoney(below, cur)} target."
+                )
+            }
+            Thread.sleep(120)
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Network
     // ------------------------------------------------------------------------
@@ -196,7 +235,17 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) :
     // Notifications
     // ------------------------------------------------------------------------
 
+    /// Posts a notification, at most once per [id]. The worker runs every
+    /// hour, so without this an alert would fire again on every run.
     private fun notifyOnce(context: Context, id: String, title: String, text: String) {
+        val prefs = WidgetRenderer.prefs(context)
+        val sent = prefs.getStringSet("bg_notified", emptySet())?.toMutableSet()
+            ?: mutableSetOf()
+        if (!sent.add(id)) return
+        // Keep the record small; old day-keyed ids are never needed again.
+        while (sent.size > 300) sent.remove(sent.first())
+        prefs.edit().putStringSet("bg_notified", sent).apply()
+
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = androidx.core.app.NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)

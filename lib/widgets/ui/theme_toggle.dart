@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/portfolio_provider.dart';
+import '../../screens/pro_screen.dart';
+import '../../services/pro_service.dart';
 import '../../theme/app_theme.dart';
 
 /// A button that opens the theme picker.
@@ -56,14 +58,14 @@ Future<void> showThemeSheet(BuildContext context) async {
                 RadioListTile<AppThemeId>(
                   value: mode,
                   groupValue: provider.themeMode,
-                  title: Text(mode.label),
+                  title: ThemeLabel(mode: mode),
                   secondary: _Preview(mode: mode),
                   onChanged: (v) {
                     if (v == null) return;
                     // Close first: applying the theme rebuilds the tree, and
                     // the sheet's context would be gone by then.
                     Navigator.of(ctx).pop();
-                    provider.setThemeMode(v);
+                    chooseTheme(context, v);
                   },
                 ),
               const SizedBox(height: 8),
@@ -73,6 +75,36 @@ Future<void> showThemeSheet(BuildContext context) async {
       ),
     ),
   );
+}
+
+/// Applies [mode], asking for Pro first when it is a locked Pro theme.
+Future<void> chooseTheme(BuildContext context, AppThemeId mode) async {
+  final provider = context.read<PortfolioProvider>();
+  if (mode.isPremium && !context.read<ProService>().has(ProFeature.themes)) {
+    final unlocked = await showProPaywall(context, feature: ProFeature.themes);
+    if (!unlocked) return;
+  }
+  await provider.setThemeMode(mode);
+}
+
+/// A theme's name, with a PRO tag on the Pro themes.
+class ThemeLabel extends StatelessWidget {
+  final AppThemeId mode;
+
+  const ThemeLabel({super.key, required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!mode.isPremium) return Text(mode.label);
+    final locked = !context.watch<ProService>().has(ProFeature.themes);
+    return Row(
+      children: [
+        Text(mode.label),
+        const SizedBox(width: 8),
+        ProBadge(locked: locked),
+      ],
+    );
+  }
 }
 
 /// A small colour chip that shows what a theme looks like.

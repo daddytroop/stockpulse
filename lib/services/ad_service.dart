@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -78,6 +80,14 @@ class AdUnits {
   /// more in the console and point the placements at them when you have
   /// them.
   static const String defaultNative = '$_publisher/4150586198';
+
+  /// The rewarded unit behind "watch an ad to try a Pro feature for 24
+  /// hours". Create a Rewarded ad unit in AdMob and paste its id here; while
+  /// it is empty, release builds simply do not offer the ad.
+  static const String rewarded = '';
+
+  /// Google's public rewarded test unit.
+  static const String rewardedTest = 'ca-app-pub-3940256099942544/5224354917';
 
   /// Google's public test units, used in debug and profile builds.
   static const Map<AdPlacement, String> test = {
@@ -295,11 +305,88 @@ class AdService extends ChangeNotifier {
 
   /// Whether the SDK currently allows ad requests.
   ///
-  /// There is deliberately no user-facing switch: the app is free because
-  /// it carries ads, so they are part of it. What the user *can* control
-  /// is consent - the privacy options form - which is a different thing
-  /// and is required.
+  /// There is no switch to turn ads off: the free app is paid for by ads,
+  /// and buying Pro is how to remove them ([setAdFree]). What every user
+  /// *can* control is consent - the privacy options form - which is a
+  /// different thing and is required.
   bool get canRequestAds => _adsAllowed;
+
+  /// Whether the user has Pro, which removes every ad.
+  bool get adFree => _adFree;
+  bool _adFree = false;
+
+  /// Follows the Pro status. Slots already on screen collapse at once.
+  void setAdFree(bool value) {
+    if (_adFree == value) return;
+    _adFree = value;
+    notifyListeners();
+  }
+
+  /// The rewarded ad unit for this build, or empty when there is none.
+  String get rewardedUnit {
+    if (useTestAds || !kReleaseMode || !kAdsLive) return AdUnits.rewardedTest;
+    return AdUnits.rewarded;
+  }
+
+  /// Rewarded ads watched to the end, and what they earned, for the
+  /// developer panel. Kept apart from the placement log because a rewarded
+  /// ad is chosen by the user rather than placed in the layout.
+  int get rewardedViews => _rewardedViews;
+  int _rewardedViews = 0;
+  double get rewardedRevenueDollars => _rewardedRevenueMicros / 1000000;
+  double _rewardedRevenueMicros = 0;
+
+  /// Whether a "watch an ad to unlock" offer can be made.
+  bool get rewardedAvailable =>
+      supported && canRequestAds && rewardedUnit.isNotEmpty;
+
+  /// Loads and shows a rewarded ad. Completes with true only when the
+  /// user watched it to the end and earned the reward.
+  Future<bool> showRewarded() async {
+    if (!rewardedAvailable) return false;
+    final result = Completer<bool>();
+    var earned = false;
+    try {
+      await RewardedAd.load(
+        adUnitId: rewardedUnit,
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (ad) {
+            ad.fullScreenContentCallback = FullScreenContentCallback(
+              onAdDismissedFullScreenContent: (ad) {
+                ad.dispose();
+                if (!result.isCompleted) result.complete(earned);
+              },
+              onAdFailedToShowFullScreenContent: (ad, error) {
+                ad.dispose();
+                if (!result.isCompleted) result.complete(false);
+              },
+            );
+            ad.onPaidEvent = (ad, valueMicros, precision, currency) {
+              _rewardedRevenueMicros += valueMicros;
+              _persist();
+            };
+            ad.show(onUserEarnedReward: (ad, reward) {
+              earned = true;
+              _rewardedViews++;
+              _persist();
+            });
+          },
+          onAdFailedToLoad: (error) {
+            if (kDebugMode) debugPrint('Rewarded ad failed: ${error.message}');
+            if (!result.isCompleted) result.complete(false);
+          },
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Rewarded ad error: $e');
+      if (!result.isCompleted) result.complete(false);
+    }
+    return result.future.timeout(
+      const Duration(minutes: 3),
+      onTimeout: () => earned,
+    );
+  }
 
   /// Whether the user must be offered a privacy-options form.
   bool get privacyOptionsRequired => _privacyRequired;
@@ -334,6 +421,9 @@ class AdService extends ChangeNotifier {
       // app, and a file written by an earlier build must not be able to
       // switch them off.
       _useTestAds = data['useTestAds'] as bool? ?? false;
+      _rewardedViews = (data['rewardedViews'] as num?)?.toInt() ?? 0;
+      _rewardedRevenueMicros =
+          (data['rewardedRevenueMicros'] as num?)?.toDouble() ?? 0;
       for (final raw in (data['log'] as List? ?? const [])) {
         if (raw is Map<String, dynamic>) _log.add(AdImpression.fromMap(raw));
       }
@@ -360,6 +450,8 @@ class AdService extends ChangeNotifier {
       'useTestAds': _useTestAds,
       'adUnits': {for (final e in _adUnits.entries) e.key.id: e.value},
       'log': [for (final i in _log) i.toMap()],
+      'rewardedViews': _rewardedViews,
+      'rewardedRevenueMicros': _rewardedRevenueMicros,
     });
   }
 
@@ -419,7 +511,7 @@ class AdService extends ChangeNotifier {
     AdPlacement placement, {
     Duration minGap = const Duration(minutes: 3),
   }) {
-    if (!supported || !canRequestAds) return false;
+    if (!supported || !canRequestAds || _adFree) return false;
     if (_sessionImpressions >= sessionCap) return false;
 
     final now = DateTime.now();

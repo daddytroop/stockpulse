@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../providers/portfolio_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/ad_service.dart';
+import '../services/pro_service.dart';
 import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
@@ -16,8 +17,10 @@ import '../utils/dividend_tax.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/theme_toggle.dart';
+import '../widgets/app_icon_picker.dart';
 import '../widgets/pulse_logo.dart';
 import 'privacy_screen.dart';
+import 'pro_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -58,6 +61,7 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
         children: [
+          const ProSettingsCard(),
           // Appearance comes first: it is the setting people reach for most
           // often, and it used to be a long way down the list.
           _section(context, 'Appearance'),
@@ -69,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
                     groupValue: provider.themeMode,
                     value: mode,
                     title: mode.label,
-                    onChanged: (v) => provider.setThemeMode(v),
+                    onChanged: (v) => chooseTheme(context, v),
                   ),
               ],
             ),
@@ -95,6 +99,8 @@ class SettingsScreen extends StatelessWidget {
               ]),
             ),
           ),
+
+          const AppIconPicker(),
 
           _section(context, 'Portfolios'),
           for (final p in provider.portfolios)
@@ -737,6 +743,17 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  title: const Text('See the app as a Pro user'),
+                  subtitle: Text(
+                    'Developer preview of Pro on this device only. '
+                    'Rewarded ads watched: ${ads.rewardedViews}, '
+                    'est. \$${ads.rewardedRevenueDollars.toStringAsFixed(4)}.',
+                  ),
+                  value: ctx.watch<ProService>().devPro,
+                  onChanged: (v) => ctx.read<ProService>().setDevPro(v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: const Text('Test ads on this device'),
                   subtitle: const Text(
                     'Serves Google test ads here only, so a real ad can never '
@@ -846,15 +863,23 @@ class SettingsScreen extends StatelessWidget {
     return Card(
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.favorite_outline),
-            title: const Text('Stock Pulse is free'),
-            subtitle: const Text(
-              'There is no subscription and nothing to buy. The app is paid '
-              'for by ads from Google, which is why there is no paid tier '
-              'and no ad-free upgrade.',
+          if (ads.adFree)
+            const ListTile(
+              leading: Icon(Icons.verified_outlined),
+              title: Text('No ads: you have Pro'),
+              subtitle: Text('Thank you for supporting Stock Pulse.'),
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.favorite_outline),
+              title: const Text('Stock Pulse is free'),
+              subtitle: const Text(
+                'Ads from Google pay for the free app. A one-time Pro unlock '
+                'removes them for good, with no subscription.',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showProPaywall(context),
             ),
-          ),
           if (ads.privacyOptionsRequired) ...[
             const Divider(height: 1),
             ListTile(
@@ -1174,7 +1199,7 @@ class RadioAdaptiveTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RadioListTile<AppThemeId>(
-      title: Text(title),
+      title: ThemeLabel(mode: value),
       value: value,
       groupValue: groupValue,
       onChanged: (v) {

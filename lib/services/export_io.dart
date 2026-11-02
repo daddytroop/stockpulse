@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
@@ -52,6 +53,29 @@ class ExportService {
       }
     }
     return false;
+  }
+
+  /// Shares an image (the share sheet on phones, a save dialog on desktop).
+  static Future<bool> shareImage({
+    required String fileName,
+    required Uint8List bytes,
+    String? text,
+  }) async {
+    try {
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        final location = await getSaveLocation(suggestedName: fileName);
+        if (location == null) return false;
+        await File(location.path).writeAsBytes(bytes, flush: true);
+        return true;
+      }
+      final tmp = await getTemporaryDirectory();
+      final path = '${tmp.path}${Platform.pathSeparator}$fileName';
+      await File(path).writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles([XFile(path, mimeType: 'image/png')], text: text);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static bool get clipboardFallbackUsed => false;

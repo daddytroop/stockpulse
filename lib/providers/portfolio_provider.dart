@@ -11,6 +11,7 @@ import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../models/transaction.dart';
+import '../models/watch_item.dart';
 import '../services/csv_import.dart';
 import '../services/ledger.dart' as ledger;
 import '../services/store.dart';
@@ -21,6 +22,7 @@ import '../utils/formatters.dart';
 import '../utils/dividend_tax.dart';
 import '../utils/fx_currency.dart';
 import '../utils/market_identity.dart';
+import '../utils/portfolio_health.dart';
 import '../utils/privacy.dart';
 
 /// Aggregate money stats for a portfolio (or all portfolios at once).
@@ -126,6 +128,13 @@ class PortfolioProvider extends ChangeNotifier {
   String _gistToken = '';
   DateTime? _lastSyncAt;
   String _webProxyUrl = '';
+
+  /// Stocks the user follows without owning them.
+  List<WatchItem> _watchlist = [];
+
+  /// Whether watchlist price-target alerts are unlocked (a Pro feature).
+  /// Set by the app from the Pro status.
+  bool _watchAlertsEnabled = false;
 
   bool _loaded = false;
   bool _quotesLoading = false;
@@ -343,6 +352,72 @@ class PortfolioProvider extends ChangeNotifier {
       };
 
   // ---------------------------------------------------------------------------
+  // Watchlist
+  // ---------------------------------------------------------------------------
+
+  /// How many stocks the free version can follow. Pro removes the limit.
+  static const freeWatchlistLimit = 3;
+
+  List<WatchItem> get watchlist => List.unmodifiable(_watchlist);
+
+  bool isWatched(String symbol) =>
+      _watchlist.any((w) => w.symbol == symbol.toUpperCase());
+
+  /// Adds [symbol] to the watchlist and fetches its quote.
+  Future<void> addToWatchlist(String symbol) async {
+    final s = symbol.trim().toUpperCase();
+    if (s.isEmpty || isWatched(s)) return;
+    _watchlist = [..._watchlist, WatchItem(symbol: s, addedAt: DateTime.now())];
+    notifyListeners();
+    await _persistData();
+    try {
+      final fetched = await _yahoo.quotes({s});
+      if (fetched.isNotEmpty) {
+        _quotes = Map.of(_quotes)..addAll(fetched);
+        notifyListeners();
+      }
+    } catch (_) {
+      // The next refresh fills it in.
+    }
+    await pushWorkerSnapshot();
+  }
+
+  Future<void> removeFromWatchlist(String symbol) async {
+    _watchlist = [for (final w in _watchlist) if (w.symbol != symbol) w];
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  /// Sets or clears the price targets for a watched symbol.
+  Future<void> setWatchTargets(String symbol, {double? above, double? below}) async {
+    _watchlist = [
+      for (final w in _watchlist)
+        if (w.symbol == symbol)
+          w.copyWith(
+            above: above,
+            below: below,
+            clearAbove: above == null,
+            clearBelow: below == null,
+          )
+        else
+          w,
+    ];
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  bool get watchAlertsEnabled => _watchAlertsEnabled;
+
+  /// Turns watchlist target alerts on or off (follows the Pro status).
+  Future<void> setWatchAlertsEnabled(bool value) async {
+    if (_watchAlertsEnabled == value) return;
+    _watchAlertsEnabled = value;
+    await pushWorkerSnapshot();
+  }
+
+  // ---------------------------------------------------------------------------
   // Persistence
   // ---------------------------------------------------------------------------
 
@@ -381,6 +456,7 @@ class PortfolioProvider extends ChangeNotifier {
       _gistToken = data['gistToken']?.toString() ?? '';
       _lastSyncAt = _ms(data['lastSyncMs']);
       _webProxyUrl = data['webProxyUrl']?.toString() ?? '';
+      _watchlist = _parseWatchlist(data['watchlist']);
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -459,8 +535,14 @@ class PortfolioProvider extends ChangeNotifier {
       'gistToken': _gistToken,
       'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
       'webProxyUrl': _webProxyUrl,
+      'watchlist': [for (final w in _watchlist) w.toMap()],
     });
   }
+
+  static List<WatchItem> _parseWatchlist(Object? raw) => [
+        for (final m in (raw as List? ?? const []).whereType<Map<String, dynamic>>())
+          WatchItem.fromMap(m),
+      ].whereType<WatchItem>().toList();
 
   Future<void> _persistCache() async {
     await _store.save(_cacheFile, {
@@ -775,7 +857,7 @@ class PortfolioProvider extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
-      final symbols = allSymbols;
+      final symbols = {...allSymbols, for (final w in _watchlist) w.symbol};
       if (symbols.isNotEmpty) {
         final fetched = await _yahoo.quotes(symbols);
         if (fetched.isNotEmpty) {
@@ -876,6 +958,43 @@ class PortfolioProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Computed values
   // ---------------------------------------------------------------------------
+
+  /// The holdings of [p] as the health check sees them: value and income
+  /// in the display currency (once every FX rate is in), sector, type and
+  /// market.
+  List<HealthPosition> healthPositionsFor(Portfolio p) {
+    final display = _displayCurrency;
+    final converting = display.isNotEmpty &&
+        p.holdings.values.every((h) => _fxRateFor(h.currency) > 0);
+    return [
+      for (final h in p.holdings.values)
+        () {
+          final q = _quotes[h.symbol];
+          final fx = converting ? _fxRateFor(h.currency) : 1.0;
+          final price = q?.price ?? 0;
+          final info = _dividendInfo[h.symbol];
+          final rate = info != null && info.ttmPerShare > 0
+              ? info.ttmPerShare
+              : (q?.dividendRate ?? 0);
+          final sector = sectorOf(h.symbol);
+          return HealthPosition(
+            symbol: h.symbol,
+            value: price * h.quantity * fx,
+            annualIncome: rate * h.quantity * fx,
+            sector: sector == 'Other' ? null : sector,
+            type: typeLabelOf(h.symbol),
+            market: marketFor(
+                  symbol: h.symbol,
+                  exchangeCode: q?.exchange,
+                  exchangeName: q?.fullExchangeName,
+                  quoteType: q?.quoteType,
+                ) ??
+                'Other',
+            yield: price > 0 ? rate / price : 0,
+          );
+        }(),
+    ];
+  }
 
   PortfolioTotals totalsFor(Portfolio p) {
     final display = _displayCurrency;
@@ -1538,6 +1657,28 @@ class PortfolioProvider extends ChangeNotifier {
     return out;
   }
 
+  /// Each holding's price change over [range], in percent, for the recap.
+  /// Symbols without enough history are left out.
+  Future<Map<String, double>> symbolChanges(Portfolio p, String range) async {
+    final out = <String, double>{};
+    await Future.wait([
+      for (final symbol in p.symbols)
+        () async {
+          try {
+            final h = await _yahoo.chartHistory(symbol, range: range, interval: '1d');
+            final pts = h?.points ?? const <ChartPoint>[];
+            if (pts.length < 2 || pts.first.close <= 0) return;
+            // The live quote is fresher than the last daily bar.
+            final last = _quotes[symbol]?.price ?? pts.last.close;
+            out[symbol] = (last / pts.first.close - 1) * 100;
+          } catch (_) {
+            // Left out of the recap.
+          }
+        }(),
+    ]);
+    return out;
+  }
+
   /// Latest StockSplit that happened after the position was created, if any.
   /// Returns null when up-to-date (nothing to fix).
   StockSplit? splitSuggestionFor(Holding h) {
@@ -1881,6 +2022,7 @@ class PortfolioProvider extends ChangeNotifier {
       'activeIndex': _activeIndex,
       'themeMode': _themeMode.index,
       'portfolios': [for (final p in _portfolios) p.toMap()],
+      'watchlist': [for (final w in _watchlist) w.toMap()],
     };
   }
 
@@ -1891,6 +2033,8 @@ class PortfolioProvider extends ChangeNotifier {
     ];
     if (parsed.isEmpty) return false;
     _portfolios = parsed;
+    // Older backups have no watchlist; keep the current one then.
+    if (data['watchlist'] != null) _watchlist = _parseWatchlist(data['watchlist']);
     _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt().clamp(0, parsed.length - 1);
     _loaded = true;
     notifyListeners();
@@ -2036,6 +2180,20 @@ class PortfolioProvider extends ChangeNotifier {
   /// ex-dividend and earnings dates, and price-alert thresholds.
   Future<void> pushWorkerSnapshot() async {
     if (!StockPulseWidgetService.supported) return;
+
+    // Watchlist targets go first: they matter even with no holdings yet.
+    await StockPulseWidgetService.pushWatchTargets([
+      if (_watchAlertsEnabled)
+        for (final w in _watchlist)
+          if (w.hasTargets)
+            (
+              symbol: w.symbol,
+              above: w.above,
+              below: w.below,
+              name: _quotes[w.symbol]?.name ?? '',
+              currency: _quotes[w.symbol]?.currency ?? 'USD',
+            ),
+    ]);
 
     final qtyBySymbol = <String, double>{};
     final curBySymbol = <String, String>{};

@@ -5,6 +5,7 @@ import 'package:stock_pulse/app.dart';
 import 'package:stock_pulse/providers/portfolio_provider.dart';
 import 'package:stock_pulse/screens/settings_screen.dart';
 import 'package:stock_pulse/services/ad_service.dart';
+import 'package:stock_pulse/services/pro_service.dart';
 import 'package:stock_pulse/services/store.dart';
 import 'package:stock_pulse/theme/app_theme.dart';
 import 'package:stock_pulse/widgets/ui/theme_toggle.dart';
@@ -24,11 +25,12 @@ class _MemoryStore extends StockPulseStore {
 
 void main() {
   /// The settings screen reads both the portfolio and the ad service.
-  Widget wrap(Widget child, PortfolioProvider provider) {
+  Widget wrap(Widget child, PortfolioProvider provider, {ProService? pro}) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<PortfolioProvider>.value(value: provider),
         ChangeNotifierProvider<AdService>.value(value: AdService()),
+        ChangeNotifierProvider<ProService>.value(value: pro ?? ProService()),
       ],
       child: child,
     );
@@ -116,6 +118,38 @@ void main() {
         await tester.pumpAndSettle();
         expect(provider.themeMode, mode);
       }
+    });
+
+    testWidgets('a locked Pro theme opens the Pro page instead of applying',
+        (tester) async {
+      final provider = PortfolioProvider(store: _MemoryStore());
+      await provider.load();
+      final pro = ProService(store: _MemoryStore(), sellsProForTest: true);
+
+      await tester.pumpWidget(wrap(
+        const MaterialApp(home: SettingsScreen()),
+        provider,
+        pro: pro,
+      ));
+      await settle(tester);
+
+      await tester.scrollUntilVisible(find.text('Gold'), 120);
+      await tester.ensureVisible(find.text('Gold'));
+      await tester.pump();
+      await tester.tap(find.text('Gold'));
+      // The Pro page animates forever, so pump rather than settle.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.text('PRO'), findsWidgets);
+      expect(find.textContaining('is part of Pro'), findsOneWidget);
+      expect(provider.themeMode, isNot(AppThemeId.gold));
+
+      // A rewarded trial unlocks the themes; the choice then applies.
+      await pro.grantTrial(ProFeature.themes);
+      await tester.pump();
+      expect(find.text('You\'re Pro. Thank you!'), findsNothing);
     });
   });
 }

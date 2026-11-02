@@ -15,7 +15,16 @@ enum AppThemeId {
 
   /// Deep near-black with electric mint, cyan and violet glow. Added last so
   /// the saved index of every older theme keeps pointing at the same theme.
-  neon;
+  neon,
+
+  /// Pro themes.
+  gold,
+  aurora,
+  sakura;
+
+  /// Whether choosing this theme needs Pro.
+  bool get isPremium =>
+      this == AppThemeId.gold || this == AppThemeId.aurora || this == AppThemeId.sakura;
 
   String get label => switch (this) {
         AppThemeId.system => 'Follow system',
@@ -25,10 +34,16 @@ enum AppThemeId {
         AppThemeId.mint => 'Mint',
         AppThemeId.ocean => 'Ocean',
         AppThemeId.neon => 'Neon',
+        AppThemeId.gold => 'Gold',
+        AppThemeId.aurora => 'Aurora',
+        AppThemeId.sakura => 'Sakura',
       };
 
-  /// The order the picker lists the themes in: the signature look first.
-  static const pickerOrder = [neon, system, light, dark, amoled, mint, ocean];
+  /// The order the picker lists the themes in: the signature look first,
+  /// the Pro themes last.
+  static const pickerOrder = [
+    neon, system, light, dark, amoled, mint, ocean, gold, aurora, sakura,
+  ];
 }
 
 class AppTheme {
@@ -59,6 +74,9 @@ class AppTheme {
       AppThemeId.ocean => ocean(seed),
       AppThemeId.neon =>
         neon(accent == null || accent == accents.first ? null : accent),
+      AppThemeId.gold => gold(),
+      AppThemeId.aurora => aurora(),
+      AppThemeId.sakura => sakura(),
     };
   }
 
@@ -116,48 +134,119 @@ class AppTheme {
 
   /// Deep near-black surfaces with electric mint highlights. [accent]
   /// replaces the mint when the user picks a different accent colour.
-  static ThemeData neon([Color? accent]) {
-    final primary = accent ?? neonMint;
+  static ThemeData neon([Color? accent]) => _glow(
+        primary: accent ?? neonMint,
+        onPrimary: const Color(0xFF04110C),
+        secondary: neonCyan,
+        tertiary: neonViolet,
+        background: neonBackground,
+        surface: neonSurface,
+        surfaceHigh: neonSurfaceHigh,
+        surfaceHighest: const Color(0xFF1B2440),
+        text: neonText,
+        muted: neonMuted,
+        outline: const Color(0xFF3A4566),
+        outlineVariant: const Color(0xFF222B45),
+      );
+
+  /// Pro: black and warm gold, like a private-bank statement.
+  static ThemeData gold() => _glow(
+        primary: const Color(0xFFF5C451),
+        onPrimary: const Color(0xFF1A1205),
+        secondary: const Color(0xFFFFE3A3),
+        tertiary: const Color(0xFFE08E3C),
+        background: const Color(0xFF0A0805),
+        surface: const Color(0xFF15110A),
+        surfaceHigh: const Color(0xFF1F190F),
+        surfaceHighest: const Color(0xFF2A2215),
+        text: const Color(0xFFF7EEDC),
+        muted: const Color(0xFFA8997C),
+        outline: const Color(0xFF4F432D),
+        outlineVariant: const Color(0xFF2E2619),
+      );
+
+  /// Pro: northern-lights violet, teal and pink on deep indigo.
+  static ThemeData aurora() => _glow(
+        primary: const Color(0xFF5EEAD4),
+        onPrimary: const Color(0xFF03201B),
+        secondary: const Color(0xFFA78BFA),
+        tertiary: const Color(0xFFF472B6),
+        background: const Color(0xFF07061A),
+        surface: const Color(0xFF110F2A),
+        surfaceHigh: const Color(0xFF1A1738),
+        surfaceHighest: const Color(0xFF242046),
+        text: const Color(0xFFEDEBFF),
+        muted: const Color(0xFF9C96C4),
+        outline: const Color(0xFF433D70),
+        outlineVariant: const Color(0xFF26224A),
+      );
+
+  /// Pro: soft blossom pink on warm white.
+  static ThemeData sakura() => _build(
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE85D9A),
+          brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        background: const Color(0xFFFFF4F8),
+      );
+
+  /// A dark theme with glowing accents: the neon family.
+  static ThemeData _glow({
+    required Color primary,
+    required Color onPrimary,
+    required Color secondary,
+    required Color tertiary,
+    required Color background,
+    required Color surface,
+    required Color surfaceHigh,
+    required Color surfaceHighest,
+    required Color text,
+    required Color muted,
+    required Color outline,
+    required Color outlineVariant,
+  }) {
     final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: primary,
-      onPrimary: const Color(0xFF04110C),
+      onPrimary: onPrimary,
       primaryContainer: primary.withValues(alpha: .18),
       onPrimaryContainer: primary,
-      secondary: neonCyan,
-      onSecondary: const Color(0xFF021418),
-      secondaryContainer: neonCyan.withValues(alpha: .16),
-      onSecondaryContainer: neonCyan,
-      tertiary: neonViolet,
+      secondary: secondary,
+      onSecondary: onPrimary,
+      secondaryContainer: secondary.withValues(alpha: .16),
+      onSecondaryContainer: secondary,
+      tertiary: tertiary,
       onTertiary: Colors.white,
-      tertiaryContainer: neonViolet.withValues(alpha: .2),
-      onTertiaryContainer: const Color(0xFFC9BCFF),
+      tertiaryContainer: tertiary.withValues(alpha: .2),
+      onTertiaryContainer: Color.lerp(tertiary, Colors.white, .6)!,
       error: const Color(0xFFFF3B6B),
       onError: Colors.white,
       errorContainer: const Color(0xFF3A0E1C),
       onErrorContainer: const Color(0xFFFFB3C4),
-      surface: neonSurface,
-      onSurface: neonText,
-      onSurfaceVariant: neonMuted,
-      surfaceContainerLowest: neonBackground,
-      surfaceContainerLow: const Color(0xFF0B101D),
-      surfaceContainer: const Color(0xFF111829),
-      surfaceContainerHigh: neonSurfaceHigh,
-      surfaceContainerHighest: const Color(0xFF1B2440),
-      outline: const Color(0xFF3A4566),
-      outlineVariant: const Color(0xFF222B45),
+      surface: surface,
+      onSurface: text,
+      onSurfaceVariant: muted,
+      surfaceContainerLowest: background,
+      surfaceContainerLow: Color.lerp(background, surface, .5)!,
+      surfaceContainer: Color.lerp(surface, surfaceHigh, .4)!,
+      surfaceContainerHigh: surfaceHigh,
+      surfaceContainerHighest: surfaceHighest,
+      outline: outline,
+      outlineVariant: outlineVariant,
       shadow: Colors.black,
-      inverseSurface: neonText,
-      onInverseSurface: neonBackground,
-      inversePrimary: const Color(0xFF00A86B),
+      inverseSurface: text,
+      onInverseSurface: background,
+      inversePrimary: Color.lerp(primary, Colors.black, .3)!,
     );
     return _build(scheme,
-        background: neonBackground, neon: true, colors: AppColors.neon(scheme));
+        background: background, neon: true, colors: AppColors.neon(scheme));
   }
 
-  /// Whether [theme] is the neon theme.
+  /// Whether [theme] belongs to the neon family (Neon, Gold, Aurora),
+  /// which ships its own glowing palette.
   static bool isNeon(ThemeData theme) =>
-      theme.colorScheme.surface == neonSurface;
+      theme.extension<AppColors>()?.gain == AppColors.neonGain;
 
   static ColorScheme _scheme(Color seed, Brightness brightness) {
     return ColorScheme.fromSeed(
@@ -178,7 +267,7 @@ class AppTheme {
       brightness: scheme.brightness,
       colorScheme: scheme.copyWith(surface: amoled ? Colors.black : scheme.surface),
       scaffoldBackgroundColor: base,
-      hintColor: neon ? neonMuted : null,
+      hintColor: neon ? scheme.onSurfaceVariant : null,
       textTheme: _textTheme(scheme),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -268,25 +357,25 @@ class AppTheme {
             )),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: neon ? neonBackground : null,
+        backgroundColor: neon ? base : null,
         indicatorColor: scheme.primary.withValues(alpha: isDark ? .16 : .14),
         selectedIconTheme: IconThemeData(color: scheme.primary),
         selectedLabelTextStyle: TextStyle(
             fontSize: 12, fontWeight: FontWeight.w800, color: scheme.primary),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: neon ? neonSurface : null,
+        backgroundColor: neon ? scheme.surface : null,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: neon ? neonSurfaceHigh : null,
+        backgroundColor: neon ? scheme.surfaceContainerHigh : null,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: neon ? neonSurfaceHigh : null,
+        color: neon ? scheme.surfaceContainerHigh : null,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Before Android 8 (no adaptive icons): the mark on a rounded square. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/alt_icon_gold_bg"/>
+            <corners android:radius="12dp"/>
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_alt_fg_gold"/>
+</layer-list>

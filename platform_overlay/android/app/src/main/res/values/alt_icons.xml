@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backgrounds of the alternate home-screen icons (Pro). -->
+<resources>
+    <color name="alt_icon_neon_bg">#060912</color>
+    <color name="alt_icon_gold_bg">#14100A</color>
+    <color name="alt_icon_aurora_bg">#110F2A</color>
+    <color name="alt_icon_sakura_bg">#FFF0F5</color>
+</resources>

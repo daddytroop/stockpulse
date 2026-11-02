@@ -4,6 +4,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:stock_pulse/app.dart';
 import 'package:stock_pulse/providers/portfolio_provider.dart';
+import 'package:stock_pulse/services/ad_service.dart';
+import 'package:stock_pulse/services/app_navigation.dart';
+import 'package:stock_pulse/services/pro_service.dart';
 
 /// Drives the app through every tab and captures a screenshot per tab.
 /// Run by .github/workflows/screenshots.yml with:
@@ -22,7 +25,15 @@ void main() {
     provider.seedDemoData();
 
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(value: provider, child: const StockPulseApp()),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<PortfolioProvider>.value(value: provider),
+          ChangeNotifierProvider<AdService>.value(value: AdService()),
+          ChangeNotifierProvider<ProService>.value(value: ProService()),
+          ChangeNotifierProvider<AppNavigation>.value(value: AppNavigation()),
+        ],
+        child: const StockPulseApp(),
+      ),
     );
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 400));

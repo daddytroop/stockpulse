@@ -132,4 +132,30 @@ class StockPulseWidgetService {
       return false;
     }
   }
+
+  /// Writes the watchlist price targets the background worker checks.
+  /// An empty list turns the target alerts off.
+  static Future<void> pushWatchTargets(
+    List<({String symbol, double? above, double? below, String name, String currency})>
+        targets,
+  ) async {
+    if (!supported) return;
+    try {
+      await HomeWidget.saveWidgetData<String>(
+        'bg_watch',
+        jsonEncode([
+          for (final t in targets)
+            {
+              's': t.symbol,
+              if (t.above != null) 'above': t.above,
+              if (t.below != null) 'below': t.below,
+              'name': t.name,
+              'cur': t.currency,
+            },
+        ]),
+      );
+    } catch (_) {
+      // Alerts are best-effort; the app keeps working without them.
+    }
+  }
 }

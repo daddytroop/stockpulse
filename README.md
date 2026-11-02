@@ -40,7 +40,9 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 📤 **Export** — CSV of any portfolio, or a full JSON backup (restore on any device).
 - 🔲 **Android home-screen widgets** — a value widget with a live trend line and a compact next-dividend widget, both in the app's own colours, updated hourly by a native WorkManager worker even when the app is closed. `tools/widget_preview.ps1` renders a picture of them so the design can be reviewed without a phone.
 - 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
-- 🎨 **Seven themes, one tap away** — a new install opens in **Neon**: near-black surfaces, electric mint and cyan highlights, a balance card that glows green or pink with the day, and a floating frosted navigation bar. A theme button in the app bar of every screen opens a picker with a preview of each palette, and the accent colour is separate.
+- ⭐ **Stock Pulse Pro** — a one-time unlock that removes ads and adds the dividend snowball, a portfolio health score, an unlimited watchlist with price-target alerts, and exclusive themes and app icons. A rewarded ad unlocks any one of them for 24 hours.
+- 📸 **Share recap** — a branded picture of your month or year, percentages only by default.
+- 🎨 **Seven themes, one tap away** (plus three Pro themes) — a new install opens in **Neon**: near-black surfaces, electric mint and cyan highlights, a balance card that glows green or pink with the day, and a floating frosted navigation bar. A theme button in the app bar of every screen opens a picker with a preview of each palette, and the accent colour is separate.
 
 ## Getting the app
 
@@ -89,7 +91,31 @@ Ad placement is a developer's decision, so there is no ad-unit setting in the ap
 - A placement never repeats within three minutes.
 - Native ads are labelled "Sponsored".
 
-**There is no ad switch, and that is deliberate.** Stock Pulse is free because it carries ads - there is no paid tier to upgrade to, so an "ad-free" toggle would be a lie. What the user *can* do is consent: **Settings → Advertising → Ad privacy choices** opens Google's privacy form, which decides what the ad SDK may share about the device. That is a different thing from turning ads off, and it is required for users in the EEA, the UK, Switzerland and the US states. Ads are still shown; they just carry less information.
+**Removing ads means buying Pro.** There is no free ad switch: the free app is paid for by its ads, and the one-time Pro unlock is the way to remove them (see below). Separately, every user can manage consent: **Settings → Advertising → Ad privacy choices** opens Google's privacy form, which decides what the ad SDK may share about the device. That is required for users in the EEA, the UK, Switzerland and the US states; ads are still shown, they just carry less information.
+
+### Stock Pulse Pro
+
+A **one-time, non-consumable** Google Play purchase (no subscription) that removes every ad and unlocks new tools. Everything that was free before Pro stays free.
+
+| Pro feature | What it does |
+|---|---|
+| Dividend snowball | Projects monthly dividend income 5–30 years out, with contributions, reinvestment, dividend and price growth, and everyday-cost milestones |
+| Portfolio health | A 0–100 diversification score (breadth, largest position, largest sector, spread) with plain-language findings |
+| Watchlist & target alerts | Free users follow up to 3 stocks; Pro removes the limit and adds buy-below / alert-above notifications from the background worker |
+| Exclusive themes & icons | Gold, Aurora and Sakura themes, and alternate home-screen icons |
+| No ads | Every banner and native ad disappears |
+
+**Try before buying.** On a locked feature's Pro page, a free user can watch a **rewarded ad** to unlock that one feature for 24 hours (a second ad adds another 24). The free **Share recap** card (a branded picture of the month or year, percentages only by default) helps people find the app.
+
+The paywall only ever appears when someone taps a locked feature: no pop-ups, no timers.
+
+**Setting it up (once):**
+
+1. Play Console → *Monetize → Products → In-app products*: create a one-time product with the id **`stockpulse_pro_lifetime`** and a price (the app shows Google's localised price).
+2. AdMob: create a **Rewarded** ad unit and put its id in `AdUnits.rewarded` in `lib/services/ad_service.dart`. Until then, release builds simply do not offer the ad (debug builds use Google's test unit).
+3. Test the purchase with a **license tester** account (Play Console → Settings → License testing) on a closed-testing build.
+
+Windows and web builds cannot sell through Google Play and show no ads, so Pro is included there. `--dart-define=PRO_LOCKED=true` previews the locked experience in those builds, and the developer panel has a **See the app as a Pro user** switch.
 
 **Measuring it.** The developer panel (five taps on the version number in **Settings → About**) shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
 

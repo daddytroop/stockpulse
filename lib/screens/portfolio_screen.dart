@@ -16,6 +16,7 @@ import '../widgets/ad_slot.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/pulse_logo.dart';
 import '../widgets/symbol_avatar.dart';
+import '../widgets/tools_grid.dart';
 import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/kpi_tile.dart';
@@ -140,7 +141,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               portfolio: portfolio,
               currency: currency,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
+            const SectionHeader(title: 'Tools'),
+            const ToolsGrid(),
+            const SizedBox(height: 14),
             _dataProvenance(context, provider),
             const SizedBox(height: 12),
             SpCard(

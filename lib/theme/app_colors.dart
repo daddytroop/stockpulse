@@ -86,8 +86,12 @@ class AppColors extends ThemeExtension<AppColors> {
 
   /// The neon palette: electric mint gains, hot pink losses, and a glowing
   /// allocation palette that stays readable on a near-black surface.
+  /// The neon family's gain colour; also how a neon-family theme is
+  /// recognised.
+  static const neonGain = Color(0xFF00F5A0);
+
   factory AppColors.neon(ColorScheme scheme) {
-    const gain = Color(0xFF00F5A0);
+    const gain = neonGain;
     const loss = Color(0xFFFF3B6B);
     return AppColors._(
       gain: gain,

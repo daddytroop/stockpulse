@@ -203,8 +203,8 @@ class _AdSlotState extends State<AdSlot> {
   @override
   Widget build(BuildContext context) {
     // Watching the service means the slot reacts when consent changes.
-    context.watch<AdService>();
-    if (!_ready || _ad == null) return const SizedBox.shrink();
+    final service = context.watch<AdService>();
+    if (!_ready || _ad == null || service.adFree) return const SizedBox.shrink();
     final theme = Theme.of(context);
 
     if (widget.native) {

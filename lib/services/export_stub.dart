@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:share_plus/share_plus.dart';
 
 import 'export_common.dart';
 
@@ -27,6 +30,23 @@ class ExportService {
   }) async {
     try {
       await Clipboard.setData(ClipboardData(text: content));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Shares an image through the browser (share sheet or download).
+  static Future<bool> shareImage({
+    required String fileName,
+    required Uint8List bytes,
+    String? text,
+  }) async {
+    try {
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, mimeType: 'image/png', name: fileName)],
+        text: text,
+      );
       return true;
     } catch (_) {
       return false;

@@ -50,6 +50,9 @@ dependencies:
 
   # Easy declarative animations
   flutter_animate: ^4.5.2
+  # Play Billing for the one-time Pro unlock. The range is wide on purpose:
+  # CI builds with an older Flutter and resolves an older compatible release.
+  in_app_purchase: ">=3.2.0 <4.0.0"
 
 dev_dependencies:
   flutter_test:
