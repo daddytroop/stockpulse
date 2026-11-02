@@ -53,6 +53,13 @@ enum ProFeature {
 /// `--dart-define=PRO_LOCKED=true`.
 const bool kProLocked = bool.fromEnvironment('PRO_LOCKED');
 
+/// Whether this build carries the "See the app as a Pro user" switch.
+///
+/// Only debug builds and test builds made with `--dart-define=DEV_TOOLS=true`
+/// (CI does this for pull-request APKs) have it. Store builds never do, so
+/// nobody can unlock Pro for free through the hidden developer panel.
+const bool kDevTools = kDebugMode || bool.fromEnvironment('DEV_TOOLS');
+
 /// Owns the one-time Pro unlock and the 24-hour trials earned by watching
 /// a rewarded ad.
 ///
@@ -68,11 +75,17 @@ class ProService extends ChangeNotifier {
     StockPulseStore? store,
     InAppPurchase? iap,
     @visibleForTesting bool? sellsProForTest,
+    @visibleForTesting bool devToolsForTest = kDevTools,
   })  : _store = store ?? StockPulseStore(),
         _iapOverride = iap,
-        _sellsOverride = sellsProForTest;
+        _sellsOverride = sellsProForTest,
+        devTools = devToolsForTest;
 
   final bool? _sellsOverride;
+
+  /// Whether the developer Pro switch exists in this build. A switch turned
+  /// on in a test build is ignored by a store build installed over it.
+  final bool devTools;
 
   /// The Play Console product id. Create a one-time product with this id.
   static const productId = 'stockpulse_pro_lifetime';
@@ -104,13 +117,13 @@ class ProService extends ChangeNotifier {
       _sellsOverride != null ? !_sellsOverride : (!isAndroidPlatform && !kProLocked);
 
   /// Whether the user has Pro for good.
-  bool get isPro => _owned || _devPro || _includedHere;
+  bool get isPro => _owned || devPro || _includedHere;
 
   /// Whether the user bought Pro (as opposed to it being included).
   bool get owned => _owned;
 
   /// Developer override, from the hidden developer panel.
-  bool get devPro => _devPro;
+  bool get devPro => devTools && _devPro;
 
   /// Whether [feature] is unlocked, permanently or by a trial.
   bool has(ProFeature feature) {
@@ -272,6 +285,7 @@ class ProService extends ChangeNotifier {
 
   /// Developer-only switch to see the app as a Pro user.
   Future<void> setDevPro(bool value) async {
+    if (!devTools) return;
     _devPro = value;
     await _persist();
     notifyListeners();

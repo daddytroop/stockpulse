@@ -115,7 +115,7 @@ The paywall only ever appears when someone taps a locked feature: no pop-ups, no
 2. AdMob: create a **Rewarded** ad unit and put its id in `AdUnits.rewarded` in `lib/services/ad_service.dart`. Until then, release builds simply do not offer the ad (debug builds use Google's test unit).
 3. Test the purchase with a **license tester** account (Play Console → Settings → License testing) on a closed-testing build.
 
-Windows and web builds cannot sell through Google Play and show no ads, so Pro is included there. `--dart-define=PRO_LOCKED=true` previews the locked experience in those builds, and the developer panel has a **See the app as a Pro user** switch.
+Windows and web builds cannot sell through Google Play and show no ads, so Pro is included there. `--dart-define=PRO_LOCKED=true` previews the locked experience in those builds, and the developer panel has a **See the app as a Pro user** switch. That switch exists only in debug builds and in builds made with `--dart-define=DEV_TOOLS=true`, which CI adds to pull-request APKs; tagged releases and the Play bundle leave it out, so nobody can unlock Pro for free.
 
 **Measuring it.** The developer panel (five taps on the version number in **Settings → About**) shows a **placement report**: impressions, clicks and estimated revenue per placement, taken from the ad SDK's own paid-event reporting. It is stored on the device only - nothing is sent to a server - so the ad units can be judged on evidence instead of guesswork.
 

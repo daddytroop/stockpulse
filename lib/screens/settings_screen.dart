@@ -741,6 +741,9 @@ class SettingsScreen extends StatelessWidget {
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
+                // Store builds leave this out, or anyone who found the
+                // panel could unlock Pro for free.
+                if (ctx.read<ProService>().devTools)
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('See the app as a Pro user'),

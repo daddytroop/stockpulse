@@ -206,5 +206,23 @@ void main() {
       expect(again.owned, isTrue);
       expect(again.isPro, isTrue);
     });
+
+    test('a store build ignores the developer Pro switch', () async {
+      final store = _MemoryStore();
+      // Turned on in a test build...
+      final testBuild = ProService(store: store, sellsProForTest: true);
+      await testBuild.setDevPro(true);
+      expect(testBuild.isPro, isTrue);
+
+      // ...then a store build is installed over it.
+      final storeBuild = ProService(
+          store: store, sellsProForTest: true, devToolsForTest: false);
+      await storeBuild.load();
+      expect(storeBuild.devPro, isFalse);
+      expect(storeBuild.isPro, isFalse);
+
+      await storeBuild.setDevPro(true);
+      expect(storeBuild.isPro, isFalse);
+    });
   });
 }

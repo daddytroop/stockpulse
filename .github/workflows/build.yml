@@ -70,15 +70,18 @@ jobs:
       - name: Build APK (release)
         env:
           ADS_LIVE: ${{ secrets.ADS_LIVE }}
+          # Pull-request APKs are for testing, so they keep the developer
+          # "See the app as a Pro user" switch. Tagged releases never do.
+          DEV_TOOLS: ${{ github.event_name == 'pull_request' }}
         run: |
           # Live ads are the default: AdMob serves nothing until the app is
           # approved, and then it starts on its own with no new build. The
           # secret only exists for the cautious case of forcing test ads.
+          defines="--dart-define=DEV_TOOLS=$DEV_TOOLS"
           if [ "$ADS_LIVE" = "false" ]; then
-            flutter build apk --release --dart-define=ADS_LIVE=false
-          else
-            flutter build apk --release
+            defines="$defines --dart-define=ADS_LIVE=false"
           fi
+          flutter build apk --release $defines
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
