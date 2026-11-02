@@ -3,8 +3,14 @@ package app.stockpulse
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
 import android.widget.RemoteViews
+import org.json.JSONArray
 
 /// Shared RemoteViews rendering for both widgets, used by the providers
 /// AND by the background worker so visuals stay identical.
@@ -15,9 +21,10 @@ object WidgetRenderer {
     /// the widget reads an empty file and shows placeholder text.
     const val PREFS_KEY = "HomeWidgetPreferences"
 
-    /// The key the rendered trend line is stored under.
-    const val SPARKLINE_KEY = "widget_sparkline"
+    /// The key the trend values (a JSON list of numbers) are stored under.
+    const val SPARKLINE_POINTS_KEY = "widget_spark_points"
 
+    val LINE_UP = 0xFF64EFAE.toInt()
     val GREEN = 0xFF66BB6A.toInt()
     val RED = 0xFFEF5350.toInt()
     val GREY = 0xFF8D8D8D.toInt()
@@ -47,19 +54,70 @@ object WidgetRenderer {
         )
         views.setTextViewText(R.id.widget_next_amount, prefs.getString("widget_next_amount", ""))
 
-        // The trend line is rendered by the app and stored as a small PNG.
-        val spark = prefs.getString(SPARKLINE_KEY, null)
-        if (!spark.isNullOrEmpty()) {
-            try {
-                val bitmap = BitmapFactory.decodeFile(spark)
-                if (bitmap != null) {
-                    views.setImageViewBitmap(R.id.widget_sparkline, bitmap)
+        // The app stores the trend as a JSON list of values; it is drawn
+        // here so it never depends on an off-screen Flutter render.
+        try {
+            val raw = prefs.getString(SPARKLINE_POINTS_KEY, null)
+            if (!raw.isNullOrEmpty()) {
+                val arr = JSONArray(raw)
+                val values = DoubleArray(arr.length()) { arr.optDouble(it, Double.NaN) }
+                    .filter { !it.isNaN() }
+                drawSparkline(context, values)?.let {
+                    views.setImageViewBitmap(R.id.widget_sparkline, it)
                 }
-            } catch (_: Exception) {
-                // A missing trend line just leaves the space empty.
             }
+        } catch (_: Exception) {
+            // A missing trend line just leaves the space empty.
         }
         return views
+    }
+
+    /// Draws [values] as a smooth line with a soft fill, sized for the
+    /// widget's trend strip. Green when the period ended up, red when down.
+    private fun drawSparkline(context: Context, values: List<Double>): Bitmap? {
+        if (values.size < 2) return null
+        val density = context.resources.displayMetrics.density
+        val w = (280 * density).toInt().coerceAtLeast(1)
+        val h = (48 * density).toInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val min = values.min()
+        val max = values.max()
+        val span = max - min
+        val pad = h * 0.15f
+        val usable = h - pad * 2
+        fun x(i: Int) = w * (i.toFloat() / (values.size - 1))
+        fun y(v: Double) =
+            if (span <= 0) h / 2f else (pad + usable - ((v - min) / span * usable)).toFloat()
+
+        val line = Path()
+        values.forEachIndexed { i, v ->
+            if (i == 0) line.moveTo(x(i), y(v)) else line.lineTo(x(i), y(v))
+        }
+        val color = if (values.last() >= values.first()) LINE_UP else RED
+
+        val fill = Path(line).apply {
+            lineTo(w.toFloat(), h.toFloat())
+            lineTo(0f, h.toFloat())
+            close()
+        }
+        canvas.drawPath(fill, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            shader = LinearGradient(
+                0f, 0f, 0f, h.toFloat(),
+                (color and 0x00FFFFFF) or 0x40000000, color and 0x00FFFFFF,
+                Shader.TileMode.CLAMP
+            )
+        })
+        canvas.drawPath(line, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * density
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+            this.color = color
+        })
+        return bitmap
     }
 
     fun renderNextDividend(context: Context): RemoteViews {

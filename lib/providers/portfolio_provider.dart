@@ -2163,10 +2163,7 @@ class PortfolioProvider extends ChangeNotifier {
       final history = await totalHistory('1mo');
       if (history.length > 1) {
         final values = [for (final p in history) p.close];
-        await StockPulseWidgetService.pushSparkline(
-          points: values,
-          colorValue: 0xFF64EFAE,
-        );
+        await StockPulseWidgetService.pushSparkline(points: values);
       }
     } catch (_) {
       // A missing trend line is not worth failing the update over.
