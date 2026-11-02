@@ -81,21 +81,23 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) :
 
             Thread.sleep(120)
         }
-        if (fetched == 0) return
+        // A total missing some holdings would look like a sudden loss; keep
+        // the last good numbers until every price comes back.
+        if (fetched == symbols.length()) {
+            val change = total - prevTotal
+            val changePct = if (prevTotal > 0) change / prevTotal * 100 else 0.0
 
-        val change = total - prevTotal
-        val changePct = if (prevTotal > 0) change / prevTotal * 100 else 0.0
-
-        prefs.edit()
-            .putString("widget_total", formatMoney(total, display))
-            .putString("widget_change", formatChange(change, changePct, display))
-            .putInt(
-                "widget_change_sign",
-                if (change > 0) 1 else if (change < 0) -1 else 0
-            )
-            .putString("bg_last_run", System.currentTimeMillis().toString())
-            .apply()
-        WidgetRenderer.updateAll(context)
+            prefs.edit()
+                .putString("widget_total", formatMoney(total, display))
+                .putString("widget_change", formatChange(change, changePct, display))
+                .putInt(
+                    "widget_change_sign",
+                    if (change > 0) 1 else if (change < 0) -1 else 0
+                )
+                .putString("bg_last_run", System.currentTimeMillis().toString())
+                .apply()
+            WidgetRenderer.updateAll(context)
+        }
 
         // ---- alerts ----
         val alerts = prefs.getString("bg_alerts", null)?.let {
@@ -211,7 +213,7 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) :
         try {
             if (conn.responseCode != 200) return null
             val body = conn.inputStream.bufferedReader().use { it.readText() }
-            val result = JSONObject(body).getJSONArray("result")
+            val result = JSONObject(body).getJSONObject("chart").getJSONArray("result")
                 .getJSONObject(0)
             val closes = result.getJSONObject("indicators")
                 .getJSONArray("quote").getJSONObject(0)

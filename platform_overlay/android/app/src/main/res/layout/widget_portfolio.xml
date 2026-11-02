@@ -95,7 +95,8 @@
         android:contentDescription="@null"/>
 
     <!-- A hairline that separates the number from the details -->
-    <View
+    <!-- RemoteViews refuses a plain View, so the hairline is a FrameLayout. -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
