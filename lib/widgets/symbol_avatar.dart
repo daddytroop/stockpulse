@@ -78,25 +78,27 @@ class _SymbolAvatarState extends State<SymbolAvatar> {
               children: [
                 _letterAvatar(context),
                 if (url != null && url.isNotEmpty)
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(2),
-                    child: Image.network(
-                      url,
-                      fit: BoxFit.contain,
-                      semanticLabel: '${widget.symbol} logo',
-                      // Fades in over the letter badge, so the avatar is
-                      // never blank while the logo downloads.
-                      frameBuilder: (context, child, frame, wasSyncLoaded) {
-                        if (wasSyncLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 180),
-                          child: child,
-                        );
-                      },
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
+                  Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    semanticLabel: '${widget.symbol} logo',
+                    // The white backing belongs to the logo, so it fades in
+                    // with it: while the logo downloads, or if it never
+                    // arrives, the letter badge underneath stays visible.
+                    frameBuilder: (context, child, frame, wasSyncLoaded) {
+                      final logo = Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(2),
+                        child: child,
+                      );
+                      if (wasSyncLoaded) return logo;
+                      return AnimatedOpacity(
+                        opacity: frame == null ? 0 : 1,
+                        duration: const Duration(milliseconds: 180),
+                        child: logo,
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
               ],
             ),
@@ -108,6 +110,30 @@ class _SymbolAvatarState extends State<SymbolAvatar> {
 
   Widget _letterAvatar(BuildContext context) {
     final color = SymbolAvatar.colorFor(context, widget.symbol);
+    if (Theme.of(context).brightness == Brightness.dark) {
+      // On dark surfaces: a tinted disc with a glowing letter.
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [color.withValues(alpha: 0.32), color.withValues(alpha: 0.12)],
+          ),
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: Center(
+          child: Text(
+            _initials(widget.symbol),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: widget.radius * 0.8,
+            ),
+          ),
+        ),
+      );
+    }
     return CircleAvatar(
       radius: widget.radius,
       backgroundColor: color,

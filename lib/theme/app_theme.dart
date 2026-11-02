@@ -11,7 +11,11 @@ enum AppThemeId {
   dark,
   amoled,
   mint,
-  ocean;
+  ocean,
+
+  /// Deep near-black with electric mint, cyan and violet glow. Added last so
+  /// the saved index of every older theme keeps pointing at the same theme.
+  neon;
 
   String get label => switch (this) {
         AppThemeId.system => 'Follow system',
@@ -20,7 +24,11 @@ enum AppThemeId {
         AppThemeId.amoled => 'AMOLED black',
         AppThemeId.mint => 'Mint',
         AppThemeId.ocean => 'Ocean',
+        AppThemeId.neon => 'Neon',
       };
+
+  /// The order the picker lists the themes in: the signature look first.
+  static const pickerOrder = [neon, system, light, dark, amoled, mint, ocean];
 }
 
 class AppTheme {
@@ -49,6 +57,8 @@ class AppTheme {
       AppThemeId.amoled => amoled(seed),
       AppThemeId.mint => mint(seed),
       AppThemeId.ocean => ocean(seed),
+      AppThemeId.neon =>
+        neon(accent == null || accent == accents.first ? null : accent),
     };
   }
 
@@ -91,6 +101,64 @@ class AppTheme {
         background: const Color(0xFF070B14),
       );
 
+  // The neon palette.
+  static const neonBackground = Color(0xFF060912);
+  static const neonSurface = Color(0xFF0E1424);
+  static const neonSurfaceHigh = Color(0xFF161E33);
+  static const neonMint = Color(0xFF00F5A0);
+  static const neonCyan = Color(0xFF00D9F5);
+  static const neonViolet = Color(0xFF7C5CFF);
+  static const neonText = Color(0xFFEAF0FF);
+  static const neonMuted = Color(0xFF8A94B0);
+
+  /// The signature gradient used for hero surfaces and highlights.
+  static const neonGradient = [neonMint, neonCyan, neonViolet];
+
+  /// Deep near-black surfaces with electric mint highlights. [accent]
+  /// replaces the mint when the user picks a different accent colour.
+  static ThemeData neon([Color? accent]) {
+    final primary = accent ?? neonMint;
+    final scheme = ColorScheme(
+      brightness: Brightness.dark,
+      primary: primary,
+      onPrimary: const Color(0xFF04110C),
+      primaryContainer: primary.withValues(alpha: .18),
+      onPrimaryContainer: primary,
+      secondary: neonCyan,
+      onSecondary: const Color(0xFF021418),
+      secondaryContainer: neonCyan.withValues(alpha: .16),
+      onSecondaryContainer: neonCyan,
+      tertiary: neonViolet,
+      onTertiary: Colors.white,
+      tertiaryContainer: neonViolet.withValues(alpha: .2),
+      onTertiaryContainer: const Color(0xFFC9BCFF),
+      error: const Color(0xFFFF3B6B),
+      onError: Colors.white,
+      errorContainer: const Color(0xFF3A0E1C),
+      onErrorContainer: const Color(0xFFFFB3C4),
+      surface: neonSurface,
+      onSurface: neonText,
+      onSurfaceVariant: neonMuted,
+      surfaceContainerLowest: neonBackground,
+      surfaceContainerLow: const Color(0xFF0B101D),
+      surfaceContainer: const Color(0xFF111829),
+      surfaceContainerHigh: neonSurfaceHigh,
+      surfaceContainerHighest: const Color(0xFF1B2440),
+      outline: const Color(0xFF3A4566),
+      outlineVariant: const Color(0xFF222B45),
+      shadow: Colors.black,
+      inverseSurface: neonText,
+      onInverseSurface: neonBackground,
+      inversePrimary: const Color(0xFF00A86B),
+    );
+    return _build(scheme,
+        background: neonBackground, neon: true, colors: AppColors.neon(scheme));
+  }
+
+  /// Whether [theme] is the neon theme.
+  static bool isNeon(ThemeData theme) =>
+      theme.colorScheme.surface == neonSurface;
+
   static ColorScheme _scheme(Color seed, Brightness brightness) {
     return ColorScheme.fromSeed(
       seedColor: seed,
@@ -99,8 +167,9 @@ class AppTheme {
     );
   }
 
-  static ThemeData _build(ColorScheme scheme, {bool amoled = false, Color? background}) {
-    final colors = AppColors.fromScheme(scheme);
+  static ThemeData _build(ColorScheme scheme,
+      {bool amoled = false, bool neon = false, Color? background, AppColors? colors}) {
+    colors ??= AppColors.fromScheme(scheme);
     final isDark = scheme.brightness == Brightness.dark;
     final base = background ?? (isDark ? const Color(0xFF081116) : const Color(0xFFF7F9F7));
 
@@ -109,6 +178,7 @@ class AppTheme {
       brightness: scheme.brightness,
       colorScheme: scheme.copyWith(surface: amoled ? Colors.black : scheme.surface),
       scaffoldBackgroundColor: base,
+      hintColor: neon ? neonMuted : null,
       textTheme: _textTheme(scheme),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -117,11 +187,19 @@ class AppTheme {
         margin: EdgeInsets.zero,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: .72),
-        selectedColor: scheme.primaryContainer,
+        backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: neon ? .5 : .72),
+        selectedColor: neon ? scheme.primary.withValues(alpha: .16) : scheme.primaryContainer,
+        checkmarkColor: scheme.primary,
         labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: scheme.onSurface),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        side: BorderSide.none,
+        secondaryLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: scheme.primary),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        side: neon
+            ? WidgetStateBorderSide.resolveWith((states) => BorderSide(
+                  color: states.contains(WidgetState.selected)
+                      ? scheme.primary.withValues(alpha: .55)
+                      : scheme.outlineVariant,
+                ))
+            : BorderSide.none,
       ),
       listTileTheme: ListTileThemeData(
         iconColor: scheme.onSurfaceVariant,
@@ -167,13 +245,60 @@ class AppTheme {
         titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: scheme.onSurface),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 80,
+        height: 68,
         elevation: 0,
-        backgroundColor: scheme.surface.withValues(alpha: .94),
-        indicatorColor: scheme.primaryContainer,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primary.withValues(alpha: isDark ? .16 : .14),
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+              color: states.contains(WidgetState.selected)
+                  ? scheme.primary
+                  : scheme.onSurfaceVariant,
+            )),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+              fontSize: 11,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w800
+                  : FontWeight.w600,
+              color: states.contains(WidgetState.selected)
+                  ? scheme.primary
+                  : scheme.onSurfaceVariant,
+            )),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: neon ? neonBackground : null,
+        indicatorColor: scheme.primary.withValues(alpha: isDark ? .16 : .14),
+        selectedIconTheme: IconThemeData(color: scheme.primary),
+        selectedLabelTextStyle: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w800, color: scheme.primary),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: neon ? neonSurface : null,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: neon ? neonSurfaceHigh : null,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: neon ? neonSurfaceHigh : null,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        linearTrackColor: scheme.primary.withValues(alpha: .12),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
+        // The neon containers are translucent, which would make a muddy
+        // button: neon gets a solid mint one instead.
+        backgroundColor: neon ? scheme.primary : null,
+        foregroundColor: neon ? scheme.onPrimary : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         extendedTextStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
@@ -197,9 +322,12 @@ class AppTheme {
   }
 
   static TextTheme _textTheme(ColorScheme scheme) {
+    // Tabular figures keep animated numbers from wobbling as digits change.
+    const tabular = [FontFeature.tabularFigures()];
     const base = TextTheme(
-      displayLarge: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, letterSpacing: -1.3),
-      displayMedium: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.9),
+      displayLarge: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, letterSpacing: -1.3, fontFeatures: tabular),
+      displayMedium: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.9, fontFeatures: tabular),
+      displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.7, fontFeatures: tabular),
       headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
       headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.35),
       headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),

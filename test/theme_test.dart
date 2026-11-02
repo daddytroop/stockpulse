@@ -68,13 +68,15 @@ void main() {
       await tester.pumpWidget(wrap(StockPulseApp(), provider));
       await settle(tester);
 
+      // A fresh install opens in the neon theme, which is dark.
       final captured = tester.element(find.byType(Scaffold).first);
-      expect(Theme.of(captured).brightness, Brightness.light);
+      expect(provider.themeMode, AppThemeId.neon);
+      expect(Theme.of(captured).brightness, Brightness.dark);
 
-      await provider.setThemeMode(AppThemeId.dark);
+      await provider.setThemeMode(AppThemeId.light);
       await tester.pumpAndSettle();
 
-      expect(Theme.of(captured).brightness, Brightness.dark);
+      expect(Theme.of(captured).brightness, Brightness.light);
     });
 
     testWidgets('the theme button opens the picker and applies a theme',
@@ -108,7 +110,7 @@ void main() {
       ));
       await settle(tester);
 
-      for (final mode in AppThemeId.values) {
+      for (final mode in AppThemeId.pickerOrder) {
         await tester.scrollUntilVisible(find.text(mode.label), 120);
         await tester.tap(find.text(mode.label));
         await tester.pumpAndSettle();

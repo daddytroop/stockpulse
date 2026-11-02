@@ -173,7 +173,7 @@ class _AdSlotState extends State<AdSlot> {
     return NativeTemplateStyle(
       templateType: TemplateType.medium,
       mainBackgroundColor: theme.colorScheme.surface,
-      cornerRadius: 18,
+      cornerRadius: 20,
       primaryTextStyle: NativeTemplateTextStyle(
         textColor: theme.colorScheme.onSurface,
         backgroundColor: Colors.transparent,
@@ -189,10 +189,13 @@ class _AdSlotState extends State<AdSlot> {
         backgroundColor: Colors.transparent,
         size: 11,
       ),
+      // A solid button in the theme's accent: clearly an action, and in
+      // keeping with the app's own buttons.
       callToActionTextStyle: NativeTemplateTextStyle(
-        textColor: theme.colorScheme.primary,
-        backgroundColor: Colors.transparent,
-        size: 13,
+        textColor: theme.colorScheme.onPrimary,
+        backgroundColor: theme.colorScheme.primary,
+        style: NativeTemplateFontStyle.bold,
+        size: 14,
       ),
     );
   }
@@ -215,9 +218,11 @@ class _AdSlotState extends State<AdSlot> {
             Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.08),
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : theme.colorScheme.outline.withValues(alpha: 0.08),
                 ),
               ),
               clipBehavior: Clip.antiAlias,

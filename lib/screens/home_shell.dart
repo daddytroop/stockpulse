@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -107,10 +109,25 @@ class _HomeShellState extends State<HomeShell> {
         );
       });
     }
-    final content = IndexedStack(
+    // The tabs draw on the shell's ambient background, so their own
+    // scaffolds are see-through. Pushed routes keep a solid background.
+    final theme = Theme.of(context);
+    final content = Theme(
+      data: theme.copyWith(
+        scaffoldBackgroundColor: Colors.transparent,
+        // Clear at rest so the glow shows; solid once content scrolls under.
+        appBarTheme: theme.appBarTheme.copyWith(
+          backgroundColor: WidgetStateColor.resolveWith((states) =>
+              states.contains(WidgetState.scrolledUnder)
+                  ? theme.scaffoldBackgroundColor.withValues(alpha: .96)
+                  : Colors.transparent),
+        ),
+      ),
+      child: IndexedStack(
         index: _index,
         children: [for (var i = 0; i < _labels.length; i++)
           TickerMode(enabled: i == _index, child: _screen(i))],
+      ),
     );
 
     // The ad service is app-wide, so every placement shares one consent
@@ -119,7 +136,9 @@ class _HomeShellState extends State<HomeShell> {
     final body = content;
 
     if (wide) {
-      return Scaffold(
+      return AmbientBackground(
+        child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: Row(
           children: [
             ScrollConfiguration(
@@ -143,34 +162,153 @@ class _HomeShellState extends State<HomeShell> {
             Expanded(child: body),
           ],
         ),
+      ),
       );
     }
 
-    return Scaffold(
-      body: DecoratedBox(
+    return AmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: body,
+        bottomNavigationBar: _FloatingNavBar(
+          index: _index,
+          icons: _icons,
+          selectedIcons: _selectedIcons,
+          labels: _labels,
+          onSelected: (i) => setState(() => _index = i),
+        ),
+      ),
+    );
+  }
+
+  static const _selectedIcons = [
+    Icons.account_balance_wallet,
+    Icons.event,
+    Icons.newspaper,
+    Icons.upload_file,
+    Icons.settings,
+  ];
+}
+
+/// Soft coloured light behind every screen, so the dark surfaces read as
+/// depth rather than as a flat fill.
+class AmbientBackground extends StatelessWidget {
+  final Widget child;
+
+  const AmbientBackground({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    return DecoratedBox(
+      decoration: BoxDecoration(color: theme.scaffoldBackgroundColor),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-1.1, -1.15),
+                  radius: 1.1,
+                  colors: [
+                    scheme.primary.withValues(alpha: isDark ? .16 : .12),
+                    scheme.primary.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(1.2, -0.7),
+                  radius: 0.9,
+                  colors: [
+                    scheme.tertiary.withValues(alpha: isDark ? .14 : .08),
+                    scheme.tertiary.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+/// A frosted, rounded navigation bar that floats above the content.
+class _FloatingNavBar extends StatelessWidget {
+  final int index;
+  final List<IconData> icons;
+  final List<IconData> selectedIcons;
+  final List<String> labels;
+  final ValueChanged<int> onSelected;
+
+  const _FloatingNavBar({
+    required this.index,
+    required this.icons,
+    required this.selectedIcons,
+    required this.labels,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(0, -1.2),
-            radius: 1.35,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: .10),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? .45 : .10),
+              blurRadius: 30,
+              offset: const Offset(0, 12),
+            ),
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: isDark ? .10 : .06),
+              blurRadius: 24,
+              spreadRadius: -6,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surface.withValues(alpha: isDark ? .72 : .86),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: .08)
+                      : scheme.outline.withValues(alpha: .12),
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: index,
+                onDestinationSelected: onSelected,
+                destinations: [
+                  for (var i = 0; i < labels.length; i++)
+                    NavigationDestination(
+                      icon: Icon(icons[i], size: 22),
+                      selectedIcon: Icon(selectedIcons[i], size: 23),
+                      label: labels[i],
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
-        child: body,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (var i = 0; i < _labels.length; i++)
-            NavigationDestination(
-              icon: Icon(_icons[i], size: 22),
-              selectedIcon: Icon(_icons[i], size: 24),
-              label: _labels[i],
-            ),
-        ],
       ),
     );
   }

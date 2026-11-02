@@ -55,9 +55,11 @@ class _PortfolioChartState extends State<PortfolioChart> {
     }
 
     final colors = AppColors.of(context);
-    final color = theme.colorScheme.primary;
     final bench = widget.benchmark;
     final normalized = bench != null && bench.length >= 2;
+    // The line takes the colour of the period: up is a gain, down a loss.
+    final periodUp = widget.points.last.close >= widget.points.first.close;
+    final color = periodUp ? colors.gain : colors.loss;
 
     final series = normalized ? _normalize(widget.points) : widget.points;
     final benchSeries = normalized ? _normalize(bench) : null;
@@ -129,6 +131,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
         curveSmoothness: 0.28,
         barWidth: 2.6,
         color: color,
+        shadow: Shadow(color: color.withValues(alpha: 0.55), blurRadius: 10),
         isStrokeCapRound: true,
         dotData: const FlDotData(show: false),
         belowBarData: BarAreaData(
@@ -137,7 +140,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              color.withValues(alpha: 0.28),
+              color.withValues(alpha: 0.32),
               color.withValues(alpha: 0.0),
             ],
           ),
@@ -536,6 +539,31 @@ class _MiniSparklinePainter extends CustomPainter {
         path.lineTo(x, y);
       }
     }
+    // A soft fill under the line, fading to nothing at the bottom.
+    final fill = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)],
+        ).createShader(Offset.zero & size),
+    );
+    // A faint halo, then the line itself.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = color.withValues(alpha: 0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
     canvas.drawPath(
       path,
       Paint()

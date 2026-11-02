@@ -133,7 +133,7 @@ class PortfolioProvider extends ChangeNotifier {
   double _dividendsProgress = 0;
   String? _lastError;
   DateTime? _lastRefreshAt;
-  AppThemeId _themeMode = AppThemeId.system;
+  AppThemeId _themeMode = AppThemeId.neon;
   int _accentIndex = 0;
   bool _autoRefreshOnStart = true;
   bool _onboardingComplete = false;
@@ -356,7 +356,8 @@ class PortfolioProvider extends ChangeNotifier {
       ];
       _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt();
       _themeMode = AppThemeId.values[
-          min(((data['themeMode'] as num?) ?? 0).toInt(), AppThemeId.values.length - 1)];
+          min(((data['themeMode'] as num?) ?? AppThemeId.neon.index).toInt(),
+              AppThemeId.values.length - 1)];
       _accentIndex = ((data['accentIndex'] as num?) ?? 0).toInt()
           .clamp(0, AppTheme.accents.length - 1);
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
@@ -1364,10 +1365,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
     if (series.isEmpty) return [];
 
-    final union = <int>{
-      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
-    }.toList()
-      ..sort();
+    final union = _sharedTimeline(series);
 
     final pointers = {for (final k in series.keys) k: 0};
     final out = <ChartPoint>[];
@@ -1472,6 +1470,28 @@ class PortfolioProvider extends ChangeNotifier {
     return out;
   }
 
+  /// The sorted timestamps a portfolio series is built on.
+  ///
+  /// Markets stamp their bars at different times of day (crypto at midnight
+  /// UTC, stocks at the open), so the earliest timestamps can have only some
+  /// holdings priced, which drew a cliff at the start of the chart. The
+  /// timeline therefore starts once every holding has a price - unless one
+  /// holding's history is so short (a recent listing) that this would hide
+  /// most of the range, in which case it is kept whole.
+  static List<int> _sharedTimeline(Map<String, List<ChartPoint>> series) {
+    final union = <int>{
+      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
+    }.toList()
+      ..sort();
+    var latestStart = 0;
+    for (final pts in series.values) {
+      final start = pts.first.time.millisecondsSinceEpoch;
+      if (start > latestStart) latestStart = start;
+    }
+    final trimmed = union.where((t) => t >= latestStart).toList();
+    return trimmed.length >= union.length / 2 ? trimmed : union;
+  }
+
   Future<List<ChartPoint>> _buildHistory(String portfolioId, String range) async {
     final p = byId(portfolioId);
     if (p == null || p.holdings.isEmpty) return [];
@@ -1491,10 +1511,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
     if (series.isEmpty) return [];
 
-    final union = <int>{
-      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
-    }.toList()
-      ..sort();
+    final union = _sharedTimeline(series);
 
     final pointers = {for (final k in series.keys) k: 0};
     final out = <ChartPoint>[];

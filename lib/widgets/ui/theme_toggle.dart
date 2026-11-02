@@ -52,7 +52,7 @@ Future<void> showThemeSheet(BuildContext context) async {
                       ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              for (final mode in AppThemeId.values)
+              for (final mode in AppThemeId.pickerOrder)
                 RadioListTile<AppThemeId>(
                   value: mode,
                   groupValue: provider.themeMode,
@@ -84,6 +84,7 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.themeFor(mode, Brightness.light);
+    final neon = mode == AppThemeId.neon;
     return Container(
       width: 26,
       height: 26,
@@ -97,8 +98,19 @@ class _Preview extends StatelessWidget {
           width: 9,
           height: 9,
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
+            color: neon ? null : theme.colorScheme.primary,
+            gradient: neon
+                ? const LinearGradient(colors: AppTheme.neonGradient)
+                : null,
             shape: BoxShape.circle,
+            boxShadow: neon
+                ? [
+                    BoxShadow(
+                      color: AppTheme.neonMint.withValues(alpha: .7),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
           ),
         ),
       ),

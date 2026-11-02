@@ -64,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                for (final mode in AppThemeId.values)
+                for (final mode in AppThemeId.pickerOrder)
                   RadioAdaptiveTile(
                     groupValue: provider.themeMode,
                     value: mode,

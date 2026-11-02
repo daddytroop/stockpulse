@@ -84,8 +84,55 @@ class AppColors extends ThemeExtension<AppColors> {
     );
   }
 
+  /// The neon palette: electric mint gains, hot pink losses, and a glowing
+  /// allocation palette that stays readable on a near-black surface.
+  factory AppColors.neon(ColorScheme scheme) {
+    const gain = Color(0xFF00F5A0);
+    const loss = Color(0xFFFF3B6B);
+    return AppColors._(
+      gain: gain,
+      gainContainer: gain.withValues(alpha: 0.14),
+      onGainContainer: gain,
+      loss: loss,
+      lossContainer: loss.withValues(alpha: 0.14),
+      onLossContainer: loss,
+      earnings: const Color(0xFFFFB547),
+      earningsContainer: const Color(0xFFFFB547).withValues(alpha: 0.14),
+      dividend: const Color(0xFF5CF2C4),
+      crypto: const Color(0xFFF7931A),
+      etf: const Color(0xFF7C5CFF),
+      stock: scheme.primary,
+      cash: const Color(0xFF8A94B0),
+      other: const Color(0xFF5B6582),
+      benchmark: const Color(0xFF8A94B0),
+      shimmerBase: const Color(0xFF111827),
+      shimmerHighlight: const Color(0xFF1C2540),
+      allocationPalette: const [
+        Color(0xFF00F5A0),
+        Color(0xFF00D9F5),
+        Color(0xFF7C5CFF),
+        Color(0xFFFF3BCB),
+        Color(0xFFFFB547),
+        Color(0xFF3B82F6),
+        Color(0xFFB7FF3B),
+        Color(0xFFFF6B3B),
+        Color(0xFF5CF2C4),
+        Color(0xFFA78BFA),
+        Color(0xFFFF3B6B),
+        Color(0xFF38BDF8),
+        Color(0xFFFDE047),
+        Color(0xFF2DD4BF),
+        Color(0xFFF472B6),
+        Color(0xFF94A3B8),
+      ],
+    );
+  }
+
+  /// The colours of the current theme. A theme can ship its own palette as
+  /// a theme extension; otherwise the palette is derived from the scheme.
   static AppColors of(BuildContext context) {
-    return AppColors.fromScheme(Theme.of(context).colorScheme);
+    final theme = Theme.of(context);
+    return theme.extension<AppColors>() ?? AppColors.fromScheme(theme.colorScheme);
   }
 
   static List<Color> _buildPalette(ColorScheme scheme, bool isDark) {
