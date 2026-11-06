@@ -1,10 +1,13 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../services/app_navigation.dart';
+import '../theme/app_colors.dart';
 import 'dividends_screen.dart';
 import 'markets_screen.dart';
 import 'news_screen.dart';
@@ -20,8 +23,27 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMixin {
   int _index = 0;
+
+  /// Plays a short fade-through whenever the tab changes.
+  late final AnimationController _tabFade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+    value: 1,
+  );
+
+  late final Animation<double> _tabOpacity =
+      CurvedAnimation(parent: _tabFade, curve: Curves.easeOut);
+  late final Animation<double> _tabScale = Tween(begin: .985, end: 1.0)
+      .animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic));
+
+  void _select(int i) {
+    if (i == _index) return;
+    HapticFeedback.selectionClick();
+    setState(() => _index = i);
+    _tabFade.forward(from: 0);
+  }
 
   static const _labels = AppNavigation.labels;
   static const _icons = [
@@ -55,12 +77,13 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onNavChanged() {
     if (!mounted) return;
-    if (_nav.index != _index) setState(() => _index = _nav.index);
+    if (_nav.index != _index) _select(_nav.index);
   }
 
   @override
   void dispose() {
     _nav.removeListener(_onNavChanged);
+    _tabFade.dispose();
     super.dispose();
   }
   Widget _screen(int i) {
@@ -123,10 +146,16 @@ class _HomeShellState extends State<HomeShell> {
                   : Colors.transparent),
         ),
       ),
-      child: IndexedStack(
-        index: _index,
-        children: [for (var i = 0; i < _labels.length; i++)
-          TickerMode(enabled: i == _index, child: _screen(i))],
+      child: FadeTransition(
+        opacity: _tabOpacity,
+        child: ScaleTransition(
+          scale: _tabScale,
+          child: IndexedStack(
+            index: _index,
+            children: [for (var i = 0; i < _labels.length; i++)
+              TickerMode(enabled: i == _index, child: _screen(i))],
+          ),
+        ),
       ),
     );
 
@@ -145,7 +174,7 @@ class _HomeShellState extends State<HomeShell> {
               behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
               child: NavigationRail(
                 selectedIndex: _index,
-                onDestinationSelected: (i) => setState(() => _index = i),
+                onDestinationSelected: _select,
                 labelType: NavigationRailLabelType.all,
                 groupAlignment: -0.9,
                 destinations: [
@@ -175,7 +204,7 @@ class _HomeShellState extends State<HomeShell> {
           icons: _icons,
           selectedIcons: _selectedIcons,
           labels: _labels,
-          onSelected: (i) => setState(() => _index = i),
+          onSelected: _select,
         ),
       ),
     );
@@ -190,55 +219,111 @@ class _HomeShellState extends State<HomeShell> {
   ];
 }
 
-/// Soft coloured light behind every screen, so the dark surfaces read as
-/// depth rather than as a flat fill.
-class AmbientBackground extends StatelessWidget {
+/// Soft coloured light behind every screen, so the surfaces read as depth
+/// rather than a flat fill. The light drifts very slowly, like a living
+/// background; it holds still when the device asks for reduced motion.
+class AmbientBackground extends StatefulWidget {
   final Widget child;
 
   const AmbientBackground({super.key, required this.child});
 
   @override
+  State<AmbientBackground> createState() => _AmbientBackgroundState();
+}
+
+class _AmbientBackgroundState extends State<AmbientBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _drift = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 24),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (still) {
+      _drift.stop();
+    } else if (!_drift.isAnimating) {
+      _drift.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _drift.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
+    final glow = AppColors.of(context).accentGradient;
+    final isDark = theme.brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(color: theme.scaffoldBackgroundColor),
       child: Stack(
         children: [
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-1.1, -1.15),
-                  radius: 1.1,
-                  colors: [
-                    scheme.primary.withValues(alpha: isDark ? .16 : .12),
-                    scheme.primary.withValues(alpha: 0),
-                  ],
-                ),
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _drift,
+                builder: (context, _) {
+                  final t = _drift.value * 2 * pi;
+                  return CustomPaint(
+                    painter: _GlowPainter(
+                      blobs: [
+                        (
+                          Alignment(-1.0 + .25 * sin(t), -1.1 + .15 * cos(t)),
+                          1.1,
+                          glow.first.withValues(alpha: isDark ? .17 : .12),
+                        ),
+                        (
+                          Alignment(1.15 + .2 * cos(t * 1.3), -.65 + .2 * sin(t)),
+                          .9,
+                          glow.last.withValues(alpha: isDark ? .14 : .08),
+                        ),
+                        (
+                          Alignment(-.4 + .4 * sin(t * .7), 1.1),
+                          .8,
+                          glow[1].withValues(alpha: isDark ? .07 : .05),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(1.2, -0.7),
-                  radius: 0.9,
-                  colors: [
-                    scheme.tertiary.withValues(alpha: isDark ? .14 : .08),
-                    scheme.tertiary.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(child: child),
+          Positioned.fill(child: widget.child),
         ],
       ),
     );
   }
+}
+
+class _GlowPainter extends CustomPainter {
+  final List<(Alignment, double, Color)> blobs;
+  _GlowPainter({required this.blobs});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    for (final (center, radius, color) in blobs) {
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = RadialGradient(
+            center: center,
+            radius: radius,
+            colors: [color, color.withValues(alpha: 0)],
+          ).createShader(rect),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GlowPainter old) => true;
 }
 
 /// A frosted, rounded navigation bar that floats above the content.
@@ -301,7 +386,16 @@ class _FloatingNavBar extends StatelessWidget {
                   for (var i = 0; i < labels.length; i++)
                     NavigationDestination(
                       icon: Icon(icons[i], size: 22),
-                      selectedIcon: Icon(selectedIcons[i], size: 23),
+                      // The chosen icon pops in with a little spring.
+                      selectedIcon: TweenAnimationBuilder<double>(
+                        key: ValueKey('sel-$i-$index'),
+                        tween: Tween(begin: .7, end: 1),
+                        duration: const Duration(milliseconds: 420),
+                        curve: Curves.elasticOut,
+                        builder: (context, s, child) =>
+                            Transform.scale(scale: s, child: child),
+                        child: Icon(selectedIcons[i], size: 23),
+                      ),
                       label: labels[i],
                     ),
                 ],

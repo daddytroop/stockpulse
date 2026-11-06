@@ -132,49 +132,51 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 child: LinearProgressIndicator(minHeight: 2),
               ),
             _freshnessBanner(context, provider),
-            _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
-            const SizedBox(height: 12),
-            _kpiRow(context, provider, portfolio, totals, currency),
-            const SizedBox(height: 10),
-            WhatsNewCard(
-              provider: provider,
-              portfolio: portfolio,
-              currency: currency,
-            ),
-            const SizedBox(height: 2),
-            const SectionHeader(title: 'Tools'),
-            const ToolsGrid(),
-            const SizedBox(height: 14),
-            _dataProvenance(context, provider),
-            const SizedBox(height: 12),
-            SpCard(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-              child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  Text('Performance', style: Theme.of(context).textTheme.titleLarge),
-                  FilterChip(label: const Text('Compare SPY'), selected: _compare,
-                    onSelected: (v) => setState(() => _compare = v)),
-                  FilterChip(
-                    label: const Text('Total return'),
-                    selected: _totalReturn,
-                    onSelected: (v) => setState(() => _totalReturn = v),
+            // The story first, like a good finance app: what it's worth,
+            // how it got here, then the details. Each block eases in.
+            ..._staggered([
+              _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
+              const SizedBox(height: 12),
+              SpCard(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    Text('Performance', style: Theme.of(context).textTheme.titleLarge),
+                    FilterChip(label: const Text('Compare SPY'), selected: _compare,
+                      onSelected: (v) => setState(() => _compare = v)),
+                    FilterChip(
+                      label: const Text('Total return'),
+                      selected: _totalReturn,
+                      onSelected: (v) => setState(() => _totalReturn = v),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  _chart(context, portfolio, provider, currency),
+                  const SizedBox(height: 10),
+                  _rangeChips(context),
+                  const SizedBox(height: 2),
+                  Text(
+                    _totalReturn
+                        ? 'Value plus every dividend received · drag the chart'
+                        : 'Price only · drag the chart',
+                    style: Theme.of(context).textTheme.labelSmall,
                   ),
-                ]),
-                const SizedBox(height: 10),
-                _chart(context, portfolio, provider, currency),
-                const SizedBox(height: 10),
-                _rangeChips(context),
-                const SizedBox(height: 2),
-                Text(
-                  _totalReturn
-                      ? 'Value plus every dividend received · drag the chart'
-                      : 'Price only · drag the chart',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ],
-            )),
+                ],
+              )),
+              const SizedBox(height: 12),
+              _kpiRow(context, provider, portfolio, totals, currency),
+              const SizedBox(height: 10),
+              WhatsNewCard(
+                provider: provider,
+                portfolio: portfolio,
+                currency: currency,
+              ),
+              const SizedBox(height: 2),
+              const SectionHeader(title: 'Tools'),
+              const ToolsGrid(),
+            ]),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
             const SizedBox(height: 12),
@@ -253,6 +255,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   native: true,
                 ),
               const AdSlot(placement: AdPlacement.portfolioBanner),
+              const SizedBox(height: 12),
+              _dataProvenance(context, provider),
               const SizedBox(height: 20),
               Center(
                 child: Text(
@@ -430,6 +434,21 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     if (by == 'industry' || by == 'sector') {
       provider.ensureProfiles(provider.active.symbols.toSet());
     }
+  }
+
+  /// Fades and lifts [children] in one after another, once, when the
+  /// screen first appears.
+  List<Widget> _staggered(List<Widget> children) {
+    var i = 0;
+    return [
+      for (final c in children)
+        c is SizedBox
+            ? c
+            : c
+                .animate()
+                .fadeIn(delay: (70 * i++).ms, duration: 420.ms, curve: Curves.easeOutCubic)
+                .slideY(begin: .06, end: 0, delay: (70 * (i - 1)).ms, duration: 420.ms, curve: Curves.easeOutCubic),
+    ];
   }
 
   Widget _errorBanner(BuildContext context, String message) {
@@ -691,6 +710,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ),
             ),
           ),
+          // A slow band of light that sweeps across the card now and then.
+          const Positioned.fill(child: IgnorePointer(child: _Sheen())),
           // The signature gradient along the top edge.
           Positioned(
             left: 0,
@@ -699,11 +720,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             child: Container(
               height: 3,
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [
-                  scheme.primary,
-                  scheme.secondary,
-                  scheme.tertiary,
-                ]),
+                gradient: LinearGradient(colors: colors.accentGradient),
               ),
             ),
           ),
@@ -1266,6 +1283,65 @@ class _Pill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A soft diagonal band of light that glides across the balance card every
+/// few seconds, like light catching glass. Still when motion is reduced.
+class _Sheen extends StatefulWidget {
+  const _Sheen();
+
+  @override
+  State<_Sheen> createState() => _SheenState();
+}
+
+class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 7000),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        // The sweep takes the first fifth of the cycle; the rest is rest.
+        final t = (_c.value / .2).clamp(0.0, 1.0);
+        if (t <= 0 || t >= 1) return const SizedBox.expand();
+        final x = -1.6 + 3.2 * Curves.easeInOut.transform(t);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(x - .5, -1),
+              end: Alignment(x + .5, 1),
+              colors: [
+                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: isDark ? .07 : .35),
+                Colors.white.withValues(alpha: 0),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
