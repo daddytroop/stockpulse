@@ -93,13 +93,38 @@ Future<void> chooseTheme(BuildContext context, AppThemeId mode) async {
   await provider.setThemeMode(mode);
 }
 
-/// Every theme as a live mini preview, two or three to a row.
+/// Every theme as a live mini preview, two or three to a row; or, with
+/// [compact], one scrolling row (for Settings, where a full grid would
+/// push everything else far down).
 class ThemeGrid extends StatelessWidget {
-  const ThemeGrid({super.key});
+  final bool compact;
+
+  const ThemeGrid({super.key, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
     final current = context.select<PortfolioProvider, AppThemeId>((p) => p.themeMode);
+    if (compact) {
+      return SizedBox(
+        height: 196,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: AppThemeId.pickerOrder.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, i) {
+            final mode = AppThemeId.pickerOrder[i];
+            return SizedBox(
+              width: 164,
+              child: ThemePreviewCard(
+                mode: mode,
+                selected: mode == current,
+                onTap: () => chooseTheme(context, mode),
+              ),
+            );
+          },
+        ),
+      );
+    }
     return LayoutBuilder(builder: (context, constraints) {
       final columns = constraints.maxWidth >= 560 ? 3 : 2;
       const gap = 12.0;
@@ -228,9 +253,8 @@ class ThemePreviewCard extends StatelessWidget {
                               painter: _MiniChartPainter(c.gain),
                             ),
                           ),
-                          Row(children: [
+                          Wrap(spacing: 4, runSpacing: 2, children: [
                             _pill('+2.4%', c.gain, c.gainContainer),
-                            const SizedBox(width: 4),
                             _pill('-0.8%', c.loss, c.lossContainer),
                           ]),
                         ],

@@ -37,6 +37,16 @@ void main() {
     );
   }
 
+  /// Scrolls the theme row in Settings until [label] is on screen.
+  Future<void> showTheme(WidgetTester tester, String label) async {
+    final row = find.descendant(
+      of: find.byType(ThemeGrid),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(find.text(label), 120, scrollable: row.first);
+    await tester.pumpAndSettle();
+  }
+
   /// Loading the provider starts background fetches with short delays.
   /// They have to be flushed before a widget test ends.
   Future<void> settle(WidgetTester tester) async {
@@ -111,7 +121,7 @@ void main() {
 
       // The theme section is near the top now, but a long list can still
       // push it off the first screen.
-      await tester.scrollUntilVisible(find.text('Dark'), 120);
+      await showTheme(tester, 'Dark');
       await tester.tap(find.text('Dark'));
       await tester.pumpAndSettle();
 
@@ -168,7 +178,7 @@ void main() {
       await settle(tester);
 
       for (final mode in AppThemeId.pickerOrder) {
-        await tester.scrollUntilVisible(find.text(mode.label), 120);
+        await showTheme(tester, mode.label);
         await tester.tap(find.text(mode.label));
         await tester.pumpAndSettle();
         expect(provider.themeMode, mode);
@@ -188,7 +198,7 @@ void main() {
       ));
       await settle(tester);
 
-      await tester.scrollUntilVisible(find.text('Gold'), 120);
+      await showTheme(tester, 'Gold');
       await tester.ensureVisible(find.text('Gold'));
       await tester.pump();
       await tester.tap(find.text('Gold'));

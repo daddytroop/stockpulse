@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
@@ -44,9 +43,33 @@ class _AdSlotState extends State<AdSlot> {
   /// app shell in the navigator and would otherwise be outside the scope.
   AdService get _service => context.read<AdService>();
 
+  /// A request is in flight.
+  bool _loading = false;
+
+  /// When the last request failed; failed slots wait before trying again.
+  DateTime? _failedAt;
+
+  late final AdService _listened = context.read<AdService>();
+
   @override
   void initState() {
     super.initState();
+    // The request reads the theme (for the native template), which is not
+    // allowed during initState, so it waits for the first frame. It also
+    // retries whenever the service changes: the SDK finishing its start-up
+    // or consent arriving after the slot was built.
+    _listened.addListener(_onServiceChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _request();
+    });
+  }
+
+  void _onServiceChanged() {
+    if (!mounted || _ready || _loading) return;
+    final failed = _failedAt;
+    if (failed != null && DateTime.now().difference(failed) < const Duration(minutes: 1)) {
+      return;
+    }
     _request();
   }
 
@@ -61,6 +84,7 @@ class _AdSlotState extends State<AdSlot> {
 
   @override
   void dispose() {
+    _listened.removeListener(_onServiceChanged);
     _generation++;
     _disposeAd();
     super.dispose();
@@ -73,7 +97,10 @@ class _AdSlotState extends State<AdSlot> {
   }
 
   Future<void> _request() async {
-    if (!_service.supported) return;
+    if (_loading || !_service.supported) return;
+    // The SDK must finish starting (and consent be known) first.
+    await _service.ready;
+    if (!mounted || _ready) return;
     if (!_service.canRequestAds) return;
     if (!_service.canShow(widget.placement)) return;
 
@@ -81,6 +108,7 @@ class _AdSlotState extends State<AdSlot> {
     if (unitId.isEmpty) return;
 
     final generation = ++_generation;
+    _loading = true;
     try {
       if (widget.native) {
         final ad = NativeAd(
@@ -93,6 +121,7 @@ class _AdSlotState extends State<AdSlot> {
                 ad.dispose();
                 return;
               }
+              _loading = false;
               setState(() {
                 _ad = ad as AdWithView;
                 _ready = true;
@@ -102,6 +131,8 @@ class _AdSlotState extends State<AdSlot> {
             },
             onAdFailedToLoad: (ad, error) {
               ad.dispose();
+              _loading = false;
+              _failedAt = DateTime.now();
               _service.reportError(widget.placement, _describe(error));
             },
             onAdClicked: (ad) => _service.recordImpression(
@@ -127,6 +158,7 @@ class _AdSlotState extends State<AdSlot> {
                 ad.dispose();
                 return;
               }
+              _loading = false;
               setState(() {
                 _ad = ad as AdWithView;
                 _ready = true;
@@ -136,6 +168,8 @@ class _AdSlotState extends State<AdSlot> {
             },
             onAdFailedToLoad: (ad, error) {
               ad.dispose();
+              _loading = false;
+              _failedAt = DateTime.now();
               _service.reportError(widget.placement, _describe(error));
             },
             onAdClicked: (ad) => _service.recordImpression(
@@ -152,7 +186,10 @@ class _AdSlotState extends State<AdSlot> {
         await ad.load();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('Ad request error: $e');
+      // Shown in the developer panel, so a broken setup is never silent.
+      _loading = false;
+      _failedAt = DateTime.now();
+      _service.reportError(widget.placement, 'Request error: $e');
     }
   }
 
@@ -227,7 +264,16 @@ class _AdSlotState extends State<AdSlot> {
               ),
               clipBehavior: Clip.antiAlias,
               padding: const EdgeInsets.all(4),
-              child: AdWidget(ad: _ad!),
+              // A native template needs a bounded box; the medium template
+              // is designed for roughly 320-360 logical pixels tall.
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 300,
+                  minHeight: 300,
+                  maxHeight: 360,
+                ),
+                child: AdWidget(ad: _ad!),
+              ),
             ),
           ],
         ),
