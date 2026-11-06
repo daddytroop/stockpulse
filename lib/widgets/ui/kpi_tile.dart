@@ -152,7 +152,9 @@ class KpiTile extends StatelessWidget {
         color: scheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: scheme.outline.withValues(alpha: 0.08),
+          color: isDark
+              ? accent.withValues(alpha: 0.16)
+              : scheme.outline.withValues(alpha: 0.08),
         ),
         boxShadow: [
           BoxShadow(

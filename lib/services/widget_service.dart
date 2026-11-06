@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 
-import '../widgets/widget_sparkline.dart';
 import 'platform_check.dart' show isAndroidPlatform;
 
 /// Bridges portfolio data into the Android home-screen widgets.
@@ -67,32 +65,37 @@ class StockPulseWidgetService {
     }
   }
 
-  /// Renders the trend line that sits inside the portfolio widget.
-  ///
-  /// The widget is drawn by Android, so the line is rendered here as a
-  /// small transparent PNG and the widget picks it up by path.
-  static Future<bool> pushSparkline({
-    required List<double> points,
-    required int colorValue,
-    double width = 280,
-    double height = 26,
-  }) async {
+  /// Hands the trend line's values to the portfolio widget, which draws
+  /// the line natively, then redraws the widget.
+  static Future<bool> pushSparkline({required List<double> points}) async {
     if (!supported) return false;
     try {
-      await HomeWidget.renderFlutterWidget(
-        WidgetSparkline(points: points, color: Color(colorValue)),
-        key: sparklineKey,
-        logicalSize: Size(width, height),
-        pixelRatio: 3.0,
-      );
-      return true;
+      await HomeWidget.saveWidgetData<String>(
+          sparklinePointsKey, sparklinePointsJson(points));
+      final ok = await HomeWidget.updateWidget(
+          qualifiedAndroidName: '$_appId.PortfolioWidgetProvider');
+      return ok == true;
     } catch (_) {
       return false;
     }
   }
 
-  /// The preferences key the rendered sparkline is stored under.
-  static const String sparklineKey = 'widget_sparkline';
+  /// The preferences key the trend values are stored under.
+  static const String sparklinePointsKey = 'widget_spark_points';
+
+  /// The trend values as the widget reads them: finite numbers only, and
+  /// at most 60 of them (a widget strip has no room for more detail).
+  static String sparklinePointsJson(List<double> points) {
+    final clean = points.where((p) => p.isFinite).toList();
+    final step = clean.length > 60 ? clean.length / 60 : 1.0;
+    final sampled = step == 1.0
+        ? clean
+        : [
+            for (var i = 0.0; i < clean.length; i += step) clean[i.floor()],
+            if (clean.isNotEmpty) clean.last,
+          ];
+    return jsonEncode(sampled);
+  }
 
   /// Writes the compact snapshot the Kotlin background worker consumes:
   /// aggregated positions, FX rates into the display currency, the next
@@ -130,6 +133,32 @@ class StockPulseWidgetService {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Writes the watchlist price targets the background worker checks.
+  /// An empty list turns the target alerts off.
+  static Future<void> pushWatchTargets(
+    List<({String symbol, double? above, double? below, String name, String currency})>
+        targets,
+  ) async {
+    if (!supported) return;
+    try {
+      await HomeWidget.saveWidgetData<String>(
+        'bg_watch',
+        jsonEncode([
+          for (final t in targets)
+            {
+              's': t.symbol,
+              if (t.above != null) 'above': t.above,
+              if (t.below != null) 'below': t.below,
+              'name': t.name,
+              'cur': t.currency,
+            },
+        ]),
+      );
+    } catch (_) {
+      // Alerts are best-effort; the app keeps working without them.
     }
   }
 }

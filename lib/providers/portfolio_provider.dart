@@ -11,6 +11,7 @@ import '../models/holding.dart';
 import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../models/transaction.dart';
+import '../models/watch_item.dart';
 import '../services/csv_import.dart';
 import '../services/ledger.dart' as ledger;
 import '../services/store.dart';
@@ -21,6 +22,7 @@ import '../utils/formatters.dart';
 import '../utils/dividend_tax.dart';
 import '../utils/fx_currency.dart';
 import '../utils/market_identity.dart';
+import '../utils/portfolio_health.dart';
 import '../utils/privacy.dart';
 
 /// Aggregate money stats for a portfolio (or all portfolios at once).
@@ -127,13 +129,20 @@ class PortfolioProvider extends ChangeNotifier {
   DateTime? _lastSyncAt;
   String _webProxyUrl = '';
 
+  /// Stocks the user follows without owning them.
+  List<WatchItem> _watchlist = [];
+
+  /// Whether watchlist price-target alerts are unlocked (a Pro feature).
+  /// Set by the app from the Pro status.
+  bool _watchAlertsEnabled = false;
+
   bool _loaded = false;
   bool _quotesLoading = false;
   bool _dividendsLoading = false;
   double _dividendsProgress = 0;
   String? _lastError;
   DateTime? _lastRefreshAt;
-  AppThemeId _themeMode = AppThemeId.system;
+  AppThemeId _themeMode = AppThemeId.neon;
   int _accentIndex = 0;
   bool _autoRefreshOnStart = true;
   bool _onboardingComplete = false;
@@ -172,9 +181,49 @@ class PortfolioProvider extends ChangeNotifier {
   int get accentIndex => _accentIndex.clamp(0, AppTheme.accents.length - 1);
   bool get autoRefreshOnStart => _autoRefreshOnStart;
   bool get showsOnboarding => _onboardingComplete;
+
+  /// The release whose highlights the What's new sheet shows.
+  static const whatsNewVersion = '1.6.0';
+  String _seenWhatsNew = '';
+
+  /// Whether to show the What's new sheet: once per release, to people
+  /// who were already using the app.
+  bool get whatsNewDue => _onboardingComplete && _seenWhatsNew != whatsNewVersion;
+
+  Future<void> markWhatsNewSeen() async {
+    _seenWhatsNew = whatsNewVersion;
+    await _persistData();
+  }
+
+  int _appOpens = 0;
+  bool _reviewAsked = false;
+
+  /// Counts a launch, for the rating prompt.
+  Future<void> countAppOpen() async {
+    _appOpens++;
+    await _persistData();
+  }
+
+  /// Whether now is a good moment to ask for a rating: the user has come
+  /// back a few times, has holdings, and is having a good day. Asked once.
+  bool get reviewDue {
+    if (_reviewAsked || _appOpens < 5 || !_onboardingComplete) return false;
+    final t = totalsForAll();
+    return active.holdings.isNotEmpty && t.hasDayChange && t.dayChange > 0;
+  }
+
+  Future<void> markReviewAsked() async {
+    _reviewAsked = true;
+    await _persistData();
+  }
   bool get crashDiagnostics => _crashDiagnostics;
   bool get backupReminderDue {
-    if (_portfolios.every((p) => p.holdings.isEmpty)) return false;
+    // Only once there is something of the user's own to lose, and not in
+    // the first few visits: a nag on day one is a poor welcome.
+    final ownHoldings = _portfolios
+        .where((p) => !p.name.startsWith('Sample'))
+        .any((p) => p.holdings.isNotEmpty);
+    if (!ownHoldings || _appOpens < 3) return false;
     final at = _lastBackupReminderAt;
     return at == null || DateTime.now().difference(at) >= const Duration(days: 30);
   }
@@ -304,6 +353,8 @@ class PortfolioProvider extends ChangeNotifier {
 
   Future<void> completeOnboarding() async {
     _onboardingComplete = true;
+    // A brand-new user has nothing to catch up on.
+    _seenWhatsNew = whatsNewVersion;
     notifyListeners();
     await _persistData();
   }
@@ -343,6 +394,72 @@ class PortfolioProvider extends ChangeNotifier {
       };
 
   // ---------------------------------------------------------------------------
+  // Watchlist
+  // ---------------------------------------------------------------------------
+
+  /// How many stocks the free version can follow. Pro removes the limit.
+  static const freeWatchlistLimit = 3;
+
+  List<WatchItem> get watchlist => List.unmodifiable(_watchlist);
+
+  bool isWatched(String symbol) =>
+      _watchlist.any((w) => w.symbol == symbol.toUpperCase());
+
+  /// Adds [symbol] to the watchlist and fetches its quote.
+  Future<void> addToWatchlist(String symbol) async {
+    final s = symbol.trim().toUpperCase();
+    if (s.isEmpty || isWatched(s)) return;
+    _watchlist = [..._watchlist, WatchItem(symbol: s, addedAt: DateTime.now())];
+    notifyListeners();
+    await _persistData();
+    try {
+      final fetched = await _yahoo.quotes({s});
+      if (fetched.isNotEmpty) {
+        _quotes = Map.of(_quotes)..addAll(fetched);
+        notifyListeners();
+      }
+    } catch (_) {
+      // The next refresh fills it in.
+    }
+    await pushWorkerSnapshot();
+  }
+
+  Future<void> removeFromWatchlist(String symbol) async {
+    _watchlist = [for (final w in _watchlist) if (w.symbol != symbol) w];
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  /// Sets or clears the price targets for a watched symbol.
+  Future<void> setWatchTargets(String symbol, {double? above, double? below}) async {
+    _watchlist = [
+      for (final w in _watchlist)
+        if (w.symbol == symbol)
+          w.copyWith(
+            above: above,
+            below: below,
+            clearAbove: above == null,
+            clearBelow: below == null,
+          )
+        else
+          w,
+    ];
+    notifyListeners();
+    await _persistData();
+    await pushWorkerSnapshot();
+  }
+
+  bool get watchAlertsEnabled => _watchAlertsEnabled;
+
+  /// Turns watchlist target alerts on or off (follows the Pro status).
+  Future<void> setWatchAlertsEnabled(bool value) async {
+    if (_watchAlertsEnabled == value) return;
+    _watchAlertsEnabled = value;
+    await pushWorkerSnapshot();
+  }
+
+  // ---------------------------------------------------------------------------
   // Persistence
   // ---------------------------------------------------------------------------
 
@@ -356,7 +473,8 @@ class PortfolioProvider extends ChangeNotifier {
       ];
       _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt();
       _themeMode = AppThemeId.values[
-          min(((data['themeMode'] as num?) ?? 0).toInt(), AppThemeId.values.length - 1)];
+          min(((data['themeMode'] as num?) ?? AppThemeId.neon.index).toInt(),
+              AppThemeId.values.length - 1)];
       _accentIndex = ((data['accentIndex'] as num?) ?? 0).toInt()
           .clamp(0, AppTheme.accents.length - 1);
       _autoRefreshOnStart = data['autoRefreshOnStart'] as bool? ?? true;
@@ -373,6 +491,9 @@ class PortfolioProvider extends ChangeNotifier {
       // while the mode is on.
       PrivacyMode.hideBalances = _hideBalances;
       _onboardingComplete = data['onboardingComplete'] as bool? ?? false;
+      _seenWhatsNew = data['seenWhatsNew'] as String? ?? '';
+      _appOpens = ((data['appOpens'] as num?) ?? 0).toInt();
+      _reviewAsked = data['reviewAsked'] as bool? ?? false;
       Diagnostics.setEnabled(data['crashDiagnostics'] as bool? ?? false);
       _crashDiagnostics = data['crashDiagnostics'] as bool? ?? false;
       _lastBackupReminderAt = _ms(data['lastBackupReminderMs']);
@@ -380,6 +501,7 @@ class PortfolioProvider extends ChangeNotifier {
       _gistToken = data['gistToken']?.toString() ?? '';
       _lastSyncAt = _ms(data['lastSyncMs']);
       _webProxyUrl = data['webProxyUrl']?.toString() ?? '';
+      _watchlist = _parseWatchlist(data['watchlist']);
     }
     if (_portfolios.isEmpty) {
       _portfolios = [Portfolio(id: _newId(), name: 'Main')];
@@ -445,6 +567,9 @@ class PortfolioProvider extends ChangeNotifier {
       'accentIndex': _accentIndex,
       'autoRefreshOnStart': _autoRefreshOnStart,
       'onboardingComplete': _onboardingComplete,
+      'seenWhatsNew': _seenWhatsNew,
+      'appOpens': _appOpens,
+      'reviewAsked': _reviewAsked,
       'crashDiagnostics': _crashDiagnostics,
       'lastBackupReminderMs': _lastBackupReminderAt?.millisecondsSinceEpoch,
       'displayCurrency': _displayCurrency,
@@ -458,8 +583,14 @@ class PortfolioProvider extends ChangeNotifier {
       'gistToken': _gistToken,
       'lastSyncMs': _lastSyncAt?.millisecondsSinceEpoch,
       'webProxyUrl': _webProxyUrl,
+      'watchlist': [for (final w in _watchlist) w.toMap()],
     });
   }
+
+  static List<WatchItem> _parseWatchlist(Object? raw) => [
+        for (final m in (raw as List? ?? const []).whereType<Map<String, dynamic>>())
+          WatchItem.fromMap(m),
+      ].whereType<WatchItem>().toList();
 
   Future<void> _persistCache() async {
     await _store.save(_cacheFile, {
@@ -774,7 +905,7 @@ class PortfolioProvider extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
-      final symbols = allSymbols;
+      final symbols = {...allSymbols, for (final w in _watchlist) w.symbol};
       if (symbols.isNotEmpty) {
         final fetched = await _yahoo.quotes(symbols);
         if (fetched.isNotEmpty) {
@@ -875,6 +1006,43 @@ class PortfolioProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Computed values
   // ---------------------------------------------------------------------------
+
+  /// The holdings of [p] as the health check sees them: value and income
+  /// in the display currency (once every FX rate is in), sector, type and
+  /// market.
+  List<HealthPosition> healthPositionsFor(Portfolio p) {
+    final display = _displayCurrency;
+    final converting = display.isNotEmpty &&
+        p.holdings.values.every((h) => _fxRateFor(h.currency) > 0);
+    return [
+      for (final h in p.holdings.values)
+        () {
+          final q = _quotes[h.symbol];
+          final fx = converting ? _fxRateFor(h.currency) : 1.0;
+          final price = q?.price ?? 0;
+          final info = _dividendInfo[h.symbol];
+          final rate = info != null && info.ttmPerShare > 0
+              ? info.ttmPerShare
+              : (q?.dividendRate ?? 0);
+          final sector = sectorOf(h.symbol);
+          return HealthPosition(
+            symbol: h.symbol,
+            value: price * h.quantity * fx,
+            annualIncome: rate * h.quantity * fx,
+            sector: sector == 'Other' ? null : sector,
+            type: typeLabelOf(h.symbol),
+            market: marketFor(
+                  symbol: h.symbol,
+                  exchangeCode: q?.exchange,
+                  exchangeName: q?.fullExchangeName,
+                  quoteType: q?.quoteType,
+                ) ??
+                'Other',
+            yield: price > 0 ? rate / price : 0,
+          );
+        }(),
+    ];
+  }
 
   PortfolioTotals totalsFor(Portfolio p) {
     final display = _displayCurrency;
@@ -1194,6 +1362,70 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  /// The bar size the advanced chart uses for each range: intraday bars for
+  /// short ranges so a day or a week still has plenty of candles.
+  static const candleIntervals = {
+    '1d': '5m',
+    '5d': '15m',
+    '1mo': '60m',
+    '3mo': '1d',
+    '6mo': '1d',
+    'ytd': '1d',
+    '1y': '1d',
+    '5y': '1wk',
+    'max': '1mo',
+  };
+
+  /// Full candles (open, high, low, close, volume) for the advanced chart.
+  /// Unlike [symbolHistory], the live last bar is kept: on a short range it
+  /// is the most interesting one.
+  Future<List<ChartPoint>> candles(String symbol, String range) async {
+    final interval = candleIntervals[range] ?? '1d';
+    try {
+      final h = await _yahoo.chartHistory(symbol, range: range, interval: interval);
+      return h?.points ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  final Map<String, ({Quote quote, DateTime at})> _marketQuotes = {};
+
+  /// Quotes for symbols that need not be held (indices, popular stocks),
+  /// cached for a minute. Held and watched symbols use the main quotes.
+  Future<Map<String, Quote>> marketQuotes(Iterable<String> symbols) async {
+    final now = DateTime.now();
+    final out = <String, Quote>{};
+    final missing = <String>{};
+    for (final s in symbols) {
+      final held = _quotes[s];
+      final cached = _marketQuotes[s];
+      if (cached != null && now.difference(cached.at) < const Duration(minutes: 1)) {
+        out[s] = cached.quote;
+      } else if (held != null && now.difference(held.updatedAt) < const Duration(minutes: 1)) {
+        out[s] = held;
+      } else {
+        missing.add(s);
+      }
+    }
+    if (missing.isNotEmpty) {
+      try {
+        final fetched = await _yahoo.quotes(missing);
+        for (final e in fetched.entries) {
+          _marketQuotes[e.key] = (quote: e.value, at: now);
+          out[e.key] = e.value;
+        }
+      } catch (_) {
+        // Fall back to whatever was cached, however old.
+        for (final s in missing) {
+          final q = _marketQuotes[s]?.quote ?? _quotes[s];
+          if (q != null) out[s] = q;
+        }
+      }
+    }
+    return out;
+  }
+
   /// A short recent trend for a symbol, used for the inline sparklines.
   ///
   /// Shares the chart cache with [symbolHistory], so the extra request is
@@ -1364,10 +1596,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
     if (series.isEmpty) return [];
 
-    final union = <int>{
-      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
-    }.toList()
-      ..sort();
+    final union = _sharedTimeline(series);
 
     final pointers = {for (final k in series.keys) k: 0};
     final out = <ChartPoint>[];
@@ -1472,6 +1701,28 @@ class PortfolioProvider extends ChangeNotifier {
     return out;
   }
 
+  /// The sorted timestamps a portfolio series is built on.
+  ///
+  /// Markets stamp their bars at different times of day (crypto at midnight
+  /// UTC, stocks at the open), so the earliest timestamps can have only some
+  /// holdings priced, which drew a cliff at the start of the chart. The
+  /// timeline therefore starts once every holding has a price - unless one
+  /// holding's history is so short (a recent listing) that this would hide
+  /// most of the range, in which case it is kept whole.
+  static List<int> _sharedTimeline(Map<String, List<ChartPoint>> series) {
+    final union = <int>{
+      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
+    }.toList()
+      ..sort();
+    var latestStart = 0;
+    for (final pts in series.values) {
+      final start = pts.first.time.millisecondsSinceEpoch;
+      if (start > latestStart) latestStart = start;
+    }
+    final trimmed = union.where((t) => t >= latestStart).toList();
+    return trimmed.length >= union.length / 2 ? trimmed : union;
+  }
+
   Future<List<ChartPoint>> _buildHistory(String portfolioId, String range) async {
     final p = byId(portfolioId);
     if (p == null || p.holdings.isEmpty) return [];
@@ -1491,10 +1742,7 @@ class PortfolioProvider extends ChangeNotifier {
     }
     if (series.isEmpty) return [];
 
-    final union = <int>{
-      for (final pts in series.values) ...[for (final pt in pts) pt.time.millisecondsSinceEpoch],
-    }.toList()
-      ..sort();
+    final union = _sharedTimeline(series);
 
     final pointers = {for (final k in series.keys) k: 0};
     final out = <ChartPoint>[];
@@ -1518,6 +1766,28 @@ class PortfolioProvider extends ChangeNotifier {
     while (out.isNotEmpty && out.first.close <= 0) {
       out.removeAt(0);
     }
+    return out;
+  }
+
+  /// Each holding's price change over [range], in percent, for the recap.
+  /// Symbols without enough history are left out.
+  Future<Map<String, double>> symbolChanges(Portfolio p, String range) async {
+    final out = <String, double>{};
+    await Future.wait([
+      for (final symbol in p.symbols)
+        () async {
+          try {
+            final h = await _yahoo.chartHistory(symbol, range: range, interval: '1d');
+            final pts = h?.points ?? const <ChartPoint>[];
+            if (pts.length < 2 || pts.first.close <= 0) return;
+            // The live quote is fresher than the last daily bar.
+            final last = _quotes[symbol]?.price ?? pts.last.close;
+            out[symbol] = (last / pts.first.close - 1) * 100;
+          } catch (_) {
+            // Left out of the recap.
+          }
+        }(),
+    ]);
     return out;
   }
 
@@ -1864,6 +2134,7 @@ class PortfolioProvider extends ChangeNotifier {
       'activeIndex': _activeIndex,
       'themeMode': _themeMode.index,
       'portfolios': [for (final p in _portfolios) p.toMap()],
+      'watchlist': [for (final w in _watchlist) w.toMap()],
     };
   }
 
@@ -1874,6 +2145,8 @@ class PortfolioProvider extends ChangeNotifier {
     ];
     if (parsed.isEmpty) return false;
     _portfolios = parsed;
+    // Older backups have no watchlist; keep the current one then.
+    if (data['watchlist'] != null) _watchlist = _parseWatchlist(data['watchlist']);
     _activeIndex = ((data['activeIndex'] as num?) ?? 0).toInt().clamp(0, parsed.length - 1);
     _loaded = true;
     notifyListeners();
@@ -2002,10 +2275,7 @@ class PortfolioProvider extends ChangeNotifier {
       final history = await totalHistory('1mo');
       if (history.length > 1) {
         final values = [for (final p in history) p.close];
-        await StockPulseWidgetService.pushSparkline(
-          points: values,
-          colorValue: 0xFF64EFAE,
-        );
+        await StockPulseWidgetService.pushSparkline(points: values);
       }
     } catch (_) {
       // A missing trend line is not worth failing the update over.
@@ -2019,6 +2289,20 @@ class PortfolioProvider extends ChangeNotifier {
   /// ex-dividend and earnings dates, and price-alert thresholds.
   Future<void> pushWorkerSnapshot() async {
     if (!StockPulseWidgetService.supported) return;
+
+    // Watchlist targets go first: they matter even with no holdings yet.
+    await StockPulseWidgetService.pushWatchTargets([
+      if (_watchAlertsEnabled)
+        for (final w in _watchlist)
+          if (w.hasTargets)
+            (
+              symbol: w.symbol,
+              above: w.above,
+              below: w.below,
+              name: _quotes[w.symbol]?.name ?? '',
+              currency: _quotes[w.symbol]?.currency ?? 'USD',
+            ),
+    ]);
 
     final qtyBySymbol = <String, double>{};
     final curBySymbol = <String, String>{};

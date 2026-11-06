@@ -14,9 +14,26 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterFragmentActivity() {
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.stockpulse/icons")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "current" -> result.success(AppIcons.current(this))
+                    "set" -> {
+                        val name = call.argument<String>("name") ?: ""
+                        result.success(runCatching { AppIcons.set(this, name) }.getOrDefault(false))
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

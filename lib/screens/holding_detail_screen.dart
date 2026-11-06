@@ -18,6 +18,7 @@ import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
 import 'add_edit_holding_sheet.dart';
+import 'advanced_chart_screen.dart';
 import 'sell_holding_dialog.dart';
 
 class HoldingDetailScreen extends StatefulWidget {
@@ -64,6 +65,11 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
       appBar: AppBar(
         title: Text(widget.symbol),
         actions: [
+          IconButton(
+            tooltip: 'Advanced chart',
+            icon: const Icon(Icons.candlestick_chart_outlined),
+            onPressed: () => openAdvancedChart(context, widget.symbol),
+          ),
           IconButton(
             tooltip: 'Sell / reduce position',
             icon: const Icon(Icons.sell_outlined),
@@ -121,6 +127,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                       valueFormatter: (v) => fmtMoney(v, currency: currency),
                     );
                   },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => openAdvancedChart(context, widget.symbol),
+                    icon: const Icon(Icons.candlestick_chart_outlined, size: 18),
+                    label: const Text('Candles, indicators & more'),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _statsGrid(context, provider, holding, quote, info, currency),

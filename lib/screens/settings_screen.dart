@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/ad_service.dart';
+import '../services/pro_service.dart';
 import '../services/diagnostics.dart';
 import '../services/export_service.dart';
 import '../services/sync_service.dart';
@@ -16,8 +19,12 @@ import '../utils/dividend_tax.dart';
 import '../utils/formatters.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/theme_toggle.dart';
+import '../widgets/app_icon_picker.dart';
 import '../widgets/pulse_logo.dart';
+import '../widgets/ui/page_transitions.dart';
+import 'import_screen.dart';
 import 'privacy_screen.dart';
+import 'pro_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -58,22 +65,11 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
         children: [
+          const ProSettingsCard(),
           // Appearance comes first: it is the setting people reach for most
           // often, and it used to be a long way down the list.
           _section(context, 'Appearance'),
-          Card(
-            child: Column(
-              children: [
-                for (final mode in AppThemeId.values)
-                  RadioAdaptiveTile(
-                    groupValue: provider.themeMode,
-                    value: mode,
-                    title: mode.label,
-                    onChanged: (v) => provider.setThemeMode(v),
-                  ),
-              ],
-            ),
-          ),
+          const ThemeGrid(),
           Card(
             margin: const EdgeInsets.only(top: 10),
             child: Padding(
@@ -81,13 +77,19 @@ class SettingsScreen extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Accent color', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
-                Text('Use the same accent across both light and dark palettes.',
+                Text("The first swatch keeps each theme's own colour. Pick another to use it everywhere.",
                   style: theme.textTheme.bodySmall),
                 const SizedBox(height: 12),
                 Wrap(spacing: 12, runSpacing: 12, children: [
                   for (var i = 0; i < AppTheme.accents.length; i++)
                     _AccentChoice(
-                      color: AppTheme.accents[i],
+                      color: i == 0
+                          ? AppTheme.themeFor(provider.themeMode,
+                                  MediaQuery.platformBrightnessOf(context))
+                              .colorScheme
+                              .primary
+                          : AppTheme.accents[i],
+                      auto: i == 0,
                       selected: provider.accentIndex == i,
                       onTap: () => provider.setAccentIndex(i),
                     ),
@@ -95,6 +97,8 @@ class SettingsScreen extends StatelessWidget {
               ]),
             ),
           ),
+
+          const AppIconPicker(),
 
           _section(context, 'Portfolios'),
           for (final p in provider.portfolios)
@@ -287,6 +291,13 @@ class SettingsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.upload_file_outlined),
+                  title: const Text('Import holdings'),
+                  subtitle: const Text('From a broker CSV or a Stock Pulse backup'),
+                  onTap: () => pushSharedAxis(context, const ImportScreen()),
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('Export backup (JSON)'),
@@ -576,6 +587,33 @@ class SettingsScreen extends StatelessWidget {
 
           _section(context, 'About'),
           Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.favorite_outline_rounded),
+                  title: const Text('Tell a friend'),
+                  subtitle: const Text('Share Stock Pulse with someone who invests'),
+                  onTap: () => Share.share(
+                    'I track my stocks and dividends with Stock Pulse: live charts, '
+                    'dividend calendar and widgets, no account needed. '
+                    'https://play.google.com/store/apps/details?id=app.stockpulse',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.star_outline_rounded),
+                  title: const Text('Rate Stock Pulse'),
+                  subtitle: const Text('A quick rating helps other people find the app'),
+                  onTap: () => launchUrl(
+                    Uri.parse('https://play.google.com/store/apps/details?id=app.stockpulse'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -587,7 +625,7 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.5.9',
+                      Text('Stock Pulse v1.6.0',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
@@ -735,6 +773,20 @@ class SettingsScreen extends StatelessWidget {
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
+                // Store builds leave this out, or anyone who found the
+                // panel could unlock Pro for free.
+                if (ctx.read<ProService>().devTools)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('See the app as a Pro user'),
+                  subtitle: Text(
+                    'Developer preview of Pro on this device only. '
+                    'Rewarded ads watched: ${ads.rewardedViews}, '
+                    'est. \$${ads.rewardedRevenueDollars.toStringAsFixed(4)}.',
+                  ),
+                  value: ctx.watch<ProService>().devPro,
+                  onChanged: (v) => ctx.read<ProService>().setDevPro(v),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Test ads on this device'),
@@ -846,15 +898,23 @@ class SettingsScreen extends StatelessWidget {
     return Card(
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.favorite_outline),
-            title: const Text('Stock Pulse is free'),
-            subtitle: const Text(
-              'There is no subscription and nothing to buy. The app is paid '
-              'for by ads from Google, which is why there is no paid tier '
-              'and no ad-free upgrade.',
+          if (ads.adFree)
+            const ListTile(
+              leading: Icon(Icons.verified_outlined),
+              title: Text('No ads: you have Pro'),
+              subtitle: Text('Thank you for supporting Stock Pulse.'),
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.favorite_outline),
+              title: const Text('Stock Pulse is free'),
+              subtitle: const Text(
+                'Ads from Google pay for the free app. A one-time Pro unlock '
+                'removes them for good, with no subscription.',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showProPaywall(context),
             ),
-          ),
           if (ads.privacyOptionsRequired) ...[
             const Divider(height: 1),
             ListTile(
@@ -1133,7 +1193,15 @@ class _AccentChoice extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  const _AccentChoice({required this.color, required this.selected, required this.onTap});
+
+  /// The "theme's own accent" swatch.
+  final bool auto;
+  const _AccentChoice({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+    this.auto = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1152,34 +1220,13 @@ class _AccentChoice extends StatelessWidget {
           ),
           boxShadow: selected ? [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 14)] : null,
         ),
-        child: selected ? const Icon(Icons.check, color: Colors.white) : null,
+        child: selected
+            ? const Icon(Icons.check, color: Colors.white)
+            : auto
+                ? const Icon(Icons.auto_awesome, color: Colors.white, size: 18)
+                : null,
       ),
     );
   }
 }
 
-class RadioAdaptiveTile extends StatelessWidget {
-  final AppThemeId groupValue;
-  final AppThemeId value;
-  final String title;
-  final void Function(AppThemeId) onChanged;
-  const RadioAdaptiveTile({
-    super.key,
-    required this.groupValue,
-    required this.value,
-    required this.title,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RadioListTile<AppThemeId>(
-      title: Text(title),
-      value: value,
-      groupValue: groupValue,
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
-    );
-  }
-}

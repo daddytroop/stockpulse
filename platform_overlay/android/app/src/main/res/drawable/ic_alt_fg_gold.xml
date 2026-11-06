@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Stock Pulse mark, recoloured for the gold icon. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_alt_foreground"
+    android:tint="#F5C451"
+    android:tintMode="src_in"/>

@@ -15,13 +15,19 @@ class AppNavigation extends ChangeNotifier {
     'Portfolio',
     'Dividends',
     'News',
-    'Import',
+    'Markets',
     'Settings',
   ];
 
   static const int portfolioTab = 0;
   static const int dividendsTab = 1;
   static const int newsTab = 2;
+  static const int marketsTab = 3;
+  static const int settingsTab = 4;
+
+  /// Something to do once the main screen is up, chosen on the first-run
+  /// screen: 'add', 'import', 'markets' or 'settings'.
+  String? pendingAction;
 
   void goTo(int index) {
     if (index < 0 || index >= labels.length) return;

@@ -15,6 +15,10 @@ class SpCard extends StatelessWidget {
   final double borderRadius;
   final double borderAlpha;
 
+  /// A soft coloured halo around the card, for the one or two surfaces on a
+  /// screen that deserve attention.
+  final Color? glow;
+
   const SpCard({
     super.key,
     required this.child,
@@ -23,19 +27,22 @@ class SpCard extends StatelessWidget {
     this.backgroundColor,
     this.gradient,
     this.onTap,
-    this.borderRadius = 18,
+    this.borderRadius = 20,
     this.borderAlpha = 0.08,
+    this.glow,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final colors = AppColors.of(context);
+    final isDark = scheme.brightness == Brightness.dark;
     final baseColor = backgroundColor ?? scheme.surface;
+    final radius = BorderRadius.circular(borderRadius);
 
     Widget content = Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius: radius,
         color: gradient == null ? baseColor : null,
         gradient: gradient != null
             ? LinearGradient(
@@ -45,15 +52,22 @@ class SpCard extends StatelessWidget {
               )
             : null,
         border: Border.all(
-          color: scheme.outline.withValues(alpha: borderAlpha),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : scheme.outline.withValues(alpha: borderAlpha),
           width: 1,
         ),
         boxShadow: [
+          if (glow != null)
+            BoxShadow(
+              color: glow!.withValues(alpha: isDark ? .22 : .16),
+              blurRadius: 32,
+              spreadRadius: -4,
+              offset: const Offset(0, 10),
+            ),
           BoxShadow(
-            color: (scheme.brightness == Brightness.dark
-                    ? Colors.black
-                    : colors.shimmerBase)
-                .withValues(alpha: scheme.brightness == Brightness.dark ? .22 : .05),
+            color: (isDark ? Colors.black : colors.shimmerBase)
+                .withValues(alpha: isDark ? .32 : .05),
             blurRadius: 18,
             spreadRadius: 1,
             offset: const Offset(0, 8),
@@ -61,8 +75,23 @@ class SpCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: Padding(padding: padding, child: child),
+        borderRadius: radius,
+        child: isDark
+            // A faint sheen along the top edge, like light catching glass.
+            ? DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.center,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.035),
+                      Colors.white.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                child: Padding(padding: padding, child: child),
+              )
+            : Padding(padding: padding, child: child),
       ),
     );
 

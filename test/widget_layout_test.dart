@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stock_pulse/services/widget_service.dart';
 
 /// Guards the Android home-screen widgets against the two mistakes that
 /// are easy to make and invisible until the widget is on a home screen:
@@ -45,6 +47,43 @@ void main() {
           reason: 'R.id.$id is used by the renderer but no layout defines it',
         );
       }
+    });
+
+    test('the layouts only use views a home-screen widget can show', () {
+      // RemoteViews inflates an allow-list of classes. Anything else (a
+      // plain <View> divider, say) makes the launcher show "Can't load
+      // widget" for the whole widget.
+      const allowed = {
+        'FrameLayout', 'LinearLayout', 'RelativeLayout', 'GridLayout',
+        'TextView', 'ImageView', 'Button', 'ImageButton', 'ProgressBar',
+        'Chronometer', 'AnalogClock', 'TextClock', 'ListView', 'GridView',
+        'StackView', 'AdapterViewFlipper', 'ViewFlipper', 'ViewStub',
+      };
+      final layouts = Directory(layoutDir)
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.xml'));
+      for (final file in layouts) {
+        final tags = RegExp(r'<([A-Za-z][\w.]*)')
+            .allMatches(file.readAsStringSync())
+            .map((m) => m.group(1)!)
+            .where((t) => t != 'merge' && t != 'include');
+        for (final tag in tags) {
+          expect(allowed, contains(tag),
+              reason: '${file.path} uses <$tag>, which widgets cannot inflate');
+        }
+      }
+    });
+
+    test('the trend line is stored as finite values, at most 60', () {
+      final many = [for (var i = 0; i < 200; i++) i.toDouble()];
+      final json = StockPulseWidgetService.sparklinePointsJson(
+          [double.nan, ...many, double.infinity]);
+      final values = (jsonDecode(json) as List).cast<num>();
+      expect(values.length, lessThanOrEqualTo(61));
+      expect(values.first, 0);
+      expect(values.last, 199);
+      expect(StockPulseWidgetService.sparklinePointsJson([1, 2]), '[1.0,2.0]');
     });
 
     test('the layouts define the brand dot and the trend line', () {

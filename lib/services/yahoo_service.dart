@@ -107,7 +107,14 @@ class YahooService {
   /// calls pass the query string pre-built.
   Future<http.Response?> _get(String path, Map<String, String> params,
       {bool withCookie = false, String? rawQuery}) async {
-    final query = rawQuery ?? Uri(queryParameters: params).query;
+    // Cookie-protected endpoints also need the crumb, or Yahoo answers 401.
+    // Raw queries (the batched quotes) already carry it.
+    final query = rawQuery ??
+        Uri(queryParameters: {
+          ...params,
+          if (withCookie && _crumb != null && !params.containsKey('crumb'))
+            'crumb': _crumb!,
+        }).query;
     for (final host in _hosts) {
       try {
         final uri = Uri.parse(_route('https://$host$path?$query'));
@@ -262,14 +269,28 @@ class YahooService {
           : null;
       final times = (res['timestamp'] as List?) ?? const [];
       final closes = (quoteSeries?['close'] as List?) ?? const [];
+      final opens = (quoteSeries?['open'] as List?) ?? const [];
+      final highs = (quoteSeries?['high'] as List?) ?? const [];
+      final lows = (quoteSeries?['low'] as List?) ?? const [];
+      final volumes = (quoteSeries?['volume'] as List?) ?? const [];
+      double? at(List list, int i) =>
+          i < list.length ? (list[i] as num?)?.toDouble() : null;
 
       final points = <ChartPoint>[];
       for (var i = 0; i < times.length && i < closes.length; i++) {
         final c = (closes[i] as num?)?.toDouble();
         if (c == null || c <= 0) continue;
+        final o = at(opens, i);
+        final h = at(highs, i);
+        final l = at(lows, i);
         points.add(ChartPoint(
           DateTime.fromMillisecondsSinceEpoch((times[i] as num).toInt() * 1000),
           c,
+          open: o != null && o > 0 ? o : null,
+          // Guard against odd bars where the high/low miss the close.
+          high: h != null && h > 0 ? (h < c ? c : h) : null,
+          low: l != null && l > 0 ? (l > c ? c : l) : null,
+          volume: at(volumes, i) ?? 0,
         ));
       }
 

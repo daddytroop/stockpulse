@@ -16,6 +16,7 @@ import '../widgets/ad_slot.dart';
 import '../widgets/portfolio_chart.dart';
 import '../widgets/pulse_logo.dart';
 import '../widgets/symbol_avatar.dart';
+import '../widgets/tools_grid.dart';
 import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/kpi_tile.dart';
@@ -82,7 +83,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your money in motion', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              _greeting(),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).hintColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
             const SizedBox(height: 4),
             Row(mainAxisSize: MainAxisSize.min, children: [
               const PulseLogo(size: 30),
@@ -125,46 +132,51 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 child: LinearProgressIndicator(minHeight: 2),
               ),
             _freshnessBanner(context, provider),
-            _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
-            const SizedBox(height: 12),
-            _kpiRow(context, provider, portfolio, totals, currency),
-            const SizedBox(height: 10),
-            WhatsNewCard(
-              provider: provider,
-              portfolio: portfolio,
-              currency: currency,
-            ),
-            const SizedBox(height: 4),
-            _dataProvenance(context, provider),
-            const SizedBox(height: 12),
-            SpCard(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-              child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  Text('Performance', style: Theme.of(context).textTheme.titleLarge),
-                  FilterChip(label: const Text('Compare SPY'), selected: _compare,
-                    onSelected: (v) => setState(() => _compare = v)),
-                  FilterChip(
-                    label: const Text('Total return'),
-                    selected: _totalReturn,
-                    onSelected: (v) => setState(() => _totalReturn = v),
+            // The story first, like a good finance app: what it's worth,
+            // how it got here, then the details. Each block eases in.
+            ..._staggered([
+              _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
+              const SizedBox(height: 12),
+              SpCard(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    Text('Performance', style: Theme.of(context).textTheme.titleLarge),
+                    FilterChip(label: const Text('Compare SPY'), selected: _compare,
+                      onSelected: (v) => setState(() => _compare = v)),
+                    FilterChip(
+                      label: const Text('Total return'),
+                      selected: _totalReturn,
+                      onSelected: (v) => setState(() => _totalReturn = v),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  _chart(context, portfolio, provider, currency),
+                  const SizedBox(height: 10),
+                  _rangeChips(context),
+                  const SizedBox(height: 2),
+                  Text(
+                    _totalReturn
+                        ? 'Value plus every dividend received · drag the chart'
+                        : 'Price only · drag the chart',
+                    style: Theme.of(context).textTheme.labelSmall,
                   ),
-                ]),
-                const SizedBox(height: 10),
-                _chart(context, portfolio, provider, currency),
-                const SizedBox(height: 10),
-                _rangeChips(context),
-                const SizedBox(height: 2),
-                Text(
-                  _totalReturn
-                      ? 'Value plus every dividend received · drag the chart'
-                      : 'Price only · drag the chart',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ],
-            )),
+                ],
+              )),
+              const SizedBox(height: 12),
+              _kpiRow(context, provider, portfolio, totals, currency),
+              const SizedBox(height: 10),
+              WhatsNewCard(
+                provider: provider,
+                portfolio: portfolio,
+                currency: currency,
+              ),
+              const SizedBox(height: 2),
+              const SectionHeader(title: 'Tools'),
+              const ToolsGrid(),
+            ]),
             const SizedBox(height: 12),
             _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
             const SizedBox(height: 12),
@@ -234,13 +246,17 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              // A native ad after the holdings, and a banner at the very end
-              // of the screen. Both sit below the content the user came for.
-              const AdSlot(
-                placement: AdPlacement.holdingsNative,
-                native: true,
-              ),
+              // A native ad after the holdings (inside a long list, see
+              // _groupedHoldings), and a banner at the very end of the
+              // screen. Both sit below the content the user came for.
+              if (holdings.length < _inFeedAdMinHoldings)
+                const AdSlot(
+                  placement: AdPlacement.holdingsNative,
+                  native: true,
+                ),
               const AdSlot(placement: AdPlacement.portfolioBanner),
+              const SizedBox(height: 12),
+              _dataProvenance(context, provider),
               const SizedBox(height: 20),
               Center(
                 child: Text(
@@ -259,6 +275,15 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   }
 
   // ---------------------------------------------------------------------------
+
+  /// A friendly hello that follows the time of day.
+  static String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return 'Up late? Here\'s your portfolio';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
   Widget _portfolioSelector(BuildContext context, PortfolioProvider provider) {
     if (provider.portfolios.length == 1) {
@@ -409,6 +434,21 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     if (by == 'industry' || by == 'sector') {
       provider.ensureProfiles(provider.active.symbols.toSet());
     }
+  }
+
+  /// Fades and lifts [children] in one after another, once, when the
+  /// screen first appears.
+  List<Widget> _staggered(List<Widget> children) {
+    var i = 0;
+    return [
+      for (final c in children)
+        c is SizedBox
+            ? c
+            : c
+                .animate()
+                .fadeIn(delay: (70 * i++).ms, duration: 420.ms, curve: Curves.easeOutCubic)
+                .slideY(begin: .06, end: 0, delay: (70 * (i - 1)).ms, duration: 420.ms, curve: Curves.easeOutCubic),
+    ];
   }
 
   Widget _errorBanner(BuildContext context, String message) {
@@ -633,46 +673,116 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
+    final up = t.dayChange >= 0;
+    final mood = t.hasDayChange ? (up ? colors.gain : colors.loss) : scheme.primary;
 
     return SpCard(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      padding: EdgeInsets.zero,
+      glow: mood,
+      borderRadius: 26,
       gradient: isDark
-          ? [const Color(0xFF12333A), const Color(0xFF0C2027)]
-          : [const Color(0xFFDCF8F1), const Color(0xFFFFFFFF)],
-      child: Column(
+          ? [
+              Color.alphaBlend(mood.withValues(alpha: .10), scheme.surface),
+              scheme.surface,
+              Color.alphaBlend(scheme.tertiary.withValues(alpha: .08), scheme.surface),
+            ]
+          : [
+              Color.alphaBlend(mood.withValues(alpha: .10), Colors.white),
+              Colors.white,
+            ],
+      child: Stack(
+        children: [
+          // A soft orb of the day's colour in the corner.
+          Positioned(
+            right: -60,
+            top: -70,
+            child: IgnorePointer(
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(colors: [
+                    mood.withValues(alpha: isDark ? .28 : .18),
+                    mood.withValues(alpha: 0),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          // A slow band of light that sweeps across the card now and then.
+          const Positioned.fill(child: IgnorePointer(child: _Sheen())),
+          // The signature gradient along the top edge.
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: colors.accentGradient),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Text(
-                'Portfolio value',
-                style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+                'TOTAL BALANCE',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.hintColor,
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               if (sampleMode) ...[
                 const SizedBox(width: 8),
                 Chip(label: const Text('Sample'), visualDensity: VisualDensity.compact),
               ],
               const Spacer(),
-              if (t.hasDayChange) const PulseIndicator(size: 6),
+              if (t.hasDayChange) ...[
+                PulseIndicator(size: 6, color: mood),
+                const SizedBox(width: 6),
+                Text(
+                  'LIVE',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mood,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 6),
-          AnimatedNumber(
-            value: t.marketValue,
-            formatter: (v) => fmtMoney(v, currency: currency),
-            style: theme.textTheme.displayMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
+          const SizedBox(height: 10),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedNumber(
+              value: t.marketValue,
+              formatter: (v) => fmtMoney(v, currency: currency),
+              style: theme.textTheme.displayLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.6,
+                height: 1.05,
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ChangeChip(
-                percent: t.hasDayChange ? t.dayChangePercent : null,
+              _MoodPill(
+                color: mood,
+                icon: !t.hasDayChange
+                    ? Icons.remove
+                    : (up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
                 label: t.hasDayChange
                     ? '${fmtSignedMoney(t.dayChange, currency: currency)} · ${fmtPct(t.dayChangePercent)} today'
                     : 'No change data yet',
@@ -691,21 +801,61 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           ),
         ],
       ),
+          ),
+        ],
+      ),
     );
   }
 
+  /// The chart range picker: one segmented bar, the selected range lit up.
   Widget _rangeChips(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Wrap(
-        spacing: 6,
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: .45),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
         children: [
           for (final e in _rangeLabels.entries)
-            ChoiceChip(
-              label: Text(e.value),
-              selected: _range == e.key,
-              visualDensity: VisualDensity.compact,
-              onSelected: (_) => setState(() => _range = e.key),
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: _range == e.key,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _range = e.key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _range == e.key
+                          ? scheme.primary.withValues(alpha: .16)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _range == e.key
+                            ? scheme.primary.withValues(alpha: .5)
+                            : Colors.transparent,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      e.value,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _range == e.key
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
@@ -753,6 +903,12 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
+  /// A list at least this long carries its native ad after the
+  /// [_inFeedAdAfter]th holding instead of at the end. Few people scroll to
+  /// the bottom of a long list, so an ad there is rarely seen.
+  static const _inFeedAdMinHoldings = 8;
+  static const _inFeedAdAfter = 5;
+
   /// Renders the holdings, grouped into market sections when enabled.
   List<Widget> _groupedHoldings(
     BuildContext context,
@@ -760,9 +916,20 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     String portfolioId,
     List<Holding> holdings,
   ) {
+    final inFeedAd = holdings.length >= _inFeedAdMinHoldings;
+    var tiles = 0;
+    List<Widget> tileWithAd(Holding h) {
+      tiles++;
+      return [
+        _holdingTile(context, provider, portfolioId, h),
+        if (inFeedAd && tiles == _inFeedAdAfter)
+          const AdSlot(placement: AdPlacement.holdingsNative, native: true),
+      ];
+    }
+
     if (!_groupByMarket) {
       return [
-        for (final h in holdings) _holdingTile(context, provider, portfolioId, h),
+        for (final h in holdings) ...tileWithAd(h),
       ];
     }
 
@@ -788,7 +955,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       final group = buckets[market]!;
       widgets.add(_marketHeader(context, market, group.length));
       for (final h in group) {
-        widgets.add(_holdingTile(context, provider, portfolioId, h));
+        widgets.addAll(tileWithAd(h));
       }
     }
     return widgets;
@@ -837,11 +1004,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final dayPct = q?.dayChangePercent;
     final currency = q?.currency ?? h.currency;
     final colors = AppColors.of(context);
+    final narrow = MediaQuery.sizeOf(context).width < 360;
 
     return GestureDetector(
       onLongPress: () => showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
       child: SpCard(
         margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
         onTap: () => pushSharedAxis(
           context,
           HoldingDetailScreen(portfolioId: portfolioId, symbol: h.symbol),
@@ -860,25 +1029,15 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        h.symbol,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _HoldingSparkline(
-                      symbol: h.symbol,
-                      provider: provider,
-                      color: dayPct == null
-                          ? Theme.of(context).hintColor
-                          : (dayPct >= 0 ? colors.gain : colors.loss),
-                    ),
-                  ],
+                Text(
+                  h.symbol,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    letterSpacing: 0.2,
+                  ),
                 ),
                 if (h.name.isNotEmpty)
                   Text(
@@ -894,13 +1053,29 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               ],
             ),
           ),
+          if (!narrow)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: _HoldingSparkline(
+                symbol: h.symbol,
+                provider: provider,
+                color: dayPct == null
+                    ? Theme.of(context).hintColor
+                    : (dayPct >= 0 ? colors.gain : colors.loss),
+              ),
+            ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 fmtMoney(value, currency: currency),
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
               ),
+              const SizedBox(height: 2),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1028,6 +1203,51 @@ class _HoldingSparklineState extends State<_HoldingSparkline> {
   }
 }
 
+/// The day's change on the balance card: a solid, glowing pill in the
+/// colour of the day.
+class _MoodPill extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  const _MoodPill({required this.color, required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 14),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Icon(icon, size: 12, color: Colors.black.withValues(alpha: .8)),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// A small rounded label used for contextual details next to a headline.
 class _Pill extends StatelessWidget {
   final String label;
@@ -1063,6 +1283,65 @@ class _Pill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A soft diagonal band of light that glides across the balance card every
+/// few seconds, like light catching glass. Still when motion is reduced.
+class _Sheen extends StatefulWidget {
+  const _Sheen();
+
+  @override
+  State<_Sheen> createState() => _SheenState();
+}
+
+class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 7000),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        // The sweep takes the first fifth of the cycle; the rest is rest.
+        final t = (_c.value / .2).clamp(0.0, 1.0);
+        if (t <= 0 || t >= 1) return const SizedBox.expand();
+        final x = -1.6 + 3.2 * Curves.easeInOut.transform(t);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(x - .5, -1),
+              end: Alignment(x + .5, 1),
+              colors: [
+                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: isDark ? .07 : .35),
+                Colors.white.withValues(alpha: 0),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

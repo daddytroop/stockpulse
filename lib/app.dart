@@ -5,6 +5,8 @@ import 'providers/portfolio_provider.dart';
 import 'screens/home_shell.dart';
 import 'screens/lock_gate.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/app_navigation.dart';
+import 'services/pro_service.dart';
 import 'theme/app_theme.dart';
 
 class StockPulseApp extends StatelessWidget {
@@ -13,17 +15,28 @@ class StockPulseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PortfolioProvider>();
+    final pro = context.watch<ProService>();
+    // A Pro theme shows as Neon while it is locked (say, after a trial ran
+    // out). The choice itself is kept, so it comes back with Pro.
+    final themeId = provider.themeMode.isPremium && !pro.has(ProFeature.themes)
+        ? AppThemeId.neon
+        : provider.themeMode;
+
+    // The first accent means "the theme's own", so Mint stays mint and
+    // Ocean stays blue unless the user picks something else.
+    final accent = AppTheme.accentFor(provider.accentIndex);
 
     return MaterialApp(
       title: 'Stock Pulse',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.themeFor(provider.themeMode, Brightness.light,
-          accent: AppTheme.accents[provider.accentIndex]),
-      darkTheme: AppTheme.themeFor(provider.themeMode, Brightness.dark,
-          accent: AppTheme.accents[provider.accentIndex]),
-      // Theme selection is handled explicitly so every surface uses the
-      // selected palette instead of only swapping light/dark shells.
-      themeMode: ThemeMode.light,
+      theme: AppTheme.themeFor(themeId, Brightness.light, accent: accent),
+      darkTheme: AppTheme.themeFor(themeId, Brightness.dark, accent: accent),
+      // Only "Follow system" switches with the device. Every other theme is
+      // the same in both slots, so the light slot is used.
+      themeMode: themeId == AppThemeId.system ? ThemeMode.system : ThemeMode.light,
+      // Themes cross-fade (every colour, including the finance colours).
+      themeAnimationDuration: const Duration(milliseconds: 450),
+      themeAnimationCurve: Curves.easeOutCubic,
       builder: (context, child) => LockGate(child: child!),
       home: const RootScreen(),
     );
@@ -39,7 +52,11 @@ class RootScreen extends StatelessWidget {
     final provider = context.watch<PortfolioProvider>();
     if (!provider.showsOnboarding) {
       return OnboardingScreen(
-        onAction: (_) => provider.completeOnboarding(),
+        // The main screen carries out the choice once it is up.
+        onAction: (action) {
+          context.read<AppNavigation>().pendingAction = action;
+          provider.completeOnboarding();
+        },
         onDone: provider.completeOnboarding,
       );
     }

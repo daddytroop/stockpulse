@@ -6,6 +6,7 @@ import '../models/portfolio.dart';
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/ad_service.dart';
+import '../services/pro_service.dart';
 import '../services/calendar_service.dart';
 import '../services/export_service.dart';
 import '../theme/app_colors.dart';
@@ -20,6 +21,8 @@ import '../widgets/ui/section_header.dart';
 import '../widgets/ui/sp_card.dart';
 import '../widgets/ui/theme_toggle.dart';
 import 'holding_detail_screen.dart';
+import 'pro_screen.dart';
+import 'snowball_screen.dart';
 
 class _SampleCallout extends StatelessWidget {
   const _SampleCallout();
@@ -148,6 +151,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
                   child: LinearProgressIndicator(value: provider.dividendsProgress, minHeight: 3),
                 ),
               _incomeHero(context, provider, portfolio, totals, next30, currency, colors),
+              if (totals.annualIncome > 0) _snowballTeaser(context, colors),
               const SizedBox(height: 12),
               _incomeFrequencyGrid(context, provider, portfolio, totals, currency),
               const SizedBox(height: 12),
@@ -217,6 +221,31 @@ class _DividendsScreenState extends State<DividendsScreen> {
             ],
           ),
           )),
+        ],
+      ),
+    );
+  }
+
+  /// Points from today's income to where it could go (the Pro snowball).
+  Widget _snowballTeaser(BuildContext context, AppColors colors) {
+    final locked = !context.watch<ProService>().has(ProFeature.snowball);
+    return SpCard(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      onTap: () => openProFeature(context, ProFeature.snowball, () => const SnowballScreen()),
+      child: Row(
+        children: [
+          Icon(Icons.ac_unit_rounded, color: colors.dividend),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Where could this income be in 10 years?',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (locked) const ProBadge(locked: true),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right),
         ],
       ),
     );

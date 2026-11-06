@@ -32,8 +32,9 @@ String currencySymbol(String? code) {
 String fmtSignedMoney(num? v, {required String? currency}) {
   if (v == null) return '–';
   if (PrivacyMode.hideBalances) return hiddenAmount;
-  final sign = v > 0 ? '+' : '';
-  return '$sign${fmtMoney(v, currency: currency)}';
+  // The sign goes before the currency symbol: -$68.51, not $-68.51.
+  final sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+  return '$sign${fmtMoney(v.abs(), currency: currency)}';
 }
 
 String fmtPct(num? v, {bool signed = true}) {

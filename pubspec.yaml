@@ -3,7 +3,7 @@ description: >-
   Stock Pulse - a free, open-source portfolio & dividend tracker for
   Android (APK + home-screen widgets) and Windows desktop.
 publish_to: 'none'
-version: 1.5.9+18
+version: 1.6.0+19
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
@@ -50,6 +50,11 @@ dependencies:
 
   # Easy declarative animations
   flutter_animate: ^4.5.2
+  # Play Billing for the one-time Pro unlock. The range is wide on purpose:
+  # CI builds with an older Flutter and resolves an older compatible release.
+  in_app_purchase: ">=3.2.0 <4.0.0"
+  # Google Play's own rating prompt (shown at most once, at a good moment).
+  in_app_review: ">=2.0.9 <3.0.0"
 
 dev_dependencies:
   flutter_test:
