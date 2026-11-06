@@ -269,14 +269,28 @@ class YahooService {
           : null;
       final times = (res['timestamp'] as List?) ?? const [];
       final closes = (quoteSeries?['close'] as List?) ?? const [];
+      final opens = (quoteSeries?['open'] as List?) ?? const [];
+      final highs = (quoteSeries?['high'] as List?) ?? const [];
+      final lows = (quoteSeries?['low'] as List?) ?? const [];
+      final volumes = (quoteSeries?['volume'] as List?) ?? const [];
+      double? at(List list, int i) =>
+          i < list.length ? (list[i] as num?)?.toDouble() : null;
 
       final points = <ChartPoint>[];
       for (var i = 0; i < times.length && i < closes.length; i++) {
         final c = (closes[i] as num?)?.toDouble();
         if (c == null || c <= 0) continue;
+        final o = at(opens, i);
+        final h = at(highs, i);
+        final l = at(lows, i);
         points.add(ChartPoint(
           DateTime.fromMillisecondsSinceEpoch((times[i] as num).toInt() * 1000),
           c,
+          open: o != null && o > 0 ? o : null,
+          // Guard against odd bars where the high/low miss the close.
+          high: h != null && h > 0 ? (h < c ? c : h) : null,
+          low: l != null && l > 0 ? (l > c ? c : l) : null,
+          volume: at(volumes, i) ?? 0,
         ));
       }
 

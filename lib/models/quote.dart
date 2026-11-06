@@ -176,12 +176,30 @@ class Quote {
       ms == null || ms <= 0 ? null : DateTime.fromMillisecondsSinceEpoch(ms.toInt() * 1000);
 }
 
-/// One point of a price history series.
+/// One point of a price history series: a full candle when the source has
+/// one, otherwise just the close (open/high/low then equal the close).
 @immutable
 class ChartPoint {
   final DateTime time;
   final double close;
-  const ChartPoint(this.time, this.close);
+  final double open;
+  final double high;
+  final double low;
+  final double volume;
+
+  const ChartPoint(
+    this.time,
+    this.close, {
+    double? open,
+    double? high,
+    double? low,
+    this.volume = 0,
+  })  : open = open ?? close,
+        high = high ?? close,
+        low = low ?? close;
+
+  /// Whether the candle closed at or above where it opened.
+  bool get isUp => close >= open;
 }
 
 /// Result of a yahoo symbol search.

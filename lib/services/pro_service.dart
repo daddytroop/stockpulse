@@ -15,7 +15,8 @@ enum ProFeature {
   snowball('snowball'),
   insights('insights'),
   watchlist('watchlist'),
-  themes('themes');
+  themes('themes'),
+  charts('charts');
 
   const ProFeature(this.id);
 
@@ -27,6 +28,7 @@ enum ProFeature {
         ProFeature.insights => 'Portfolio health',
         ProFeature.watchlist => 'Unlimited watchlist & target alerts',
         ProFeature.themes => 'Exclusive themes & app icons',
+        ProFeature.charts => 'Pro chart studies',
       };
 
   String get blurb => switch (this) {
@@ -38,6 +40,8 @@ enum ProFeature {
           'Follow any number of stocks and get a notification when they hit your price.',
         ProFeature.themes =>
           'Gold, Aurora and Sakura themes, plus alternate home-screen icons.',
+        ProFeature.charts =>
+          'RSI, MACD and Bollinger bands on the advanced chart, for every stock and range.',
       };
 
   IconData get icon => switch (this) {
@@ -45,6 +49,7 @@ enum ProFeature {
         ProFeature.insights => Icons.health_and_safety_outlined,
         ProFeature.watchlist => Icons.notifications_active_outlined,
         ProFeature.themes => Icons.palette_outlined,
+        ProFeature.charts => Icons.candlestick_chart_outlined,
       };
 }
 

@@ -52,7 +52,7 @@ void main() {
     // still capture them for completeness.
     await go(Icons.event_outlined, '02_dividends');
     await go(Icons.newspaper_outlined, '03_news');
-    await go(Icons.upload_file_outlined, '04_import');
+    await go(Icons.candlestick_chart_outlined, '04_markets');
     await go(Icons.settings_outlined, '05_settings');
   });
 }

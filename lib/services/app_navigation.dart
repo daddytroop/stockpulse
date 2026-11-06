@@ -15,13 +15,14 @@ class AppNavigation extends ChangeNotifier {
     'Portfolio',
     'Dividends',
     'News',
-    'Import',
+    'Markets',
     'Settings',
   ];
 
   static const int portfolioTab = 0;
   static const int dividendsTab = 1;
   static const int newsTab = 2;
+  static const int marketsTab = 3;
 
   void goTo(int index) {
     if (index < 0 || index >= labels.length) return;

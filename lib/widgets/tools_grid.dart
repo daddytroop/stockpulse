@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
+import '../screens/advanced_chart_screen.dart';
 import '../screens/insights_screen.dart';
 import '../screens/pro_screen.dart';
 import '../screens/recap_screen.dart';
@@ -48,6 +49,17 @@ class ToolsGrid extends StatelessWidget {
         onTap: () => pushSharedAxis(context, const WatchlistScreen()),
       ),
       _Tool(
+        icon: Icons.candlestick_chart_outlined,
+        title: 'Advanced charts',
+        subtitle: 'Candles, RSI, MACD & more',
+        colors: const [Color(0xFF22D3EE), Color(0xFF7C5CFF)],
+        locked: false,
+        onTap: () {
+          final held = context.read<PortfolioProvider>().active.symbols;
+          openAdvancedChart(context, held.isEmpty ? 'SPY' : held.first);
+        },
+      ),
+      _Tool(
         icon: Icons.ios_share_rounded,
         title: 'Share recap',
         subtitle: 'Your month in a picture',
@@ -65,7 +77,16 @@ class ToolsGrid extends StatelessWidget {
         return Wrap(
           spacing: gap,
           runSpacing: gap,
-          children: [for (final t in tools) SizedBox(width: width, child: t)],
+          children: [
+            for (var i = 0; i < tools.length; i++)
+              SizedBox(
+                // An odd tile out spans the row instead of leaving a gap.
+                width: i == tools.length - 1 && tools.length % columns != 0
+                    ? constraints.maxWidth
+                    : width,
+                child: tools[i],
+              ),
+          ],
         );
       },
     );

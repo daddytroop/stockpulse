@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/app_navigation.dart';
 import 'dividends_screen.dart';
-import 'import_screen.dart';
+import 'markets_screen.dart';
 import 'news_screen.dart';
 import 'portfolio_screen.dart';
 import 'settings_screen.dart';
@@ -28,7 +28,7 @@ class _HomeShellState extends State<HomeShell> {
     Icons.account_balance_wallet_outlined,
     Icons.event_outlined,
     Icons.newspaper_outlined,
-    Icons.upload_file_outlined,
+    Icons.candlestick_chart_outlined,
     Icons.settings_outlined,
   ];
 
@@ -72,7 +72,7 @@ class _HomeShellState extends State<HomeShell> {
       case 2:
         return const NewsScreen();
       case 3:
-        return const ImportScreen(embedded: true);
+        return const MarketsScreen();
       case 4:
       default:
         return const SettingsScreen();
@@ -185,7 +185,7 @@ class _HomeShellState extends State<HomeShell> {
     Icons.account_balance_wallet,
     Icons.event,
     Icons.newspaper,
-    Icons.upload_file,
+    Icons.candlestick_chart,
     Icons.settings,
   ];
 }

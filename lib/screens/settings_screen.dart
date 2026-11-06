@@ -19,6 +19,8 @@ import '../widgets/ui/section_header.dart';
 import '../widgets/ui/theme_toggle.dart';
 import '../widgets/app_icon_picker.dart';
 import '../widgets/pulse_logo.dart';
+import '../widgets/ui/page_transitions.dart';
+import 'import_screen.dart';
 import 'privacy_screen.dart';
 import 'pro_screen.dart';
 
@@ -287,6 +289,13 @@ class SettingsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.upload_file_outlined),
+                  title: const Text('Import holdings'),
+                  subtitle: const Text('From a broker CSV or a Stock Pulse backup'),
+                  onTap: () => pushSharedAxis(context, const ImportScreen()),
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('Export backup (JSON)'),

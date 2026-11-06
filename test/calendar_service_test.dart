@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:stock_pulse/providers/portfolio_provider.dart';
 import 'package:stock_pulse/services/calendar_service.dart';
 
@@ -22,6 +23,14 @@ UpcomingEvent _event({
   );
 }
 
+/// A day [n] days from today, so the tests never fall into the past.
+DateTime _day(int n) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day + n);
+}
+
+String _ymd(DateTime d) => DateFormat('yyyyMMdd').format(d);
+
 void main() {
   group('calendar export', () {
     test('an empty list produces no file', () {
@@ -35,14 +44,14 @@ void main() {
 
     test('a dividend becomes an all-day event', () {
       final ics = CalendarService.buildIcs(
-        events: [_event(date: DateTime(2026, 11, 5))],
+        events: [_event(date: _day(5))],
         currency: 'CAD',
       );
       expect(ics, contains('BEGIN:VCALENDAR'));
       expect(ics, contains('VERSION:2.0'));
       expect(ics, contains('BEGIN:VEVENT'));
-      expect(ics, contains('DTSTART;VALUE=DATE:20261105'));
-      expect(ics, contains('DTEND;VALUE=DATE:20261106'));
+      expect(ics, contains("DTSTART;VALUE=DATE:${_ymd(_day(5))}"));
+      expect(ics, contains("DTEND;VALUE=DATE:${_ymd(_day(6))}"));
       expect(ics, contains('SUMMARY:RY.TO dividend'));
       expect(ics, contains('END:VCALENDAR'));
     });
@@ -50,25 +59,25 @@ void main() {
     test('earnings are included as their own event', () {
       final ics = CalendarService.buildIcs(
         events: [
-          _event(symbol: 'AAPL', kind: 'earnings', date: DateTime(2026, 11, 6)),
+          _event(symbol: 'AAPL', kind: 'earnings', date: _day(6)),
         ],
         currency: 'USD',
       );
       expect(ics, contains('SUMMARY:AAPL earnings'));
-      expect(ics, contains('DTSTART;VALUE=DATE:20261106'));
+      expect(ics, contains("DTSTART;VALUE=DATE:${_ymd(_day(6))}"));
     });
 
     test('a payment date is not a second event', () {
       final ics = CalendarService.buildIcs(
         events: [
-          _event(date: DateTime(2026, 11, 5)),
-          _event(date: DateTime(2026, 11, 20), isPayDate: true),
+          _event(date: _day(5)),
+          _event(date: _day(20), isPayDate: true),
         ],
         currency: 'CAD',
       );
       expect('BEGIN:VEVENT'.allMatches(ics).length, 1);
       // The payment date is described on the ex-dividend entry.
-      expect(ics, contains('pays 20 Nov 2026'));
+      expect(ics, contains("pays ${DateFormat('d MMM yyyy').format(_day(20))}"));
     });
 
     test('special characters are escaped', () {

@@ -49,8 +49,8 @@ void main() {
       final seen = <String, AppThemeId>{};
       for (final id in AppThemeId.values.where((i) => i != AppThemeId.system)) {
         final t = AppTheme.themeFor(id, Brightness.light);
-        final key = '${t.scaffoldBackgroundColor.toARGB32()}/'
-            '${t.colorScheme.primary.toARGB32()}';
+        final key = '${t.scaffoldBackgroundColor}/'
+            '${t.colorScheme.primary}';
         expect(seen[key], isNull, reason: '$id looks the same as ${seen[key]}');
         seen[key] = id;
       }

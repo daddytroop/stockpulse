@@ -12,6 +12,7 @@ import '../utils/formatters.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/sp_card.dart';
+import 'advanced_chart_screen.dart';
 import 'pro_screen.dart';
 
 /// Stocks the user follows without owning them.
@@ -33,7 +34,7 @@ class WatchlistScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _SymbolSearchSheet(provider: provider),
+      builder: (_) => SymbolSearchSheet(provider: provider),
     );
     if (symbol != null) await provider.addToWatchlist(symbol);
   }
@@ -221,6 +222,12 @@ class _WatchTile extends StatelessWidget {
                 if (pct != null) ChangeChip(percent: pct, label: fmtPct(pct)),
               ],
             ),
+            IconButton(
+              tooltip: 'Chart',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.candlestick_chart_outlined),
+              onPressed: () => openAdvancedChart(context, item.symbol),
+            ),
           ],
         ),
       ),
@@ -228,17 +235,20 @@ class _WatchTile extends StatelessWidget {
   }
 }
 
-/// Finds a symbol to follow.
-class _SymbolSearchSheet extends StatefulWidget {
+/// Finds a symbol: to follow, or (with [forChart]) to open on the chart.
+class SymbolSearchSheet extends StatefulWidget {
   final PortfolioProvider provider;
 
-  const _SymbolSearchSheet({required this.provider});
+  /// Shows a chart icon instead of the follow state.
+  final bool forChart;
+
+  const SymbolSearchSheet({super.key, required this.provider, this.forChart = false});
 
   @override
-  State<_SymbolSearchSheet> createState() => _SymbolSearchSheetState();
+  State<SymbolSearchSheet> createState() => SymbolSearchSheetState();
 }
 
-class _SymbolSearchSheetState extends State<_SymbolSearchSheet> {
+class SymbolSearchSheetState extends State<SymbolSearchSheet> {
   Timer? _debounce;
   List<SearchResult> _results = const [];
   bool _searching = false;
@@ -315,7 +325,9 @@ class _SymbolSearchSheetState extends State<_SymbolSearchSheet> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: widget.provider.isWatched(r.symbol)
+                      trailing: widget.forChart
+                          ? const Icon(Icons.candlestick_chart_outlined)
+                          : widget.provider.isWatched(r.symbol)
                           ? Icon(Icons.check_rounded, color: theme.colorScheme.primary)
                           : const Icon(Icons.add_rounded),
                       onTap: () => Navigator.pop(context, r.symbol),
@@ -415,4 +427,15 @@ class _TargetSheetState extends State<_TargetSheet> {
       ),
     );
   }
+}
+
+/// Asks for any stock, ETF or crypto symbol. Null when cancelled.
+Future<String?> pickSymbol(BuildContext context, {bool forChart = true}) {
+  final provider = context.read<PortfolioProvider>();
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => SymbolSearchSheet(provider: provider, forChart: forChart),
+  );
 }

@@ -1314,6 +1314,70 @@ class PortfolioProvider extends ChangeNotifier {
     }
   }
 
+  /// The bar size the advanced chart uses for each range: intraday bars for
+  /// short ranges so a day or a week still has plenty of candles.
+  static const candleIntervals = {
+    '1d': '5m',
+    '5d': '15m',
+    '1mo': '60m',
+    '3mo': '1d',
+    '6mo': '1d',
+    'ytd': '1d',
+    '1y': '1d',
+    '5y': '1wk',
+    'max': '1mo',
+  };
+
+  /// Full candles (open, high, low, close, volume) for the advanced chart.
+  /// Unlike [symbolHistory], the live last bar is kept: on a short range it
+  /// is the most interesting one.
+  Future<List<ChartPoint>> candles(String symbol, String range) async {
+    final interval = candleIntervals[range] ?? '1d';
+    try {
+      final h = await _yahoo.chartHistory(symbol, range: range, interval: interval);
+      return h?.points ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  final Map<String, ({Quote quote, DateTime at})> _marketQuotes = {};
+
+  /// Quotes for symbols that need not be held (indices, popular stocks),
+  /// cached for a minute. Held and watched symbols use the main quotes.
+  Future<Map<String, Quote>> marketQuotes(Iterable<String> symbols) async {
+    final now = DateTime.now();
+    final out = <String, Quote>{};
+    final missing = <String>{};
+    for (final s in symbols) {
+      final held = _quotes[s];
+      final cached = _marketQuotes[s];
+      if (cached != null && now.difference(cached.at) < const Duration(minutes: 1)) {
+        out[s] = cached.quote;
+      } else if (held != null && now.difference(held.updatedAt) < const Duration(minutes: 1)) {
+        out[s] = held;
+      } else {
+        missing.add(s);
+      }
+    }
+    if (missing.isNotEmpty) {
+      try {
+        final fetched = await _yahoo.quotes(missing);
+        for (final e in fetched.entries) {
+          _marketQuotes[e.key] = (quote: e.value, at: now);
+          out[e.key] = e.value;
+        }
+      } catch (_) {
+        // Fall back to whatever was cached, however old.
+        for (final s in missing) {
+          final q = _marketQuotes[s]?.quote ?? _quotes[s];
+          if (q != null) out[s] = q;
+        }
+      }
+    }
+    return out;
+  }
+
   /// A short recent trend for a symbol, used for the inline sparklines.
   ///
   /// Shares the chart cache with [symbolHistory], so the extra request is
