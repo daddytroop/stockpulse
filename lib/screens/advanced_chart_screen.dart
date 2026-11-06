@@ -274,7 +274,11 @@ class _AdvancedChartScreenState extends State<AdvancedChartScreen> {
     final colors = AppColors.of(context);
     final scrub = _scrub;
     final price = scrub?.close ?? quote?.price ?? (points.isNotEmpty ? points.last.close : 0);
-    final base = points.isNotEmpty ? points.first.close : null;
+    // "Today" is measured from yesterday's close, like every quote screen;
+    // longer ranges from the first bar shown.
+    final base = _range == '1d' && (quote?.previousClose ?? 0) > 0
+        ? quote!.previousClose
+        : (points.isNotEmpty ? points.first.close : null);
     final change = base == null ? null : price - base;
     final pct = base == null || base == 0 ? null : change! / base * 100;
     final up = (change ?? 0) >= 0;

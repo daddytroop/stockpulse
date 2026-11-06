@@ -218,7 +218,12 @@ class PortfolioProvider extends ChangeNotifier {
   }
   bool get crashDiagnostics => _crashDiagnostics;
   bool get backupReminderDue {
-    if (_portfolios.every((p) => p.holdings.isEmpty)) return false;
+    // Only once there is something of the user's own to lose, and not in
+    // the first few visits: a nag on day one is a poor welcome.
+    final ownHoldings = _portfolios
+        .where((p) => !p.name.startsWith('Sample'))
+        .any((p) => p.holdings.isNotEmpty);
+    if (!ownHoldings || _appOpens < 3) return false;
     final at = _lastBackupReminderAt;
     return at == null || DateTime.now().difference(at) >= const Duration(days: 30);
   }
