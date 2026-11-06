@@ -497,6 +497,10 @@ class AdService extends ChangeNotifier {
                 debugPrint('Consent form failed: ${formError.message}');
               }
               if (!consent.isCompleted) consent.complete();
+              // People take longer than the start-up wait to read the
+              // form, so the answer is always re-read when it closes; the
+              // change lets every waiting ad slot try again.
+              _checkConsent();
             });
           } catch (_) {
             if (!consent.isCompleted) consent.complete();
