@@ -7,6 +7,7 @@ import 'package:stock_pulse/screens/settings_screen.dart';
 import 'package:stock_pulse/services/ad_service.dart';
 import 'package:stock_pulse/services/pro_service.dart';
 import 'package:stock_pulse/services/store.dart';
+import 'package:stock_pulse/theme/app_colors.dart';
 import 'package:stock_pulse/theme/app_theme.dart';
 import 'package:stock_pulse/widgets/ui/theme_toggle.dart';
 
@@ -43,7 +44,61 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  group('palettes', () {
+    test('every theme looks different from every other', () {
+      final seen = <String, AppThemeId>{};
+      for (final id in AppThemeId.values.where((i) => i != AppThemeId.system)) {
+        final t = AppTheme.themeFor(id, Brightness.light);
+        final key = '${t.scaffoldBackgroundColor.toARGB32()}/'
+            '${t.colorScheme.primary.toARGB32()}';
+        expect(seen[key], isNull, reason: '$id looks the same as ${seen[key]}');
+        seen[key] = id;
+      }
+    });
+
+    test('gains are green and losses red in every theme', () {
+      for (final id in AppThemeId.values) {
+        for (final b in Brightness.values) {
+          final c = AppTheme.themeFor(id, b).extension<AppColors>()!;
+          final gainHue = HSLColor.fromColor(c.gain).hue;
+          final lossHue = HSLColor.fromColor(c.loss).hue;
+          expect(gainHue, inInclusiveRange(120, 170), reason: '$id gain');
+          expect(lossHue < 15 || lossHue > 330, isTrue, reason: '$id loss');
+        }
+      }
+    });
+
+    test('the default accent keeps each theme its own colour', () {
+      expect(AppTheme.accentFor(0), isNull);
+      expect(AppTheme.themeFor(AppThemeId.mint, Brightness.light).colorScheme.primary,
+          isNot(AppTheme.themeFor(AppThemeId.ocean, Brightness.light).colorScheme.primary));
+      expect(AppTheme.themeFor(AppThemeId.ocean, Brightness.light).brightness,
+          Brightness.dark);
+    });
+
+    test('follow system resolves with the device brightness', () {
+      expect(AppTheme.themeFor(AppThemeId.system, Brightness.dark).brightness,
+          Brightness.dark);
+      expect(AppTheme.themeFor(AppThemeId.system, Brightness.light).brightness,
+          Brightness.light);
+    });
+  });
+
   group('theme', () {
+    testWidgets('follow system switches with the device', (tester) async {
+      final provider = PortfolioProvider(store: _MemoryStore());
+      await provider.load();
+      await provider.setThemeMode(AppThemeId.system);
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      await tester.pumpWidget(wrap(StockPulseApp(), provider));
+      await settle(tester);
+
+      final captured = tester.element(find.byType(Scaffold).first);
+      expect(Theme.of(captured).brightness, Brightness.dark);
+    });
+
     testWidgets('tapping a theme in the settings changes the theme', (tester) async {
       final provider = PortfolioProvider(store: _MemoryStore());
       await provider.load();

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// Visual themes for Stock Pulse. Themes are intentionally named instead of
-/// just light/dark so accents, contrast, and surface depth can feel distinct.
+/// Visual themes for Stock Pulse. Every theme is a hand-tuned palette, not
+/// a generated one, so each looks clearly different from the others.
 enum AppThemeId {
   system,
   light,
@@ -39,6 +39,20 @@ enum AppThemeId {
         AppThemeId.sakura => 'Sakura',
       };
 
+  /// One line describing the theme in the picker.
+  String get blurb => switch (this) {
+        AppThemeId.system => 'Light by day, dark by night',
+        AppThemeId.light => 'Crisp and bright',
+        AppThemeId.dark => 'Easy on the eyes',
+        AppThemeId.amoled => 'True black, saves battery',
+        AppThemeId.mint => 'Fresh green on white',
+        AppThemeId.ocean => 'Deep blue sea',
+        AppThemeId.neon => 'Electric glow',
+        AppThemeId.gold => 'Black and gold',
+        AppThemeId.aurora => 'Northern lights',
+        AppThemeId.sakura => 'Cherry blossom',
+      };
+
   /// The order the picker lists the themes in: the signature look first,
   /// the Pro themes last.
   static const pickerOrder = [
@@ -49,6 +63,8 @@ enum AppThemeId {
 class AppTheme {
   AppTheme._();
 
+  /// Accent colours the user can pick. The first entry means "the theme's
+  /// own accent"; the swatch shown for it is only a stand-in.
   static const accents = [
     Color(0xFF14B8A6),
     Color(0xFF2563EB),
@@ -60,66 +76,34 @@ class AppTheme {
     Color(0xFFEAB308),
   ];
 
+  /// The accent for a saved accent index: null for the theme's own.
+  static Color? accentFor(int index) =>
+      index <= 0 || index >= accents.length ? null : accents[index];
+
+  /// The theme for [id]. "Follow system" resolves with [platformBrightness].
   static ThemeData themeFor(AppThemeId id, Brightness platformBrightness,
       {Color? accent}) {
     final effective = id == AppThemeId.system
         ? (platformBrightness == Brightness.dark ? AppThemeId.dark : AppThemeId.light)
         : id;
-    final seed = accent ?? _defaultAccent(effective);
     return switch (effective) {
-      AppThemeId.system || AppThemeId.light => _custom(seed, Brightness.light),
-      AppThemeId.dark => _custom(seed, Brightness.dark),
-      AppThemeId.amoled => amoled(seed),
-      AppThemeId.mint => mint(seed),
-      AppThemeId.ocean => ocean(seed),
-      AppThemeId.neon =>
-        neon(accent == null || accent == accents.first ? null : accent),
+      AppThemeId.system || AppThemeId.light => light(accent),
+      AppThemeId.dark => dark(accent),
+      AppThemeId.amoled => amoled(accent),
+      AppThemeId.mint => mint(accent),
+      AppThemeId.ocean => ocean(accent),
+      AppThemeId.neon => neon(accent),
       AppThemeId.gold => gold(),
       AppThemeId.aurora => aurora(),
       AppThemeId.sakura => sakura(),
     };
   }
 
-  static Color _defaultAccent(AppThemeId id) => switch (id) {
-        AppThemeId.mint => const Color(0xFF00A878),
-        AppThemeId.ocean => const Color(0xFF2563EB),
-        AppThemeId.amoled => const Color(0xFF34D399),
-        _ => accents.first,
-      };
+  /// Whether [id] is a dark theme (for "Follow system", on a light device).
+  static bool isDarkTheme(AppThemeId id) =>
+      themeFor(id, Brightness.light).brightness == Brightness.dark;
 
-  static ThemeData _custom(Color seed, Brightness brightness) => _build(
-        ColorScheme.fromSeed(seedColor: seed, brightness: brightness, surface: brightness == Brightness.dark ? const Color(0xFF111A1F) : Colors.white),
-      );
-
-  static ThemeData light() => _build(_scheme(const Color(0xFF14B8A6), Brightness.light));
-
-  static ThemeData dark() => _build(_scheme(const Color(0xFF2DD4BF), Brightness.dark));
-
-  static ThemeData amoled([Color seed = const Color(0xFF34D399)]) => _build(
-        _scheme(seed, Brightness.dark)
-            .copyWith(surface: Colors.black, surfaceContainer: Colors.black),
-        amoled: true,
-      );
-
-  static ThemeData mint([Color seed = const Color(0xFF00A878)]) => _build(
-        ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.light,
-          surface: const Color(0xFFF4FFFA),
-        ),
-        background: const Color(0xFFEEFAFA),
-      );
-
-  static ThemeData ocean([Color seed = const Color(0xFF2563EB)]) => _build(
-        ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF0B1220),
-        ),
-        background: const Color(0xFF070B14),
-      );
-
-  // The neon palette.
+  // The neon palette, also used by the Pro page.
   static const neonBackground = Color(0xFF060912);
   static const neonSurface = Color(0xFF0E1424);
   static const neonSurfaceHigh = Color(0xFF161E33);
@@ -132,9 +116,91 @@ class AppTheme {
   /// The signature gradient used for hero surfaces and highlights.
   static const neonGradient = [neonMint, neonCyan, neonViolet];
 
+  static ThemeData light([Color? accent]) => _palette(
+        brightness: Brightness.light,
+        primary: accent ?? const Color(0xFF0D9488),
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF0284C7),
+        tertiary: const Color(0xFF7C3AED),
+        background: const Color(0xFFF4F6FA),
+        surface: Colors.white,
+        surfaceHigh: const Color(0xFFEEF2F7),
+        surfaceHighest: const Color(0xFFE3E8F0),
+        text: const Color(0xFF0B1220),
+        muted: const Color(0xFF5B6577),
+        outline: const Color(0xFFC3CBD7),
+        outlineVariant: const Color(0xFFE2E7EE),
+      );
+
+  static ThemeData dark([Color? accent]) => _palette(
+        brightness: Brightness.dark,
+        primary: accent ?? const Color(0xFF2DD4BF),
+        onPrimary: const Color(0xFF04201C),
+        secondary: const Color(0xFF60A5FA),
+        tertiary: const Color(0xFFA78BFA),
+        background: const Color(0xFF0B0F14),
+        surface: const Color(0xFF131922),
+        surfaceHigh: const Color(0xFF1A222D),
+        surfaceHighest: const Color(0xFF232D3A),
+        text: const Color(0xFFE8EDF4),
+        muted: const Color(0xFF8D98A8),
+        outline: const Color(0xFF3A4554),
+        outlineVariant: const Color(0xFF232C38),
+      );
+
+  static ThemeData amoled([Color? accent]) => _palette(
+        brightness: Brightness.dark,
+        primary: accent ?? const Color(0xFF34D399),
+        onPrimary: const Color(0xFF00180F),
+        secondary: const Color(0xFF22D3EE),
+        tertiary: const Color(0xFFA78BFA),
+        background: Colors.black,
+        surface: const Color(0xFF0A0A0B),
+        surfaceHigh: const Color(0xFF141416),
+        surfaceHighest: const Color(0xFF1D1D20),
+        text: const Color(0xFFF2F2F2),
+        muted: const Color(0xFF8A8A8F),
+        outline: const Color(0xFF34343A),
+        outlineVariant: const Color(0xFF1C1C20),
+      );
+
+  static ThemeData mint([Color? accent]) => _palette(
+        brightness: Brightness.light,
+        primary: accent ?? const Color(0xFF00A878),
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF14B8A6),
+        tertiary: const Color(0xFF0EA5E9),
+        background: const Color(0xFFE9FAF2),
+        surface: const Color(0xFFFBFFFD),
+        surfaceHigh: const Color(0xFFE0F6EB),
+        surfaceHighest: const Color(0xFFCFEFDF),
+        text: const Color(0xFF06281D),
+        muted: const Color(0xFF4A6B5E),
+        outline: const Color(0xFFB2DAC8),
+        outlineVariant: const Color(0xFFD3EEE1),
+      );
+
+  static ThemeData ocean([Color? accent]) => _palette(
+        brightness: Brightness.dark,
+        primary: accent ?? const Color(0xFF38BDF8),
+        onPrimary: const Color(0xFF021627),
+        secondary: const Color(0xFF818CF8),
+        tertiary: const Color(0xFF22D3EE),
+        background: const Color(0xFF030B18),
+        surface: const Color(0xFF0A1A2F),
+        surfaceHigh: const Color(0xFF10243F),
+        surfaceHighest: const Color(0xFF17304F),
+        text: const Color(0xFFE6F1FF),
+        muted: const Color(0xFF8AA3C2),
+        outline: const Color(0xFF2B4466),
+        outlineVariant: const Color(0xFF15294A),
+      );
+
   /// Deep near-black surfaces with electric mint highlights. [accent]
   /// replaces the mint when the user picks a different accent colour.
-  static ThemeData neon([Color? accent]) => _glow(
+  static ThemeData neon([Color? accent]) => _palette(
+        brightness: Brightness.dark,
+        glow: true,
         primary: accent ?? neonMint,
         onPrimary: const Color(0xFF04110C),
         secondary: neonCyan,
@@ -150,7 +216,9 @@ class AppTheme {
       );
 
   /// Pro: black and warm gold, like a private-bank statement.
-  static ThemeData gold() => _glow(
+  static ThemeData gold() => _palette(
+        brightness: Brightness.dark,
+        glow: true,
         primary: const Color(0xFFF5C451),
         onPrimary: const Color(0xFF1A1205),
         secondary: const Color(0xFFFFE3A3),
@@ -166,7 +234,9 @@ class AppTheme {
       );
 
   /// Pro: northern-lights violet, teal and pink on deep indigo.
-  static ThemeData aurora() => _glow(
+  static ThemeData aurora() => _palette(
+        brightness: Brightness.dark,
+        glow: true,
         primary: const Color(0xFF5EEAD4),
         onPrimary: const Color(0xFF03201B),
         secondary: const Color(0xFFA78BFA),
@@ -182,17 +252,25 @@ class AppTheme {
       );
 
   /// Pro: soft blossom pink on warm white.
-  static ThemeData sakura() => _build(
-        ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE85D9A),
-          brightness: Brightness.light,
-          surface: Colors.white,
-        ),
+  static ThemeData sakura() => _palette(
+        brightness: Brightness.light,
+        primary: const Color(0xFFDB2777),
+        onPrimary: Colors.white,
+        secondary: const Color(0xFFA855F7),
+        tertiary: const Color(0xFFFB7185),
         background: const Color(0xFFFFF4F8),
+        surface: Colors.white,
+        surfaceHigh: const Color(0xFFFDEAF1),
+        surfaceHighest: const Color(0xFFF9DAE6),
+        text: const Color(0xFF2A0E19),
+        muted: const Color(0xFF7A5464),
+        outline: const Color(0xFFEBC2D2),
+        outlineVariant: const Color(0xFFF6DEE8),
       );
 
-  /// A dark theme with glowing accents: the neon family.
-  static ThemeData _glow({
+  /// Builds a theme from a hand-picked palette.
+  static ThemeData _palette({
+    required Brightness brightness,
     required Color primary,
     required Color onPrimary,
     required Color secondary,
@@ -205,25 +283,29 @@ class AppTheme {
     required Color muted,
     required Color outline,
     required Color outlineVariant,
+    bool glow = false,
   }) {
+    final isDark = brightness == Brightness.dark;
     final scheme = ColorScheme(
-      brightness: Brightness.dark,
+      brightness: brightness,
       primary: primary,
       onPrimary: onPrimary,
-      primaryContainer: primary.withValues(alpha: .18),
-      onPrimaryContainer: primary,
+      primaryContainer: primary.withValues(alpha: isDark ? .18 : .12),
+      onPrimaryContainer: isDark ? primary : Color.lerp(primary, Colors.black, .35)!,
       secondary: secondary,
       onSecondary: onPrimary,
-      secondaryContainer: secondary.withValues(alpha: .16),
-      onSecondaryContainer: secondary,
+      secondaryContainer: secondary.withValues(alpha: isDark ? .16 : .12),
+      onSecondaryContainer: isDark ? secondary : Color.lerp(secondary, Colors.black, .35)!,
       tertiary: tertiary,
       onTertiary: Colors.white,
-      tertiaryContainer: tertiary.withValues(alpha: .2),
-      onTertiaryContainer: Color.lerp(tertiary, Colors.white, .6)!,
-      error: const Color(0xFFFF3B6B),
+      tertiaryContainer: tertiary.withValues(alpha: isDark ? .2 : .12),
+      onTertiaryContainer: isDark
+          ? Color.lerp(tertiary, Colors.white, .6)!
+          : Color.lerp(tertiary, Colors.black, .35)!,
+      error: isDark ? const Color(0xFFFF3B6B) : const Color(0xFFDC2626),
       onError: Colors.white,
-      errorContainer: const Color(0xFF3A0E1C),
-      onErrorContainer: const Color(0xFFFFB3C4),
+      errorContainer: isDark ? const Color(0xFF3A0E1C) : const Color(0xFFFDE8E8),
+      onErrorContainer: isDark ? const Color(0xFFFFB3C4) : const Color(0xFF7F1D1D),
       surface: surface,
       onSurface: text,
       onSurfaceVariant: muted,
@@ -235,43 +317,37 @@ class AppTheme {
       outline: outline,
       outlineVariant: outlineVariant,
       shadow: Colors.black,
+      scrim: Colors.black,
       inverseSurface: text,
       onInverseSurface: background,
-      inversePrimary: Color.lerp(primary, Colors.black, .3)!,
+      inversePrimary: Color.lerp(primary, isDark ? Colors.black : Colors.white, .3)!,
     );
-    return _build(scheme,
-        background: background, neon: true, colors: AppColors.neon(scheme));
+    final colors = glow
+        ? AppColors.neon(scheme, gradient: [primary, secondary, tertiary])
+        : AppColors.forScheme(scheme);
+    return _build(scheme, background: background, neon: glow, colors: colors);
   }
 
-  /// Whether [theme] belongs to the neon family (Neon, Gold, Aurora),
-  /// which ships its own glowing palette.
-  static bool isNeon(ThemeData theme) =>
-      theme.extension<AppColors>()?.gain == AppColors.neonGain;
-
-  static ColorScheme _scheme(Color seed, Brightness brightness) {
-    return ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: brightness,
-      surface: brightness == Brightness.dark ? const Color(0xFF111A1F) : Colors.white,
-    );
-  }
+  /// Whether [theme] belongs to the glowing neon family (Neon, Gold,
+  /// Aurora).
+  static bool isNeon(ThemeData theme) => theme.extension<AppColors>()?.glow ?? false;
 
   static ThemeData _build(ColorScheme scheme,
-      {bool amoled = false, bool neon = false, Color? background, AppColors? colors}) {
-    colors ??= AppColors.fromScheme(scheme);
+      {bool neon = false, Color? background, AppColors? colors}) {
+    colors ??= AppColors.forScheme(scheme);
     final isDark = scheme.brightness == Brightness.dark;
     final base = background ?? (isDark ? const Color(0xFF081116) : const Color(0xFFF7F9F7));
 
     return ThemeData(
       useMaterial3: true,
       brightness: scheme.brightness,
-      colorScheme: scheme.copyWith(surface: amoled ? Colors.black : scheme.surface),
+      colorScheme: scheme,
       scaffoldBackgroundColor: base,
-      hintColor: neon ? scheme.onSurfaceVariant : null,
+      hintColor: scheme.onSurfaceVariant,
       textTheme: _textTheme(scheme),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: amoled ? const Color(0xFF050505) : scheme.surface,
+        color: scheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         margin: EdgeInsets.zero,
       ),
@@ -357,25 +433,25 @@ class AppTheme {
             )),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: neon ? base : null,
+        backgroundColor: base,
         indicatorColor: scheme.primary.withValues(alpha: isDark ? .16 : .14),
         selectedIconTheme: IconThemeData(color: scheme.primary),
         selectedLabelTextStyle: TextStyle(
             fontSize: 12, fontWeight: FontWeight.w800, color: scheme.primary),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: neon ? scheme.surface : null,
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: neon ? scheme.surfaceContainerHigh : null,
+        backgroundColor: scheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: neon ? scheme.surfaceContainerHigh : null,
+        color: scheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
@@ -384,10 +460,10 @@ class AppTheme {
         linearTrackColor: scheme.primary.withValues(alpha: .12),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        // The neon containers are translucent, which would make a muddy
-        // button: neon gets a solid mint one instead.
-        backgroundColor: neon ? scheme.primary : null,
-        foregroundColor: neon ? scheme.onPrimary : null,
+        // The containers are translucent, which would make a muddy
+        // button: every theme gets a solid one in its accent instead.
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         extendedTextStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),

@@ -21,16 +21,21 @@ class StockPulseApp extends StatelessWidget {
         ? AppThemeId.neon
         : provider.themeMode;
 
+    // The first accent means "the theme's own", so Mint stays mint and
+    // Ocean stays blue unless the user picks something else.
+    final accent = AppTheme.accentFor(provider.accentIndex);
+
     return MaterialApp(
       title: 'Stock Pulse',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.themeFor(themeId, Brightness.light,
-          accent: AppTheme.accents[provider.accentIndex]),
-      darkTheme: AppTheme.themeFor(themeId, Brightness.dark,
-          accent: AppTheme.accents[provider.accentIndex]),
-      // Theme selection is handled explicitly so every surface uses the
-      // selected palette instead of only swapping light/dark shells.
-      themeMode: ThemeMode.light,
+      theme: AppTheme.themeFor(themeId, Brightness.light, accent: accent),
+      darkTheme: AppTheme.themeFor(themeId, Brightness.dark, accent: accent),
+      // Only "Follow system" switches with the device. Every other theme is
+      // the same in both slots, so the light slot is used.
+      themeMode: themeId == AppThemeId.system ? ThemeMode.system : ThemeMode.light,
+      // Themes cross-fade (every colour, including the finance colours).
+      themeAnimationDuration: const Duration(milliseconds: 450),
+      themeAnimationCurve: Curves.easeOutCubic,
       builder: (context, child) => LockGate(child: child!),
       home: const RootScreen(),
     );

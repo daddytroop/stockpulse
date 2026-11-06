@@ -65,19 +65,7 @@ class SettingsScreen extends StatelessWidget {
           // Appearance comes first: it is the setting people reach for most
           // often, and it used to be a long way down the list.
           _section(context, 'Appearance'),
-          Card(
-            child: Column(
-              children: [
-                for (final mode in AppThemeId.pickerOrder)
-                  RadioAdaptiveTile(
-                    groupValue: provider.themeMode,
-                    value: mode,
-                    title: mode.label,
-                    onChanged: (v) => chooseTheme(context, v),
-                  ),
-              ],
-            ),
-          ),
+          const ThemeGrid(),
           Card(
             margin: const EdgeInsets.only(top: 10),
             child: Padding(
@@ -85,13 +73,19 @@ class SettingsScreen extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Accent color', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
-                Text('Use the same accent across both light and dark palettes.',
+                Text("The first swatch keeps each theme's own colour. Pick another to use it everywhere.",
                   style: theme.textTheme.bodySmall),
                 const SizedBox(height: 12),
                 Wrap(spacing: 12, runSpacing: 12, children: [
                   for (var i = 0; i < AppTheme.accents.length; i++)
                     _AccentChoice(
-                      color: AppTheme.accents[i],
+                      color: i == 0
+                          ? AppTheme.themeFor(provider.themeMode,
+                                  MediaQuery.platformBrightnessOf(context))
+                              .colorScheme
+                              .primary
+                          : AppTheme.accents[i],
+                      auto: i == 0,
                       selected: provider.accentIndex == i,
                       onTap: () => provider.setAccentIndex(i),
                     ),
@@ -1161,7 +1155,15 @@ class _AccentChoice extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  const _AccentChoice({required this.color, required this.selected, required this.onTap});
+
+  /// The "theme's own accent" swatch.
+  final bool auto;
+  const _AccentChoice({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+    this.auto = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1180,34 +1182,13 @@ class _AccentChoice extends StatelessWidget {
           ),
           boxShadow: selected ? [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 14)] : null,
         ),
-        child: selected ? const Icon(Icons.check, color: Colors.white) : null,
+        child: selected
+            ? const Icon(Icons.check, color: Colors.white)
+            : auto
+                ? const Icon(Icons.auto_awesome, color: Colors.white, size: 18)
+                : null,
       ),
     );
   }
 }
 
-class RadioAdaptiveTile extends StatelessWidget {
-  final AppThemeId groupValue;
-  final AppThemeId value;
-  final String title;
-  final void Function(AppThemeId) onChanged;
-  const RadioAdaptiveTile({
-    super.key,
-    required this.groupValue,
-    required this.value,
-    required this.title,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RadioListTile<AppThemeId>(
-      title: ThemeLabel(mode: value),
-      value: value,
-      groupValue: groupValue,
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
-    );
-  }
-}
