@@ -18,6 +18,8 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 
 ## Features
 
+- 🕯️ **Advanced charts for any symbol** — candles or a line from 1 day (5-minute bars) to all time, volume, SMA 20/50/200, EMA 20, and (Pro) Bollinger bands, RSI and MACD. Drag or hover to read open/high/low/close and volume, pinch or mouse-wheel to zoom, double-tap to reset. Opens from any holding, the watchlist, the Markets tab or the Tools grid.
+- 🌎 **Markets tab** — the S&P 500, Nasdaq, Dow, Russell 2000, TSX, Bitcoin, gold and oil with sparklines, the most popular stocks, and a search that charts any symbol. Useful from the first launch, with no holdings at all.
 - 📈 **Multi-portfolio tracking** — stocks, ETFs, crypto (`BTC-USD`), foreign exchanges (`SHOP.TO`, `AIR.PA`, ...). Quantities and average cost merge automatically when you buy more of the same symbol.
 - 🏛️ **Grouped by market** — holdings are split into exchange sections (NYSE, NASDAQ, TSX, TSX Venture, NYSE Arca, Crypto, …) using the venue each quote actually reports, so Canadian and US listings are never mixed up.
 - 🖼️ **Real company logos** — each holding shows the issuer's own logo, served by Wikimedia Commons. A ticker is only matched when it maps to a single company, otherwise a letter badge is used.
@@ -42,7 +44,9 @@ Built with Flutter. Market data comes from Yahoo Finance's public (unofficial) e
 - 🌓 **Polished UI** — unified design system with theme-aware finance colors, shimmer skeletons, animated numbers, staggered list entrances, shared-axis page transitions, Hero avatar drill-downs, frosted-glass cards, and adaptive desktop/phone navigation.
 - ⭐ **Stock Pulse Pro** — a one-time unlock that removes ads and adds the dividend snowball, a portfolio health score, an unlimited watchlist with price-target alerts, and exclusive themes and app icons. A rewarded ad unlocks any one of them for 24 hours.
 - 📸 **Share recap** — a branded picture of your month or year, percentages only by default.
-- 🎨 **Seven themes, one tap away** (plus three Pro themes) — a new install opens in **Neon**: near-black surfaces, electric mint and cyan highlights, a balance card that glows green or pink with the day, and a floating frosted navigation bar. A theme button in the app bar of every screen opens a picker with a preview of each palette, and the accent colour is separate.
+- 🎨 **Seven themes, one tap away** (plus three Pro themes) — every theme is a hand-tuned palette, gains are always green and losses red, and **Follow system** switches with the phone. A new install opens in **Neon**. The theme button on every screen opens a grid of live mini previews; the app cross-fades to a theme while the picker stays open. The first accent swatch keeps each theme's own colour.
+- ✨ **Motion** — the home screen eases in block by block, tabs fade through, the selected tab icon springs, the background glow drifts slowly and a band of light sweeps the balance card. All of it holds still when the phone asks for reduced motion.
+- 📣 **Store listing** — [`docs/STORE_LISTING.md`](docs/STORE_LISTING.md) has the Play Store title, descriptions, release notes and screenshot order, ready to paste.
 
 ## Getting the app
 
