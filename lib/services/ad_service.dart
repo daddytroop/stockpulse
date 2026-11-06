@@ -90,12 +90,17 @@ class AdUnits {
   static const String rewardedTest = 'ca-app-pub-3940256099942544/5224354917';
 
   /// Google's public test units, used in debug and profile builds.
+  /// The native placements need Google's *native* test unit: a banner
+  /// unit cannot serve a native ad, so test ads would never appear.
+  static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _testNative = 'ca-app-pub-3940256099942544/2247696110';
+
   static const Map<AdPlacement, String> test = {
-    AdPlacement.holdingsNative: 'ca-app-pub-3940256099942544/6300978111',
-    AdPlacement.newsNative: 'ca-app-pub-3940256099942544/6300978111',
-    AdPlacement.newsArticle: 'ca-app-pub-3940256099942544/6300978111',
-    AdPlacement.portfolioBanner: 'ca-app-pub-3940256099942544/6300978111',
-    AdPlacement.dividendsNative: 'ca-app-pub-3940256099942544/6300978111',
+    AdPlacement.holdingsNative: _testNative,
+    AdPlacement.newsNative: _testNative,
+    AdPlacement.newsArticle: _testNative,
+    AdPlacement.portfolioBanner: _testBanner,
+    AdPlacement.dividendsNative: _testNative,
   };
 
   /// The ad unit used for a placement in release builds.
@@ -441,7 +446,11 @@ class AdService extends ChangeNotifier {
     }
     // A new session starts with a fresh impression budget.
     _sessionImpressions = 0;
-    if (isAndroidPlatform) await _initAds();
+    if (isAndroidPlatform) {
+      await _initAds();
+    } else {
+      _markReady();
+    }
     notifyListeners();
   }
 
@@ -455,22 +464,60 @@ class AdService extends ChangeNotifier {
     });
   }
 
+  final Completer<void> _readyCompleter = Completer<void>();
+
+  /// Completes once the SDK has started and consent is known, so ad slots
+  /// never ask before ads are allowed (and never ask too early to count).
+  /// Off Android, and if start-up hangs, it completes anyway.
+  Future<void> get ready => _readyCompleter.future;
+
+  void _markReady() {
+    if (!_readyCompleter.isCompleted) _readyCompleter.complete();
+    notifyListeners();
+  }
+
+  /// Google's consent flow, then the SDK:
+  ///  1. refresh the consent status,
+  ///  2. show the consent form if this user needs one (EEA, UK and
+  ///     Switzerland; Google requires it there before any ad),
+  ///  3. start the SDK and let the slots load.
   Future<void> _initAds() async {
     if (_initialized) return;
     _initialized = true;
+    // Never leave the slots waiting forever.
+    Timer(const Duration(seconds: 10), _markReady);
+    final consent = Completer<void>();
     try {
-      await MobileAds.instance.initialize();
       ConsentInformation.instance.requestConsentInfoUpdate(
         ConsentRequestParameters(),
-        () => _checkConsent(),
+        () async {
+          try {
+            await ConsentForm.loadAndShowConsentFormIfRequired((formError) {
+              if (formError != null && kDebugMode) {
+                debugPrint('Consent form failed: ${formError.message}');
+              }
+              if (!consent.isCompleted) consent.complete();
+              // People take longer than the start-up wait to read the
+              // form, so the answer is always re-read when it closes; the
+              // change lets every waiting ad slot try again.
+              _checkConsent();
+            });
+          } catch (_) {
+            if (!consent.isCompleted) consent.complete();
+          }
+        },
         (error) {
           if (kDebugMode) debugPrint('Consent update failed: ${error.message}');
-          _checkConsent();
+          if (!consent.isCompleted) consent.complete();
         },
       );
+      await consent.future.timeout(const Duration(seconds: 8), onTimeout: () {});
+      await _checkConsent();
+      await MobileAds.instance.initialize();
     } catch (e) {
       if (kDebugMode) debugPrint('Ad init failed: $e');
     }
+    _markReady();
   }
 
   Future<void> _checkConsent() async {

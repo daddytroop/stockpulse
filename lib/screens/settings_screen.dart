@@ -69,7 +69,7 @@ class SettingsScreen extends StatelessWidget {
           // Appearance comes first: it is the setting people reach for most
           // often, and it used to be a long way down the list.
           _section(context, 'Appearance'),
-          const ThemeGrid(),
+          const ThemeGrid(compact: true),
           Card(
             margin: const EdgeInsets.only(top: 10),
             child: Padding(
@@ -625,13 +625,13 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.6.0',
+                      Text('Stock Pulse v1.6.1',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'A free, open-source replacement for paid portfolio trackers. '
+                    'Free to use, with an optional one-time Pro upgrade. '
                     'Market data comes from Yahoo Finance\'s unofficial endpoints; '
                     'dividend and earnings dates may be estimated (marked with *).\n\n'
                     'This app is for tracking only and is not investment advice. '

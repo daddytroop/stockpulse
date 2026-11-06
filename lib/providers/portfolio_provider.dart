@@ -1766,6 +1766,26 @@ class PortfolioProvider extends ChangeNotifier {
     while (out.isNotEmpty && out.first.close <= 0) {
       out.removeAt(0);
     }
+
+    // The unfinished bar was dropped above, so without this the line would
+    // stop at yesterday's close and disagree with today's balance. End it
+    // on "now", valued from the live quotes, when every holding has one.
+    if (out.isNotEmpty) {
+      var live = 0.0;
+      var complete = true;
+      for (final e in series.keys) {
+        final q = _quotes[e];
+        if (q == null || q.price <= 0) {
+          complete = false;
+          break;
+        }
+        live += (p.holdings[e]?.quantity ?? 0) * q.price;
+      }
+      final now = DateTime.now();
+      if (complete && live > 0 && now.isAfter(out.last.time)) {
+        out.add(ChartPoint(now, live));
+      }
+    }
     return out;
   }
 

@@ -30,6 +30,18 @@ void main() {
       );
     });
 
+    test('native placements test with the native sample unit', () {
+      // A banner unit cannot serve a native ad, so test ads would never
+      // appear in the native slots.
+      const native = 'ca-app-pub-3940256099942544/2247696110';
+      const banner = 'ca-app-pub-3940256099942544/6300978111';
+      for (final p in AdPlacement.values) {
+        expect(AdUnits.test[p],
+            p == AdPlacement.portfolioBanner ? banner : native,
+            reason: p.label);
+      }
+    });
+
     test('live ads are opt-in', () {
       // Live ads are the default so they start on their own once AdMob
       // approves the app; a build can still force test ads.
