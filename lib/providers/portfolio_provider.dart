@@ -181,6 +181,41 @@ class PortfolioProvider extends ChangeNotifier {
   int get accentIndex => _accentIndex.clamp(0, AppTheme.accents.length - 1);
   bool get autoRefreshOnStart => _autoRefreshOnStart;
   bool get showsOnboarding => _onboardingComplete;
+
+  /// The release whose highlights the What's new sheet shows.
+  static const whatsNewVersion = '1.6.0';
+  String _seenWhatsNew = '';
+
+  /// Whether to show the What's new sheet: once per release, to people
+  /// who were already using the app.
+  bool get whatsNewDue => _onboardingComplete && _seenWhatsNew != whatsNewVersion;
+
+  Future<void> markWhatsNewSeen() async {
+    _seenWhatsNew = whatsNewVersion;
+    await _persistData();
+  }
+
+  int _appOpens = 0;
+  bool _reviewAsked = false;
+
+  /// Counts a launch, for the rating prompt.
+  Future<void> countAppOpen() async {
+    _appOpens++;
+    await _persistData();
+  }
+
+  /// Whether now is a good moment to ask for a rating: the user has come
+  /// back a few times, has holdings, and is having a good day. Asked once.
+  bool get reviewDue {
+    if (_reviewAsked || _appOpens < 5 || !_onboardingComplete) return false;
+    final t = totalsForAll();
+    return active.holdings.isNotEmpty && t.hasDayChange && t.dayChange > 0;
+  }
+
+  Future<void> markReviewAsked() async {
+    _reviewAsked = true;
+    await _persistData();
+  }
   bool get crashDiagnostics => _crashDiagnostics;
   bool get backupReminderDue {
     if (_portfolios.every((p) => p.holdings.isEmpty)) return false;
@@ -313,6 +348,8 @@ class PortfolioProvider extends ChangeNotifier {
 
   Future<void> completeOnboarding() async {
     _onboardingComplete = true;
+    // A brand-new user has nothing to catch up on.
+    _seenWhatsNew = whatsNewVersion;
     notifyListeners();
     await _persistData();
   }
@@ -449,6 +486,9 @@ class PortfolioProvider extends ChangeNotifier {
       // while the mode is on.
       PrivacyMode.hideBalances = _hideBalances;
       _onboardingComplete = data['onboardingComplete'] as bool? ?? false;
+      _seenWhatsNew = data['seenWhatsNew'] as String? ?? '';
+      _appOpens = ((data['appOpens'] as num?) ?? 0).toInt();
+      _reviewAsked = data['reviewAsked'] as bool? ?? false;
       Diagnostics.setEnabled(data['crashDiagnostics'] as bool? ?? false);
       _crashDiagnostics = data['crashDiagnostics'] as bool? ?? false;
       _lastBackupReminderAt = _ms(data['lastBackupReminderMs']);
@@ -522,6 +562,9 @@ class PortfolioProvider extends ChangeNotifier {
       'accentIndex': _accentIndex,
       'autoRefreshOnStart': _autoRefreshOnStart,
       'onboardingComplete': _onboardingComplete,
+      'seenWhatsNew': _seenWhatsNew,
+      'appOpens': _appOpens,
+      'reviewAsked': _reviewAsked,
       'crashDiagnostics': _crashDiagnostics,
       'lastBackupReminderMs': _lastBackupReminderAt?.millisecondsSinceEpoch,
       'displayCurrency': _displayCurrency,

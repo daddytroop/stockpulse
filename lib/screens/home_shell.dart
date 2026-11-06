@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
@@ -7,12 +8,17 @@ import 'package:provider/provider.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../services/app_navigation.dart';
+import '../services/review_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/ui/page_transitions.dart';
+import 'add_edit_holding_sheet.dart';
 import 'dividends_screen.dart';
+import 'import_screen.dart';
 import 'markets_screen.dart';
 import 'news_screen.dart';
 import 'portfolio_screen.dart';
 import 'settings_screen.dart';
+import 'whats_new_sheet.dart';
 
 /// Adaptive navigation shell: bottom nav on phones, a navigation rail on
 /// wide desktop windows.
@@ -66,7 +72,12 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
     // Seed dividend data in the background once the first frame is up.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<PortfolioProvider>().ensureDividendInfo();
+      final provider = context.read<PortfolioProvider>();
+      provider.ensureDividendInfo();
+      provider.countAppOpen();
+      _runPendingAction();
+      _maybeShowWhatsNew();
+      _maybeAskForReview();
     });
     // Follow tab requests made from anywhere in the app.
     _nav = context.read<AppNavigation>();
@@ -74,6 +85,47 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
   }
 
   late final AppNavigation _nav;
+
+  /// Shows the release highlights once to people who updated.
+  Future<void> _maybeShowWhatsNew() async {
+    final provider = context.read<PortfolioProvider>();
+    if (!provider.whatsNewDue || provider.backupReminderDue) return;
+    await provider.markWhatsNewSeen();
+    if (!mounted) return;
+    await showWhatsNewSheet(context,
+        onOpenMarkets: () => _select(AppNavigation.marketsTab));
+  }
+
+  /// Asks for a rating once, a little after opening the app on a good day.
+  void _maybeAskForReview() {
+    _reviewTimer = Timer(const Duration(seconds: 8), () async {
+      if (!mounted) return;
+      final provider = context.read<PortfolioProvider>();
+      // Never on top of another sheet or dialog.
+      if (!provider.reviewDue || ModalRoute.of(context)?.isCurrent != true) return;
+      await provider.markReviewAsked();
+      await ReviewService.request();
+    });
+  }
+
+  Timer? _reviewTimer;
+
+  /// Carries out what was picked on the first-run screen.
+  void _runPendingAction() {
+    final action = _nav.pendingAction;
+    _nav.pendingAction = null;
+    final provider = context.read<PortfolioProvider>();
+    switch (action) {
+      case 'add':
+        showAddEditHoldingSheet(context, provider, provider.active.id);
+      case 'import':
+        pushSharedAxis(context, const ImportScreen());
+      case 'markets':
+        _select(AppNavigation.marketsTab);
+      case 'settings':
+        _select(AppNavigation.settingsTab);
+    }
+  }
 
   void _onNavChanged() {
     if (!mounted) return;
@@ -83,6 +135,7 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _nav.removeListener(_onNavChanged);
+    _reviewTimer?.cancel();
     _tabFade.dispose();
     super.dispose();
   }

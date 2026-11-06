@@ -77,6 +77,13 @@ class OnboardingScreen extends StatelessWidget {
                     onPressed: () => onAction('import'),
                   ),
                   _Step(
+                    icon: Icons.candlestick_chart_outlined,
+                    title: 'Or just watch the markets',
+                    copy: 'Live indices, popular stocks and pro charts with RSI and MACD. No holdings needed.',
+                    actionLabel: 'Open markets',
+                    onPressed: () => onAction('markets'),
+                  ),
+                  _Step(
                     icon: Icons.tune_outlined,
                     title: 'Make it yours later',
                     copy: 'Theme, currency, widgets, backup, sync, and lock live in Settings. No account is required to get the core features.',

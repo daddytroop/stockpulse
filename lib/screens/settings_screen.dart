@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/portfolio_provider.dart';
 import '../theme/app_theme.dart';
@@ -584,6 +586,33 @@ class SettingsScreen extends StatelessWidget {
           ),
 
           _section(context, 'About'),
+          Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.favorite_outline_rounded),
+                  title: const Text('Tell a friend'),
+                  subtitle: const Text('Share Stock Pulse with someone who invests'),
+                  onTap: () => Share.share(
+                    'I track my stocks and dividends with Stock Pulse: live charts, '
+                    'dividend calendar and widgets, no account needed. '
+                    'https://play.google.com/store/apps/details?id=app.stockpulse',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.star_outline_rounded),
+                  title: const Text('Rate Stock Pulse'),
+                  subtitle: const Text('A quick rating helps other people find the app'),
+                  onTap: () => launchUrl(
+                    Uri.parse('https://play.google.com/store/apps/details?id=app.stockpulse'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),

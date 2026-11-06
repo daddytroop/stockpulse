@@ -5,6 +5,7 @@ import 'providers/portfolio_provider.dart';
 import 'screens/home_shell.dart';
 import 'screens/lock_gate.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/app_navigation.dart';
 import 'services/pro_service.dart';
 import 'theme/app_theme.dart';
 
@@ -51,7 +52,11 @@ class RootScreen extends StatelessWidget {
     final provider = context.watch<PortfolioProvider>();
     if (!provider.showsOnboarding) {
       return OnboardingScreen(
-        onAction: (_) => provider.completeOnboarding(),
+        // The main screen carries out the choice once it is up.
+        onAction: (action) {
+          context.read<AppNavigation>().pendingAction = action;
+          provider.completeOnboarding();
+        },
         onDone: provider.completeOnboarding,
       );
     }
