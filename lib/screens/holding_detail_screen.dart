@@ -14,6 +14,7 @@ import '../widgets/portfolio_chart.dart';
 import '../widgets/stat_cards.dart';
 import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/animated_number.dart';
+import '../widgets/ui/range_selector.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
@@ -95,7 +96,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
       body: holding == null
           ? const Center(child: Text('Holding removed.'))
           : ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 if (provider.splitSuggestionFor(holding) != null) ...[
                   _splitBanner(
@@ -111,32 +112,6 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
                   _yearRangeCard(context, quote!, currency),
                   const SizedBox(height: 12),
                 ],
-                _rangeChips(context),
-                FutureBuilder(
-                  key: ValueKey('${widget.symbol}|$_range|'
-                      '${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
-                  future: _history(provider, quote),
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-                      return const ShimmerSkeleton.chart(height: 200);
-                    }
-                    return PortfolioChart(
-                      points: snap.data ?? const [],
-                      title: 'Price history',
-                      currency: currency,
-                      valueFormatter: (v) => fmtMoney(v, currency: currency),
-                    );
-                  },
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => openAdvancedChart(context, widget.symbol),
-                    icon: const Icon(Icons.candlestick_chart_outlined, size: 18),
-                    label: const Text('Candles, indicators & more'),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 _statsGrid(context, provider, holding, quote, info, currency),
                 const SizedBox(height: 12),
                 if ((portfolio?.txnsFor(holding.symbol) ?? const []).isNotEmpty)
@@ -281,13 +256,14 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     return provider.symbolHistory(widget.symbol, _range);
   }
 
+  /// The top of the screen in one card: what it is, what it trades at, the
+  /// chart, and what this position is worth.
   Widget _header(BuildContext context, PortfolioProvider provider,
       Portfolio? portfolio, Holding holding, Quote? quote, String currency) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
     final value = (quote?.price ?? 0) * holding.quantity;
     final pnl = value - holding.costBasis;
+    final pnlPct = holding.costBasis > 0 ? pnl / holding.costBasis * 100 : 0.0;
 
     // How much of the portfolio this single position represents.
     var weight = 0.0;
@@ -299,87 +275,126 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     }
 
     return SpCard(
-      padding: const EdgeInsets.all(16),
-      gradient: isDark
-          ? [const Color(0xFF1A2C30), const Color(0xFF0F1E21)]
-          : [const Color(0xFFE0F2F1), const Color(0xFFF5F7F8)],
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      borderRadius: 22,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Hero(
-            tag: 'avatar_${widget.portfolioId}_${holding.symbol}',
-            child: SymbolAvatar(
-              symbol: holding.symbol,
-              radius: 24,
-              companyName: quote?.name,
-            ),
-          ),
-          const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    holding.name.isEmpty ? holding.symbol : holding.name,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    '${fmtQty(holding.quantity)} units'
-                    '${holding.avgCost > 0 ? ' @ ${fmtMoney(holding.avgCost, currency: currency)}' : ''}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                  ),
-                  Text(
-                    'Value ${fmtMoney(value, currency: currency)}'
-                    '${holding.avgCost > 0 ? ' · P/L ${fmtSignedMoney(pnl, currency: currency)}' : ''}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                  ),
-                  if (weight > 0)
-                    Text(
-                      '${weight.toStringAsFixed(1)}% of this portfolio',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
+          Row(
+            children: [
+              Hero(
+                tag: 'avatar_${widget.portfolioId}_${holding.symbol}',
+                child: SymbolAvatar(
+                  symbol: holding.symbol,
+                  radius: 20,
+                  companyName: quote?.name,
+                ),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                AnimatedNumber(
-                  value: quote?.price ?? 0,
-                  formatter: (v) => fmtMoney(v, currency: currency),
-                  duration: const Duration(milliseconds: 800),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      holding.name.isEmpty ? holding.symbol : holding.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text(
+                      '${fmtQty(holding.quantity)} units'
+                      '${holding.avgCost > 0 ? ' @ ${fmtMoney(holding.avgCost, currency: currency)}' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedNumber(
+                    value: quote?.price ?? 0,
+                    formatter: (v) => fmtMoney(v, currency: currency),
+                    duration: const Duration(milliseconds: 800),
+                    style: theme.textTheme.displayMedium,
                   ),
                 ),
-                ChangeChip(
+              ),
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: ChangeChip(
                   percent: quote?.dayChangePercent,
                   label: quote?.dayChangePercent == null
                       ? '–'
                       : '${fmtSignedMoney(quote!.dayChange, currency: currency)} (${fmtPct(quote.dayChangePercent)})',
                 ),
-              ],
-            ),
-          ],
-        ),
-    );
-  }
-
-  Widget _rangeChips(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      children: [
-        for (final e in _rangeLabels.entries)
-          ChoiceChip(
-            label: Text(e.value),
-            selected: _range == e.key,
-            visualDensity: VisualDensity.compact,
-            onSelected: (_) => setState(() => _range = e.key),
+              ),
+            ],
           ),
-      ],
+          const SizedBox(height: 12),
+          FutureBuilder(
+            key: ValueKey('${widget.symbol}|$_range|'
+                '${provider.lastRefreshAt?.millisecondsSinceEpoch ?? 0}'),
+            future: _history(provider, quote),
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done && !snap.hasData) {
+                return const ShimmerSkeleton.chart(height: 170);
+              }
+              return PortfolioChart(
+                points: snap.data ?? const [],
+                height: 170,
+                currency: currency,
+                valueFormatter: (v) => fmtMoney(v, currency: currency),
+              );
+            },
+          ),
+          const SizedBox(height: 4),
+          RangeSelector(
+            ranges: _rangeLabels,
+            selected: _range,
+            onChanged: (r) => setState(() => _range = r),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _HeaderStat(label: 'Value', value: fmtMoney(value, currency: currency)),
+              ),
+              Expanded(
+                child: _HeaderStat(
+                  label: 'Total gain',
+                  value: holding.avgCost > 0
+                      ? '${fmtSignedMoney(pnl, currency: currency)} (${fmtPct(pnlPct)})'
+                      : '–',
+                  color: holding.avgCost > 0 ? pnlColor(pnl, context) : null,
+                ),
+              ),
+              Expanded(
+                child: _HeaderStat(
+                  label: 'Of portfolio',
+                  value: weight > 0 ? '${weight.toStringAsFixed(1)}%' : '–',
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => openAdvancedChart(context, widget.symbol),
+              icon: const Icon(Icons.candlestick_chart_outlined, size: 18),
+              label: const Text('Candles, indicators & more'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -708,5 +723,40 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     } catch (_) {
       // ignore
     }
+  }
+}
+
+/// One figure under the chart: a small label and its value.
+class _HeaderStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+
+  const _HeaderStat({required this.label, required this.value, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

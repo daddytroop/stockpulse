@@ -231,7 +231,7 @@ class _RelatedCard extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

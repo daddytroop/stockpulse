@@ -79,7 +79,7 @@ class _SnowballScreenState extends State<SnowballScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
               if (gross <= 0 && _yield == null)
                 SpCard(
@@ -92,7 +92,7 @@ class _SnowballScreenState extends State<SnowballScreen> {
                 ),
               SpCard(
                 glow: colors.dividend,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

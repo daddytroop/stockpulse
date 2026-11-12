@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../models/quote.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/ad_service.dart';
+import '../theme/tokens.dart';
 import '../utils/formatters.dart';
 import '../widgets/ad_slot.dart';
-import '../widgets/symbol_avatar.dart';
 import '../widgets/ui/empty_state.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
@@ -48,7 +47,7 @@ class _NewsScreenState extends State<NewsScreen> {
     final portfolio = provider.active;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('News for your holdings'),
+        title: const Text('News'),
         actions: [
           const ThemeToggleButton(),
           if (provider.quotesLoading)
@@ -76,29 +75,13 @@ class _NewsScreenState extends State<NewsScreen> {
               subtitle: 'Add holdings to see news about them here.',
             )
           : (_future == null)
-              ? const SizedBox(
-                  height: 64,
-                  child: Center(
-                    child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
-                  ),
-                )
+              ? const _NewsSkeleton()
               : FutureBuilder<List<NewsItem>>(
                   key: ValueKey(_reloadAt?.millisecondsSinceEpoch ?? 0),
                   future: _future,
                   builder: (context, snap) {
                     if (!snap.hasData) {
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                        children: const [
-                          ShimmerSkeleton.card(height: 96),
-                          SizedBox(height: 8),
-                          ShimmerSkeleton.card(height: 96),
-                          SizedBox(height: 8),
-                          ShimmerSkeleton.card(height: 96),
-                          SizedBox(height: 8),
-                          ShimmerSkeleton.card(height: 96),
-                        ],
-                      );
+                      return const _NewsSkeleton();
                     }
                     final items = snap.data!;
                     if (items.isEmpty) {
@@ -122,7 +105,7 @@ class _NewsScreenState extends State<NewsScreen> {
                       },
                       child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                        padding: const EdgeInsets.fromLTRB(Sp.page, 8, Sp.page, 24),
                         itemCount: items.length + 1,
                         itemBuilder: (context, i) {
                           // A native ad every few stories, so it reads as part
@@ -140,73 +123,7 @@ class _NewsScreenState extends State<NewsScreen> {
                             );
                           }
                           final n = items[i];
-                          return SpCard(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            onTap: () => _openStory(context, n),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              leading: n.imageUrl == null || n.imageUrl!.isEmpty
-                                  ? null
-                                  : ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        n.imageUrl!,
-                                        width: 62,
-                                        height: 62,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const SizedBox(
-                                          width: 62,
-                                          height: 62,
-                                        ),
-                                      ),
-                                    ),
-                              title: Text(
-                                n.title,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Wrap(
-                                spacing: 6,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(n.publisher,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.labelSmall),
-                                  Text('· ${timeAgo(n.publishedAt)}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelSmall
-                                          ?.copyWith(
-                                              color: Theme.of(context).hintColor)),
-                                  for (final s in n.relatedTickers.take(2))
-                                    Chip(
-                                      avatar: SizedBox(
-                                        width: 16,
-                                        child: SymbolAvatar(symbol: s, radius: 8),
-                                      ),
-                                      label: Text(s,
-                                          style: Theme.of(context).textTheme.labelSmall),
-                                      visualDensity: VisualDensity.compact,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ).animate(
-                            // Stories fade in as the feed appears.
-                            delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
-                            effects: [
-                              FadeEffect(duration: 280.ms),
-                              SlideEffect(
-                                begin: const Offset(0, 0.05),
-                                end: Offset.zero,
-                                duration: 280.ms,
-                                curve: Curves.easeOut,
-                              ),
-                            ],
-                          );
+                          return _StoryCard(item: n, onTap: () => _openStory(context, n));
                         },
                       ),
                     );
@@ -218,6 +135,127 @@ class _NewsScreenState extends State<NewsScreen> {
   Future<void> _openStory(BuildContext context, NewsItem item) async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => NewsDetailScreen(item: item)),
+    );
+  }
+}
+
+/// One story: headline, where and when, and which holdings it is about.
+class _StoryCard extends StatelessWidget {
+  final NewsItem item;
+  final VoidCallback onTap;
+
+  const _StoryCard({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.labelMedium?.copyWith(color: theme.hintColor);
+    final image = item.imageUrl;
+    return SpCard(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    for (final s in item.relatedTickers.take(2))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _Ticker(symbol: s),
+                      ),
+                    Flexible(
+                      child: Text(
+                        '${item.publisher} · ${timeAgo(item.publishedAt)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (image != null && image.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Sp.radiusSmall),
+              child: Image.network(
+                image,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+                // Decoded at the size it is shown, not the size it was sent.
+                cacheWidth: 216,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A holding's symbol as a small tag.
+class _Ticker extends StatelessWidget {
+  final String symbol;
+
+  const _Ticker({required this.symbol});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        symbol,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: scheme.primary,
+          letterSpacing: .2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder stories while the feed loads.
+class _NewsSkeleton extends StatelessWidget {
+  const _NewsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(Sp.page, 8, Sp.page, 24),
+      children: [
+        for (var i = 0; i < 6; i++) ...const [
+          ShimmerSkeleton.card(height: 96),
+          SizedBox(height: 8),
+        ],
+      ],
     );
   }
 }

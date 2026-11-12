@@ -75,7 +75,7 @@ class WatchlistScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 760),
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
               children: [
                 if (items.isEmpty)
                   const EmptyState(
@@ -292,7 +292,7 @@ class SymbolSearchSheetState extends State<SymbolSearchSheet> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: TextField(
                 autofocus: true,
                 textCapitalization: TextCapitalization.characters,

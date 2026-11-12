@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../models/holding.dart';
@@ -9,6 +10,7 @@ import '../providers/portfolio_provider.dart';
 import '../services/ad_service.dart';
 import '../services/app_navigation.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 import '../utils/formatters.dart';
 import '../utils/market_identity.dart';
 import '../widgets/allocation_donut.dart';
@@ -19,9 +21,11 @@ import '../widgets/symbol_avatar.dart';
 import '../widgets/tools_grid.dart';
 import '../widgets/ui/animated_number.dart';
 import '../widgets/ui/empty_state.dart';
+import '../widgets/ui/entrance.dart';
 import '../widgets/ui/kpi_tile.dart';
 import '../widgets/ui/page_transitions.dart';
 import '../widgets/ui/pulse_indicator.dart';
+import '../widgets/ui/range_selector.dart';
 import '../widgets/ui/section_header.dart';
 import '../widgets/ui/shimmer_skeleton.dart';
 import '../widgets/ui/sp_card.dart';
@@ -57,6 +61,23 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     '1mo': '1M', '3mo': '3M', '6mo': '6M', '1y': '1Y', '2y': '2Y', '5y': '5Y',
   };
 
+  /// When the screen first appeared. Its blocks ease in only then, not
+  /// every time they scroll back into view.
+  final DateTime _shownAt = DateTime.now();
+
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh(PortfolioProvider provider) async {
+    await provider.refreshQuotes();
+    await provider.ensureDividendInfo();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PortfolioProvider>();
@@ -66,41 +87,117 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         (portfolio.holdings.isEmpty ? null : portfolio.holdings.values.first.currency);
     final events = provider.upcomingEventsFor([portfolio], horizonDays: 90).take(5).toList();
     final colors = AppColors.of(context);
-    final holdings = portfolio.holdings.values.where((h) =>
-        '${h.symbol} ${h.name}'.toLowerCase().contains(_query.toLowerCase())).toList();
-    holdings.sort((a, b) {
-      if (_sort == 'day') {
-        return (provider.quoteOf(b.symbol)?.dayChangePercent ?? double.negativeInfinity)
-            .compareTo(provider.quoteOf(a.symbol)?.dayChangePercent ?? double.negativeInfinity);
-      }
-      return a.symbol.compareTo(b.symbol);
-    });
+    final theme = Theme.of(context);
+    final query = _query.toLowerCase();
+    final holdings = portfolio.holdings.values
+        .where((h) => '${h.symbol} ${h.name}'.toLowerCase().contains(query))
+        .toList();
+    double valueOf(Holding h) => (provider.quoteOf(h.symbol)?.price ?? 0) * h.quantity;
+    double dayOf(Holding h) =>
+        provider.quoteOf(h.symbol)?.dayChangePercent ?? double.negativeInfinity;
+    holdings.sort((a, b) => switch (_sort) {
+          'day' => dayOf(b).compareTo(dayOf(a)),
+          'value' => valueOf(b).compareTo(valueOf(a)),
+          _ => a.symbol.compareTo(b.symbol),
+        });
+
+    final entering =
+        DateTime.now().difference(_shownAt) < const Duration(milliseconds: 1500);
+    var order = 0;
+    Widget enter(Widget child) =>
+        Entrance(order: order++, enabled: entering, child: child);
+
+    // The story first, like a good finance app: what it's worth and how it
+    // got here, then the details. The list is built lazily, so a long
+    // portfolio costs nothing until it is scrolled to.
+    final items = <Widget>[
+      if (provider.lastError != null)
+        _errorBanner(context, provider.lastError!)
+      else if (provider.quotesLoading)
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: LinearProgressIndicator(minHeight: 2),
+        )
+      else
+        const SizedBox.shrink(),
+      _freshnessBanner(context, provider),
+      enter(_heroCard(context, portfolio, provider, totals, currency, colors)),
+      enter(Padding(
+        padding: const EdgeInsets.only(bottom: Sp.gap),
+        child: _kpiRow(context, provider, portfolio, totals, currency),
+      )),
+      enter(WhatsNewCard(provider: provider, portfolio: portfolio, currency: currency)),
+      enter(const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title: 'Tools'),
+          ToolsGrid(),
+          SizedBox(height: Sp.gap + 4),
+        ],
+      )),
+      if (portfolio.holdings.isNotEmpty)
+        enter(_allocationCard(
+            context, provider, portfolio, totals.displayCurrency ?? currency)),
+      if (events.isNotEmpty) ...[
+        const SectionHeader(title: 'Upcoming', subtitle: 'Dividends and earnings, next 90 days'),
+        _eventsCard(context, events, colors),
+      ],
+      if (portfolio.holdings.isEmpty)
+        _emptyState(context)
+      else ...[
+        _holdingsHeader(context, portfolio.holdings.length),
+        if (holdings.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text('No matching holdings')),
+          ),
+        ..._groupedHoldings(context, provider, portfolio.id, holdings),
+        // A native ad after the holdings (inside a long list, see
+        // _groupedHoldings), and a banner at the very end of the
+        // screen. Both sit below the content the user came for.
+        if (holdings.length < _inFeedAdMinHoldings)
+          const AdSlot(placement: AdPlacement.holdingsNative, native: true),
+        const AdSlot(placement: AdPlacement.portfolioBanner),
+        const SizedBox(height: 12),
+        _dataProvenance(context, provider),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            'Prices from Yahoo Finance (unofficial). Values are estimates,\nnot investment advice.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+          ),
+        ),
+      ],
+    ];
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 96,
-        titleSpacing: 20,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        toolbarHeight: 68,
+        title: Row(
           children: [
-            Text(
-              _greeting(),
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).hintColor,
-                    fontWeight: FontWeight.w600,
+            const PulseLogo(size: 34),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _greeting(),
+                    style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor),
                   ),
+                  _portfolioSelector(context, provider),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              const PulseLogo(size: 30),
-              const SizedBox(width: 10),
-              Flexible(child: _portfolioSelector(context, provider)),
-            ]),          ],
+          ],
         ),
         actions: [
           const ThemeToggleButton(),
           _refreshButton(context, provider),
           _moreMenu(context, provider, portfolio),
+          const SizedBox(width: 4),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -112,162 +209,17 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         onPressed: () => showAddEditHoldingSheet(context, provider, portfolio.id),
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          await provider.refreshQuotes();
-          await provider.ensureDividendInfo();
-        },
+        onRefresh: () => _refresh(provider),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1000),
-            child: ListView(
-          key: const PageStorageKey('portfolio-scroll'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-          children: [
-            if (provider.lastError != null)
-              _errorBanner(context, provider.lastError!)
-            else if (provider.quotesLoading)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: LinearProgressIndicator(minHeight: 2),
-              ),
-            _freshnessBanner(context, provider),
-            // The story first, like a good finance app: what it's worth,
-            // how it got here, then the details. Each block eases in.
-            ..._staggered([
-              _totalsCard(context, totals, currency, colors, portfolio.name.startsWith('Sample')),
-              const SizedBox(height: 12),
-              SpCard(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    Text('Performance', style: Theme.of(context).textTheme.titleLarge),
-                    FilterChip(label: const Text('Compare SPY'), selected: _compare,
-                      onSelected: (v) => setState(() => _compare = v)),
-                    FilterChip(
-                      label: const Text('Total return'),
-                      selected: _totalReturn,
-                      onSelected: (v) => setState(() => _totalReturn = v),
-                    ),
-                  ]),
-                  const SizedBox(height: 10),
-                  _chart(context, portfolio, provider, currency),
-                  const SizedBox(height: 10),
-                  _rangeChips(context),
-                  const SizedBox(height: 2),
-                  Text(
-                    _totalReturn
-                        ? 'Value plus every dividend received · drag the chart'
-                        : 'Price only · drag the chart',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ],
-              )),
-              const SizedBox(height: 12),
-              _kpiRow(context, provider, portfolio, totals, currency),
-              const SizedBox(height: 10),
-              WhatsNewCard(
-                provider: provider,
-                portfolio: portfolio,
-                currency: currency,
-              ),
-              const SizedBox(height: 2),
-              const SectionHeader(title: 'Tools'),
-              const ToolsGrid(),
-            ]),
-            const SizedBox(height: 12),
-            _allocationCard(context, provider, portfolio, totals.displayCurrency ?? currency),
-            const SizedBox(height: 12),
-            if (events.isNotEmpty) ...[
-              SectionHeader(title: 'Upcoming', subtitle: '${events.length} events in the next 90 days'),
-              ...events.map((e) => _eventTile(context, e, colors)).toList().animate(
-                interval: 40.ms,
-                effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.08), end: Offset.zero, duration: 300.ms)],
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (portfolio.holdings.isEmpty)
-              _emptyState(context)
-            else ...[
-              SectionHeader(title: 'Holdings (${portfolio.holdings.length})'),
-              Row(children: [
-                Expanded(child: TextField(
-                  decoration: const InputDecoration(hintText: 'Find a holding',
-                    prefixIcon: Icon(Icons.search)),
-                  onChanged: (v) => setState(() => _query = v.trim()),
-                  textInputAction: TextInputAction.search,
-                )),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Sort'),
-                  onPressed: () async {
-                    final v = await showModalBottomSheet<String>(
-                      context: context,
-                      builder: (ctx) => SafeArea(child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Padding(padding: EdgeInsets.all(16), child: Text('Sort holdings', style: TextStyle(fontWeight: FontWeight.w800))),
-                          ListTile(leading: Icon(Icons.sort_by_alpha), title: Text('Symbol A–Z'), subtitle: Text('Easy to scan'), onTap: () => Navigator.pop(ctx, 'symbol')),
-                          ListTile(leading: Icon(Icons.trending_up), title: Text('Daily change'), subtitle: Text('Biggest movers first'), onTap: () => Navigator.pop(ctx, 'day')),
-                        ],
-                      )),
-                    );
-                    if (v != null) setState(() => _sort = v);
-                  },
-                ),
-              ]),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  FilterChip(
-                    avatar: const Icon(Icons.account_balance_outlined, size: 16),
-                    label: const Text('Group by market'),
-                    selected: _groupByMarket,
-                    onSelected: (v) => setState(() => _groupByMarket = v),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (holdings.isEmpty) const Padding(
-                padding: EdgeInsets.all(24), child: Center(child: Text('No matching holdings'))),
-              ..._groupedHoldings(context, provider, portfolio.id, holdings).animate(
-                interval: 45.ms,
-                effects: [
-                  FadeEffect(duration: 320.ms),
-                  SlideEffect(
-                    begin: const Offset(0, 0.06),
-                    end: Offset.zero,
-                    duration: 320.ms,
-                    curve: Curves.easeOut,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // A native ad after the holdings (inside a long list, see
-              // _groupedHoldings), and a banner at the very end of the
-              // screen. Both sit below the content the user came for.
-              if (holdings.length < _inFeedAdMinHoldings)
-                const AdSlot(
-                  placement: AdPlacement.holdingsNative,
-                  native: true,
-                ),
-              const AdSlot(placement: AdPlacement.portfolioBanner),
-              const SizedBox(height: 12),
-              _dataProvenance(context, provider),
-              const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  'Prices from Yahoo Finance (unofficial). Values are estimates,\nnot investment advice.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor),
-                ),
-              ),
-            ],
-          ],
-        ),
+            child: ListView.builder(
+              key: const PageStorageKey('portfolio-scroll'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(Sp.page, 4, Sp.page, 104),
+              itemCount: items.length,
+              itemBuilder: (context, i) => items[i],
+            ),
           ),
         ),
       ),
@@ -300,6 +252,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       child: DropdownButton<int>(
         value: provider.activeIndex.clamp(0, provider.portfolios.length - 1),
         borderRadius: BorderRadius.circular(12),
+        isDense: true,
         items: [
           for (var i = 0; i < provider.portfolios.length; i++)
             DropdownMenuItem(
@@ -436,21 +389,6 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     }
   }
 
-  /// Fades and lifts [children] in one after another, once, when the
-  /// screen first appears.
-  List<Widget> _staggered(List<Widget> children) {
-    var i = 0;
-    return [
-      for (final c in children)
-        c is SizedBox
-            ? c
-            : c
-                .animate()
-                .fadeIn(delay: (70 * i++).ms, duration: 420.ms, curve: Curves.easeOutCubic)
-                .slideY(begin: .06, end: 0, delay: (70 * (i - 1)).ms, duration: 420.ms, curve: Curves.easeOutCubic),
-    ];
-  }
-
   Widget _errorBanner(BuildContext context, String message) {
     final theme = Theme.of(context);
     return SpCard(
@@ -541,8 +479,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           valueColor: totals.totalReturn >= 0 ? colors.gain : colors.loss,
           icon: totals.totalReturn >= 0 ? Icons.savings_outlined : Icons.trending_down,
           sub: totals.dividendsReceived > 0
-              ? '${fmtPct(totals.totalReturnPercent)} · incl. '
-                  '${fmtMoney(totals.dividendsReceived, currency: currency)} dividends'
+              ? '${fmtPct(totals.totalReturnPercent)} with dividends'
               : '${fmtPct(totals.totalReturnPercent)} on cost',
         ),
         KpiTile(
@@ -669,7 +606,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     );
   }
 
-  Widget _totalsCard(BuildContext context, PortfolioTotals t, String? currency, AppColors colors, bool sampleMode) {
+  /// The top of the screen in one card: what the portfolio is worth, how
+  /// today went, and the chart of how it got here.
+  Widget _heroCard(BuildContext context, Portfolio portfolio, PortfolioProvider provider,
+      PortfolioTotals t, String? currency, AppColors colors) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
@@ -678,185 +618,124 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
     return SpCard(
       padding: EdgeInsets.zero,
-      glow: mood,
-      borderRadius: 26,
-      gradient: isDark
-          ? [
-              Color.alphaBlend(mood.withValues(alpha: .10), scheme.surface),
-              scheme.surface,
-              Color.alphaBlend(scheme.tertiary.withValues(alpha: .08), scheme.surface),
-            ]
-          : [
-              Color.alphaBlend(mood.withValues(alpha: .10), Colors.white),
-              Colors.white,
-            ],
+      glow: colors.glow ? mood : null,
+      borderRadius: 22,
       child: Stack(
         children: [
           // A soft orb of the day's colour in the corner.
           Positioned(
-            right: -60,
-            top: -70,
+            right: -80,
+            top: -100,
             child: IgnorePointer(
               child: Container(
-                width: 200,
-                height: 200,
+                width: 240,
+                height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
-                    mood.withValues(alpha: isDark ? .28 : .18),
+                    mood.withValues(alpha: isDark ? .20 : .12),
                     mood.withValues(alpha: 0),
                   ]),
                 ),
               ),
             ),
           ),
-          // A slow band of light that sweeps across the card now and then.
+          // A band of light that sweeps across the card now and then.
           const Positioned.fill(child: IgnorePointer(child: _Sheen())),
-          // The signature gradient along the top edge.
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            child: Container(
-              height: 3,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: colors.accentGradient),
-              ),
-            ),
-          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
             child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'TOTAL BALANCE',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.hintColor,
-                  letterSpacing: 1.6,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (sampleMode) ...[
-                const SizedBox(width: 8),
-                Chip(label: const Text('Sample'), visualDensity: VisualDensity.compact),
-              ],
-              const Spacer(),
-              if (t.hasDayChange) ...[
-                PulseIndicator(size: 6, color: mood),
-                const SizedBox(width: 6),
-                Text(
-                  'LIVE',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: mood,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: AnimatedNumber(
-              value: t.marketValue,
-              formatter: (v) => fmtMoney(v, currency: currency),
-              style: theme.textTheme.displayLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -1.6,
-                height: 1.05,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _MoodPill(
-                color: mood,
-                icon: !t.hasDayChange
-                    ? Icons.remove
-                    : (up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
-                label: t.hasDayChange
-                    ? '${fmtSignedMoney(t.dayChange, currency: currency)} · ${fmtPct(t.dayChangePercent)} today'
-                    : 'No change data yet',
-              ),
-              if (t.converted && t.displayCurrency != null)
-                _Pill(
-                  label: 'in ${t.displayCurrency}',
-                  icon: Icons.currency_exchange,
-                ),
-              if (t.hasDayChange)
-                _Pill(
-                  label: 'Cost ${fmtMoney(t.costBasis, currency: currency)}',
-                  icon: Icons.savings_outlined,
-                ),
-            ],
-          ),
-        ],
-      ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// The chart range picker: one segmented bar, the selected range lit up.
-  Widget _rangeChips(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          for (final e in _rangeLabels.entries)
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: _range == e.key,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _range = e.key),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _range == e.key
-                          ? scheme.primary.withValues(alpha: .16)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _range == e.key
-                            ? scheme.primary.withValues(alpha: .5)
-                            : Colors.transparent,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Total balance',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.hintColor,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      e.value,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: _range == e.key
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
+                    if (portfolio.name.startsWith('Sample')) ...[
+                      const SizedBox(width: 8),
+                      const _Pill(label: 'Sample'),
+                    ],
+                    const Spacer(),
+                    if (t.hasDayChange) ...[
+                      PulseIndicator(size: 6, color: mood),
+                      const SizedBox(width: 4),
+                      Text(
+                        'LIVE',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: mood,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedNumber(
+                    value: t.marketValue,
+                    formatter: (v) => fmtMoney(v, currency: currency),
+                    style: theme.textTheme.displayLarge,
                   ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _MoodPill(
+                      color: mood,
+                      icon: !t.hasDayChange
+                          ? Icons.remove
+                          : (up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
+                      label: t.hasDayChange
+                          ? '${fmtSignedMoney(t.dayChange, currency: currency)} · ${fmtPct(t.dayChangePercent)} today'
+                          : 'No change data yet',
+                    ),
+                    if (t.converted && t.displayCurrency != null)
+                      _Pill(label: 'in ${t.displayCurrency}', icon: Icons.currency_exchange),
+                    if (t.hasDayChange)
+                      _Pill(
+                        label: 'Cost ${fmtMoney(t.costBasis, currency: currency)}',
+                        icon: Icons.savings_outlined,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _chart(context, portfolio, provider, currency),
+                const SizedBox(height: 4),
+                RangeSelector(
+                  ranges: _rangeLabels,
+                  selected: _range,
+                  onChanged: (r) => setState(() => _range = r),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _Toggle(
+                      label: 'Compare SPY',
+                      selected: _compare,
+                      onChanged: (v) => setState(() => _compare = v),
+                    ),
+                    const SizedBox(width: 8),
+                    _Toggle(
+                      label: 'Total return',
+                      selected: _totalReturn,
+                      onChanged: (v) => setState(() => _totalReturn = v),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -879,13 +758,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       future: _history,
       builder: (context, snap) {
         if (snap.hasError) {
-          return SizedBox(height: 180, child: Center(child: TextButton.icon(
+          return SizedBox(height: 170, child: Center(child: TextButton.icon(
             icon: const Icon(Icons.refresh), label: const Text('Retry chart'),
             onPressed: () => setState(() => _historyKey = null),
           )));
         }
         if (!snap.hasData && snap.connectionState != ConnectionState.done) {
-          return const ShimmerSkeleton.chart(height: 180);
+          return const ShimmerSkeleton.chart(height: 170);
         }
         final results = snap.data as List? ?? const [];
         final points = results.isNotEmpty ? (results[0] as List<ChartPoint>) : const <ChartPoint>[];
@@ -893,9 +772,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         return PortfolioChart(
           points: points,
           benchmark: _compare ? benchmark : null,
-          title: _totalReturn
-              ? 'Total return'
-              : (_compare ? 'Relative growth' : 'Value history'),
+          height: 170,
           currency: currency,
           valueFormatter: (v) => fmtMoney(v, currency: currency),
         );
@@ -909,7 +786,64 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   static const _inFeedAdMinHoldings = 8;
   static const _inFeedAdAfter = 5;
 
-  /// Renders the holdings, grouped into market sections when enabled.
+  /// The holdings title with its controls: group, sort and (for a list
+  /// long enough to need it) search.
+  Widget _holdingsHeader(BuildContext context, int count) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text('Holdings', style: theme.textTheme.titleMedium),
+              const SizedBox(width: 8),
+              _CountBadge(count: count),
+              const Spacer(),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: _groupByMarket ? 'Stop grouping by market' : 'Group by market',
+                isSelected: _groupByMarket,
+                icon: const Icon(Icons.account_balance_outlined, size: 20),
+                color: scheme.onSurfaceVariant,
+                selectedIcon:
+                    Icon(Icons.account_balance, size: 20, color: scheme.primary),
+                onPressed: () => setState(() => _groupByMarket = !_groupByMarket),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Sort holdings',
+                initialValue: _sort,
+                icon: Icon(Icons.swap_vert_rounded, size: 22, color: scheme.onSurfaceVariant),
+                onSelected: (v) => setState(() => _sort = v),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'symbol', child: Text('Symbol A–Z')),
+                  PopupMenuItem(value: 'value', child: Text('Largest first')),
+                  PopupMenuItem(value: 'day', child: Text('Biggest movers today')),
+                ],
+              ),
+            ],
+          ),
+          if (count > 5) ...[
+            const SizedBox(height: 4),
+            TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                hintText: 'Find a holding',
+                prefixIcon: Icon(Icons.search, size: 20),
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _query = v.trim()),
+              textInputAction: TextInputAction.search,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Renders the holdings as cards of rows, one card per market when
+  /// grouping is on.
   List<Widget> _groupedHoldings(
     BuildContext context,
     PortfolioProvider provider,
@@ -917,20 +851,38 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     List<Holding> holdings,
   ) {
     final inFeedAd = holdings.length >= _inFeedAdMinHoldings;
+    final out = <Widget>[];
+    var rows = <Widget>[];
     var tiles = 0;
-    List<Widget> tileWithAd(Holding h) {
+
+    // The ad goes in after the card that holds the fifth holding: between
+    // two cards, never inside one.
+    var adDue = false;
+
+    void flush() {
+      if (rows.isEmpty) return;
+      out.add(_RowsCard(rows: rows));
+      rows = [];
+      if (adDue) {
+        adDue = false;
+        out.add(const AdSlot(placement: AdPlacement.holdingsNative, native: true));
+      }
+    }
+
+    void add(Holding h) {
+      rows.add(_holdingRow(context, provider, portfolioId, h));
       tiles++;
-      return [
-        _holdingTile(context, provider, portfolioId, h),
-        if (inFeedAd && tiles == _inFeedAdAfter)
-          const AdSlot(placement: AdPlacement.holdingsNative, native: true),
-      ];
+      if (inFeedAd && tiles == _inFeedAdAfter) {
+        adDue = true;
+        // An ungrouped list is one long card, so it is split for the ad.
+        if (!_groupByMarket) flush();
+      }
     }
 
     if (!_groupByMarket) {
-      return [
-        for (final h in holdings) ...tileWithAd(h),
-      ];
+      holdings.forEach(add);
+      flush();
+      return out;
     }
 
     // Bucket the holdings by the exchange their quote reports. Symbols
@@ -950,53 +902,43 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final markets = buckets.keys.toList()
       ..sort((a, b) => compareMarkets(a, b));
 
-    final widgets = <Widget>[];
     for (final market in markets) {
       final group = buckets[market]!;
-      widgets.add(_marketHeader(context, market, group.length));
-      for (final h in group) {
-        widgets.addAll(tileWithAd(h));
-      }
+      flush();
+      out.add(_marketHeader(context, market, group.length));
+      group.forEach(add);
     }
-    return widgets;
+    flush();
+    return out;
   }
 
   Widget _marketHeader(BuildContext context, String market, int count) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
       child: Row(
         children: [
-          Icon(Icons.account_balance_outlined,
-              size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
           Text(
-            market,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.2,
+            market.toUpperCase(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.hintColor,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .8,
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              count == 1 ? '1 holding' : '$count holdings',
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
+          const SizedBox(width: 6),
+          Text(
+            '· $count',
+            style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _holdingTile(
+  Widget _holdingRow(
       BuildContext context, PortfolioProvider provider, String portfolioId, Holding h) {
+    final theme = Theme.of(context);
     final q = provider.quoteOf(h.symbol);
     final price = q?.price ?? 0;
     final value = price * h.quantity;
@@ -1004,140 +946,181 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     final dayPct = q?.dayChangePercent;
     final currency = q?.currency ?? h.currency;
     final colors = AppColors.of(context);
-    final narrow = MediaQuery.sizeOf(context).width < 360;
+    final width = MediaQuery.sizeOf(context).width;
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.hintColor);
 
-    return GestureDetector(
-      onLongPress: () => showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
-      child: SpCard(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
         onTap: () => pushSharedAxis(
           context,
           HoldingDetailScreen(portfolioId: portfolioId, symbol: h.symbol),
         ),
-        child: Row(
-        children: [
-          Hero(
-            tag: 'avatar_${portfolioId}_${h.symbol}',
-            child: SymbolAvatar(
-              symbol: h.symbol,
-              companyName: q?.name,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  h.symbol,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                if (h.name.isNotEmpty)
-                  Text(
-                    h.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-                  ),
-                Text(
-                  '${fmtQty(h.quantity)} ${h.avgCost > 0 ? '× ${fmtMoney(h.avgCost, currency: currency)}' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-                ),
-              ],
-            ),
-          ),
-          if (!narrow)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _HoldingSparkline(
-                symbol: h.symbol,
-                provider: provider,
-                color: dayPct == null
-                    ? Theme.of(context).hintColor
-                    : (dayPct >= 0 ? colors.gain : colors.loss),
-              ),
-            ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        onLongPress: () =>
+            showAddEditHoldingSheet(context, provider, portfolioId, editSymbol: h.symbol),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+          child: Row(
             children: [
-              Text(
-                fmtMoney(value, currency: currency),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  fontFeatures: [FontFeature.tabularFigures()],
+              Hero(
+                tag: 'avatar_${portfolioId}_${h.symbol}',
+                child: SymbolAvatar(symbol: h.symbol, companyName: q?.name),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      h.symbol,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      h.name.isEmpty
+                          ? fmtQty(h.quantity)
+                          : '${fmtQty(h.quantity)} · ${h.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: muted,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              if (width >= 360)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  // Its own layer: a row repainting (a price ticking) does
+                  // not redraw the line.
+                  child: RepaintBoundary(
+                    child: _HoldingSparkline(
+                      symbol: h.symbol,
+                      provider: provider,
+                      color: dayPct == null
+                          ? theme.hintColor
+                          : (dayPct >= 0 ? colors.gain : colors.loss),
+                    ),
+                  ),
+                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    q == null ? ' ' : '${fmtMoney(q.price, currency: currency)} ',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-                  ),
-                  if (dayPct != null) ChangeChip(percent: dayPct, label: fmtPct(dayPct)),
-                ],
-              ),
-              Text(
-                h.avgCost > 0 ? '${fmtSignedMoney(pnl, currency: currency)} P/L' : ' ',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: h.avgCost > 0 ? pnlColor(pnl, context) : null,
-                      fontWeight: FontWeight.w600,
+                    fmtMoney(value, currency: currency),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      fontFeatures: [FontFeature.tabularFigures()],
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // The total gain needs room; a small phone shows the
+                      // day's change alone.
+                      if (h.avgCost > 0 && width >= 400) ...[
+                        Text(
+                          fmtSignedMoney(pnl, currency: currency),
+                          style: muted?.copyWith(
+                            color: pnlColor(pnl, context),
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      if (dayPct != null)
+                        ChangeChip(percent: dayPct, label: fmtPct(dayPct))
+                      else
+                        Text('No quote', style: muted),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
-    ),
     );
   }
 
-  Widget _eventTile(BuildContext context, UpcomingEvent e, AppColors colors) {
+  /// The next few dividends and earnings dates, as rows in one card.
+  Widget _eventsCard(BuildContext context, List<UpcomingEvent> events, AppColors colors) {
+    final portfolioId = context.read<PortfolioProvider>().active.id;
+    return _RowsCard(
+      indent: 68,
+      rows: [
+        for (final e in events) _eventRow(context, e, colors, portfolioId),
+      ],
+    );
+  }
+
+  Widget _eventRow(
+      BuildContext context, UpcomingEvent e, AppColors colors, String portfolioId) {
     final theme = Theme.of(context);
     final isDiv = e.kind == 'dividend';
     final color = isDiv ? colors.dividend : colors.earnings;
-    return SpCard(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      onTap: () => pushSharedAxis(context, HoldingDetailScreen(
-        portfolioId: context.read<PortfolioProvider>().active.id,
-        symbol: e.symbol,
-      )),
-      child: ListTile(
-        dense: true,
-        leading: Container(
-          width: 44,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: () => pushSharedAxis(
+          context,
+          HoldingDetailScreen(portfolioId: portfolioId, symbol: e.symbol),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(Sp.radiusSmall),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('${e.date.day}',
+                        style: TextStyle(
+                            color: color, fontWeight: FontWeight.w800, fontSize: 16, height: 1.1)),
+                    Text(isDiv ? 'DIV' : 'EPS',
+                        style: TextStyle(
+                            color: color, fontSize: 9, fontWeight: FontWeight.w700, height: 1.2)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(e.symbol,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                    Text(
+                      isDiv
+                          ? '${e.isPayDate ? 'Pays' : 'Ex-dividend'} ${fmtDate(e.date)}${e.estimated ? ' (est.)' : ''}'
+                          : 'Earnings ${fmtDate(e.date)}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                ),
+              ),
+              if (isDiv && e.total != null && e.total! > 0)
+                Text(
+                  fmtSignedMoney(e.total, currency: null),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+            ],
           ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text('${e.date.day}', style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 18)),
-            Text(isDiv ? 'DIV' : 'EPS', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w700)),
-          ]),
         ),
-        title: Text(e.symbol, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(
-          isDiv
-              ? '${e.isPayDate ? 'Pays' : 'Ex-dividend'} ${fmtDate(e.date)}${e.estimated ? ' (est.)' : ''}'
-              : 'Earnings ${fmtDate(e.date)}',
-          style: theme.textTheme.bodySmall,
-        ),
-        trailing: isDiv && e.total != null && e.total! > 0
-            ? Text(
-                fmtSignedMoney(e.total, currency: null),
-                style: TextStyle(color: color, fontWeight: FontWeight.w700),
-              )
-            : null,
       ),
     );
   }
@@ -1299,21 +1282,29 @@ class _Sheen extends StatefulWidget {
 class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 7000),
+    duration: const Duration(milliseconds: 1400),
   );
+
+  /// Starts a sweep every few seconds. The controller only ticks while the
+  /// band is moving, so the card costs nothing in between.
+  Timer? _every;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
-      _c.stop();
-    } else if (!_c.isAnimating) {
-      _c.repeat();
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (still) {
+      _every?.cancel();
+      _every = null;
+      _c.value = 0;
+    } else {
+      _every ??= Timer.periodic(const Duration(seconds: 7), (_) => _c.forward(from: 0));
     }
   }
 
   @override
   void dispose() {
+    _every?.cancel();
     _c.dispose();
     super.dispose();
   }
@@ -1324,8 +1315,7 @@ class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
-        // The sweep takes the first fifth of the cycle; the rest is rest.
-        final t = (_c.value / .2).clamp(0.0, 1.0);
+        final t = _c.value;
         if (t <= 0 || t >= 1) return const SizedBox.expand();
         final x = -1.6 + 3.2 * Curves.easeInOut.transform(t);
         return DecoratedBox(
@@ -1342,6 +1332,104 @@ class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+}
+
+/// Rows in one card, separated by hairlines.
+class _RowsCard extends StatelessWidget {
+  final List<Widget> rows;
+
+  /// Where the hairlines start, so they line up with the row text.
+  final double indent;
+
+  const _RowsCard({required this.rows, this.indent = 62});
+
+  @override
+  Widget build(BuildContext context) {
+    return SpCard(
+      padding: EdgeInsets.zero,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) Divider(height: 1, indent: indent),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A small count next to a section title.
+class _CountBadge extends StatelessWidget {
+  final int count;
+
+  const _CountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count',
+        style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor),
+      ),
+    );
+  }
+}
+
+/// A compact on/off pill for a chart option.
+class _Toggle extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  const _Toggle({required this.label, required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onChanged(!selected),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary.withValues(alpha: .14) : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? scheme.primary.withValues(alpha: .45) : scheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                size: 13,
+                color: color,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

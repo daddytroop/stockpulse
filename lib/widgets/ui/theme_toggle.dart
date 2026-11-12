@@ -105,23 +105,27 @@ class ThemeGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final current = context.select<PortfolioProvider, AppThemeId>((p) => p.themeMode);
     if (compact) {
-      return SizedBox(
-        height: 196,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: AppThemeId.pickerOrder.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, i) {
-            final mode = AppThemeId.pickerOrder[i];
-            return SizedBox(
-              width: 164,
-              child: ThemePreviewCard(
-                mode: mode,
-                selected: mode == current,
-                onTap: () => chooseTheme(context, mode),
+      // A row that is as tall as its cards, whatever the font size: a
+      // fixed height either clipped them or left a gap underneath.
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final (i, mode) in AppThemeId.pickerOrder.indexed)
+              Padding(
+                padding: EdgeInsets.only(left: i == 0 ? 0 : 10),
+                child: SizedBox(
+                  width: 164,
+                  child: ThemePreviewCard(
+                    mode: mode,
+                    selected: mode == current,
+                    onTap: () => chooseTheme(context, mode),
+                  ),
+                ),
               ),
-            );
-          },
+          ],
         ),
       );
     }
@@ -214,6 +218,7 @@ class ThemePreviewCard extends StatelessWidget {
               child: Container(
                 color: t.scaffoldBackgroundColor,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // The mini balance card.

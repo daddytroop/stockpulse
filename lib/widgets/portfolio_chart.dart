@@ -22,6 +22,9 @@ class PortfolioChart extends StatefulWidget {
   /// Formats the value shown in the scrub readout.
   final String Function(double)? valueFormatter;
 
+  /// Height of the plot itself.
+  final double height;
+
   const PortfolioChart({
     super.key,
     required this.points,
@@ -29,6 +32,7 @@ class PortfolioChart extends StatefulWidget {
     this.title = '',
     this.currency,
     this.valueFormatter,
+    this.height = 200,
   });
 
   @override
@@ -44,7 +48,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
     final theme = Theme.of(context);
     if (widget.points.length < 2) {
       return SizedBox(
-        height: 200,
+        height: widget.height,
         child: Center(
           child: Text(
             'Not enough history yet',
@@ -129,9 +133,9 @@ class _PortfolioChartState extends State<PortfolioChart> {
         ],
         isCurved: true,
         curveSmoothness: 0.28,
-        barWidth: 2.6,
+        barWidth: 2.2,
         color: color,
-        shadow: Shadow(color: color.withValues(alpha: 0.55), blurRadius: 10),
+        shadow: Shadow(color: color.withValues(alpha: 0.4), blurRadius: 6),
         isStrokeCapRound: true,
         dotData: const FlDotData(show: false),
         belowBarData: BarAreaData(
@@ -140,7 +144,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              color.withValues(alpha: 0.32),
+              color.withValues(alpha: 0.22),
               color.withValues(alpha: 0.0),
             ],
           ),
@@ -220,7 +224,7 @@ class _PortfolioChartState extends State<PortfolioChart> {
             ),
           ),
         SizedBox(
-          height: 200,
+          height: widget.height,
           child: LineChart(
             LineChartData(
               minX: minX,
@@ -233,9 +237,8 @@ class _PortfolioChartState extends State<PortfolioChart> {
                 drawVerticalLine: false,
                 horizontalInterval: _yInterval(minY, maxY),
                 getDrawingHorizontalLine: (value) => FlLine(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.10),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.08),
                   strokeWidth: 1,
-                  dashArray: [4, 6],
                 ),
               ),
               borderData: FlBorderData(show: false),

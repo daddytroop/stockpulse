@@ -63,7 +63,7 @@ class SettingsScreen extends StatelessWidget {
         actions: const [ThemeToggleButton()],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           const ProSettingsCard(),
           // Appearance comes first: it is the setting people reach for most
@@ -625,7 +625,7 @@ class SettingsScreen extends StatelessWidget {
                     child: const Row(children: [
                       PulseLogo(size: 44),
                       SizedBox(width: 12),
-                      Text('Stock Pulse v1.6.1',
+                      Text('Stock Pulse v1.7.0',
                           style: TextStyle(fontWeight: FontWeight.w700)),
                     ]),
                   ),
@@ -870,7 +870,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _section(BuildContext context, String title) {
     return SectionHeader(
       title: title,
-      padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
+      padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
     );
   }
 

@@ -51,7 +51,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           : _text == null
               ? const Center(child: CircularProgressIndicator())
               : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                   children: [
                     for (final block in _parse(_text!)) block,
                   ],

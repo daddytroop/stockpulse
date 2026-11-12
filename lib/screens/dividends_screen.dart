@@ -56,15 +56,24 @@ class _HeroPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: .16)),
+        color: theme.colorScheme.surface.withValues(alpha: .6),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
+        Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()])),
+        ),
       ]),
     );
   }
@@ -128,12 +137,21 @@ class _DividendsScreenState extends State<DividendsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 84,
-        titleSpacing: 20,
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Income dashboard', style: Theme.of(context).textTheme.labelSmall),
-          Text(portfolio.name),
-        ]),
+        toolbarHeight: 68,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              portfolio.name,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: Theme.of(context).hintColor),
+            ),
+            const Text('Dividends'),
+          ],
+        ),
         actions: const [ThemeToggleButton()],
       ),
       body: Stack(
@@ -141,7 +159,7 @@ class _DividendsScreenState extends State<DividendsScreen> {
           Center(child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1000),
             child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               if (portfolio.name.startsWith('Sample'))
                 const _SampleCallout(),
@@ -257,7 +275,8 @@ class _DividendsScreenState extends State<DividendsScreen> {
     final isDark = theme.colorScheme.brightness == Brightness.dark;
     final monthly = provider.monthlyDividendRateFor(portfolio);
     return SpCard(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
+      borderRadius: 22,
       gradient: isDark
           ? [const Color(0xFF06362E), const Color(0xFF101820)]
           : [const Color(0xFFDDF7EA), const Color(0xFFFFFFFF)],
@@ -296,10 +315,13 @@ class _DividendsScreenState extends State<DividendsScreen> {
             ),
           ),
         const SizedBox(height: 18),
-        Wrap(spacing: 10, runSpacing: 10, children: [
-          _HeroPill(label: 'Next 30 days', value: fmtMoney(next30, currency: currency)),
-          _HeroPill(label: 'Yield on cost', value: fmtPct(totals.yieldOnCost, signed: false)),
-          _HeroPill(label: 'Reinvested in 5 years', value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency)),
+        // Three equal columns, so they never wrap into a ragged second row.
+        Row(children: [
+          Expanded(child: _HeroPill(label: 'Next 30 days', value: fmtMoney(next30, currency: currency))),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroPill(label: 'Yield on cost', value: fmtPct(totals.yieldOnCost, signed: false))),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroPill(label: 'In 5 years', value: fmtMoney(provider.dripProjectionFor(portfolio), currency: currency))),
         ]),
       ]),
     );

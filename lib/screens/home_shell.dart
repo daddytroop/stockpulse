@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -32,22 +32,27 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMixin {
   int _index = 0;
 
+  /// The tabs opened so far. A tab is only built once it is first shown, so
+  /// starting the app builds one screen instead of five.
+  final _visited = <int>{0};
+
   /// Plays a short fade-through whenever the tab changes.
   late final AnimationController _tabFade = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 320),
+    duration: const Duration(milliseconds: 220),
     value: 1,
   );
 
   late final Animation<double> _tabOpacity =
       CurvedAnimation(parent: _tabFade, curve: Curves.easeOut);
-  late final Animation<double> _tabScale = Tween(begin: .985, end: 1.0)
-      .animate(CurvedAnimation(parent: _tabFade, curve: Curves.easeOutCubic));
 
   void _select(int i) {
     if (i == _index) return;
     HapticFeedback.selectionClick();
-    setState(() => _index = i);
+    setState(() {
+      _index = i;
+      _visited.add(i);
+    });
     _tabFade.forward(from: 0);
   }
 
@@ -59,12 +64,6 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
     Icons.candlestick_chart_outlined,
     Icons.settings_outlined,
   ];
-
-  /// Switches tabs from anywhere in the app (used by the KPI tiles).
-  void goToTab(int index) {
-    if (index < 0 || index >= _labels.length) return;
-    setState(() => _index = index);
-  }
 
   @override
   void initState() {
@@ -176,7 +175,7 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
               FilledButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  setState(() => _index = 4);
+                  _select(AppNavigation.settingsTab);
                 },
                 child: const Text('Open backup'),
               ),
@@ -201,13 +200,14 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
       ),
       child: FadeTransition(
         opacity: _tabOpacity,
-        child: ScaleTransition(
-          scale: _tabScale,
-          child: IndexedStack(
-            index: _index,
-            children: [for (var i = 0; i < _labels.length; i++)
-              TickerMode(enabled: i == _index, child: _screen(i))],
-          ),
+        child: IndexedStack(
+          index: _index,
+          children: [
+            for (var i = 0; i < _labels.length; i++)
+              _visited.contains(i)
+                  ? TickerMode(enabled: i == _index, child: _screen(i))
+                  : const SizedBox.shrink(),
+          ],
         ),
       ),
     );
@@ -273,40 +273,14 @@ class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMix
 }
 
 /// Soft coloured light behind every screen, so the surfaces read as depth
-/// rather than a flat fill. The light drifts very slowly, like a living
-/// background; it holds still when the device asks for reduced motion.
-class AmbientBackground extends StatefulWidget {
+/// rather than a flat fill.
+///
+/// It is painted once and kept as its own layer. (It used to drift, which
+/// repainted the whole screen behind the frosted bar on every frame.)
+class AmbientBackground extends StatelessWidget {
   final Widget child;
 
   const AmbientBackground({super.key, required this.child});
-
-  @override
-  State<AmbientBackground> createState() => _AmbientBackgroundState();
-}
-
-class _AmbientBackgroundState extends State<AmbientBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _drift = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 24),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (still) {
-      _drift.stop();
-    } else if (!_drift.isAnimating) {
-      _drift.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _drift.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -319,36 +293,30 @@ class _AmbientBackgroundState extends State<AmbientBackground>
         children: [
           Positioned.fill(
             child: RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: _drift,
-                builder: (context, _) {
-                  final t = _drift.value * 2 * pi;
-                  return CustomPaint(
-                    painter: _GlowPainter(
-                      blobs: [
-                        (
-                          Alignment(-1.0 + .25 * sin(t), -1.1 + .15 * cos(t)),
-                          1.1,
-                          glow.first.withValues(alpha: isDark ? .17 : .12),
-                        ),
-                        (
-                          Alignment(1.15 + .2 * cos(t * 1.3), -.65 + .2 * sin(t)),
-                          .9,
-                          glow.last.withValues(alpha: isDark ? .14 : .08),
-                        ),
-                        (
-                          Alignment(-.4 + .4 * sin(t * .7), 1.1),
-                          .8,
-                          glow[1].withValues(alpha: isDark ? .07 : .05),
-                        ),
-                      ],
+              child: CustomPaint(
+                painter: _GlowPainter(
+                  blobs: [
+                    (
+                      const Alignment(-1.0, -1.05),
+                      1.0,
+                      glow.first.withValues(alpha: isDark ? .13 : .10),
                     ),
-                  );
-                },
+                    (
+                      const Alignment(1.2, -.6),
+                      .85,
+                      glow.last.withValues(alpha: isDark ? .11 : .07),
+                    ),
+                    (
+                      const Alignment(-.4, 1.1),
+                      .8,
+                      glow[1].withValues(alpha: isDark ? .06 : .04),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          Positioned.fill(child: widget.child),
+          Positioned.fill(child: child),
         ],
       ),
     );
@@ -376,7 +344,7 @@ class _GlowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GlowPainter old) => true;
+  bool shouldRepaint(_GlowPainter old) => !listEquals(old.blobs, blobs);
 }
 
 /// A frosted, rounded navigation bar that floats above the content.
@@ -401,31 +369,26 @@ class _FloatingNavBar extends StatelessWidget {
     final isDark = scheme.brightness == Brightness.dark;
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? .45 : .10),
-              blurRadius: 30,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: scheme.primary.withValues(alpha: isDark ? .10 : .06),
+              color: Colors.black.withValues(alpha: isDark ? .40 : .08),
               blurRadius: 24,
-              spreadRadius: -6,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: scheme.surface.withValues(alpha: isDark ? .72 : .86),
-                borderRadius: BorderRadius.circular(26),
+                color: scheme.surface.withValues(alpha: isDark ? .78 : .88),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isDark
                       ? Colors.white.withValues(alpha: .08)

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
-import '../widgets/ui/sp_card.dart';
+import '../theme/tokens.dart';
 import '../widgets/pulse_logo.dart';
+import '../widgets/ui/entrance.dart';
+import '../widgets/ui/sp_card.dart';
 
 /// One-time, skippable first-run orientation. Core tracking remains usable
 /// without holding any account or API keys.
@@ -20,9 +21,9 @@ class OnboardingScreen extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            end: Alignment.center,
             colors: [
-              theme.colorScheme.primary.withValues(alpha: .18),
+              theme.colorScheme.primary.withValues(alpha: .16),
               theme.scaffoldBackgroundColor,
             ],
           ),
@@ -31,76 +32,92 @@ class OnboardingScreen extends StatelessWidget {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+              child: Column(
                 children: [
-                  Row(children: [
-                    const PulseMark(size: 66),
-                    const SizedBox(width: 14),
-                    Expanded(child: Text(
-                      'Welcome to your money dashboard',
-                      style: theme.textTheme.headlineMedium,
-                    )),
-                  ]).animate(
-                    delay: 60.ms,
-                    effects: [
-                      FadeEffect(duration: 400.ms),
-                      SlideEffect(
-                        begin: const Offset(0, 0.08),
-                        end: Offset.zero,
-                        duration: 400.ms,
-                        curve: Curves.easeOut,
-                      ),
-                    ],
+                  // The choices scroll if the screen is short; the button
+                  // below always stays in reach.
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(Sp.page + 4, 28, Sp.page + 4, 12),
+                      children: [
+                        Entrance(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const PulseMark(size: 52),
+                              const SizedBox(height: 18),
+                              Text(
+                                'Welcome to your money dashboard',
+                                style: theme.textTheme.headlineLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Private by default, no account needed. Pick where to start.',
+                                style: theme.textTheme.bodyLarge
+                                    ?.copyWith(color: theme.hintColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        Entrance(
+                          order: 2,
+                          child: _Step(
+                            icon: Icons.add_chart,
+                            title: 'Add your first holding',
+                            copy: 'A symbol, how many you own, and what you paid.',
+                            onPressed: () => onAction('add'),
+                          ),
+                        ),
+                        Entrance(
+                          order: 3,
+                          child: _Step(
+                            icon: Icons.upload_file_outlined,
+                            title: 'Or import everything at once',
+                            copy: 'Paste or open a CSV from your broker.',
+                            onPressed: () => onAction('import'),
+                          ),
+                        ),
+                        Entrance(
+                          order: 4,
+                          child: _Step(
+                            icon: Icons.candlestick_chart_outlined,
+                            title: 'Or just watch the markets',
+                            copy: 'Indices, popular stocks and pro charts.',
+                            onPressed: () => onAction('markets'),
+                          ),
+                        ),
+                        Entrance(
+                          order: 5,
+                          child: _Step(
+                            icon: Icons.tune_outlined,
+                            title: 'Make it yours',
+                            copy: 'Theme, currency, widgets, backup and lock.',
+                            onPressed: () => onAction('settings'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Stock Pulse is private by default and keeps getting more useful as you add holdings.',
-                    style: theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
-                  ).animate(
-                    delay: 160.ms,
-                    effects: [FadeEffect(duration: 400.ms)],
-                  ),
-                  const SizedBox(height: 24),
-                  _Step(
-                    icon: Icons.add_chart,
-                    title: 'Add your first holding',
-                    copy: 'Track stocks, ETFs, and crypto with a symbol, quantity, and optional cost.',
-                    actionLabel: 'Add holding',
-                    onPressed: () => onAction('add'),
-                  ),
-                  _Step(
-                    icon: Icons.upload_file_outlined,
-                    title: 'Or import everything at once',
-                    copy: 'Paste or open a broker CSV. Duplicate rows merge automatically.',
-                    actionLabel: 'Import CSV',
-                    onPressed: () => onAction('import'),
-                  ),
-                  _Step(
-                    icon: Icons.candlestick_chart_outlined,
-                    title: 'Or just watch the markets',
-                    copy: 'Live indices, popular stocks and pro charts with RSI and MACD. No holdings needed.',
-                    actionLabel: 'Open markets',
-                    onPressed: () => onAction('markets'),
-                  ),
-                  _Step(
-                    icon: Icons.tune_outlined,
-                    title: 'Make it yours later',
-                    copy: 'Theme, currency, widgets, backup, sync, and lock live in Settings. No account is required to get the core features.',
-                    actionLabel: 'Open settings',
-                    onPressed: () => onAction('settings'),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Prices use Yahoo’s unofficial endpoints and may be delayed or estimated. This app is not investment advice.',
-                    style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    key: const ValueKey('onboarding-start'),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Start exploring'),
-                    onPressed: onDone,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(Sp.page + 4, 4, Sp.page + 4, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FilledButton(
+                          key: const ValueKey('onboarding-start'),
+                          onPressed: onDone,
+                          child: const Text('Start exploring'),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Prices come from Yahoo Finance and may be delayed. Not investment advice.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: theme.hintColor),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -122,47 +139,56 @@ class PulseMark extends StatelessWidget {
   }
 }
 
+/// One way to start: the whole card is the button.
 class _Step extends StatelessWidget {
   final IconData icon;
   final String title;
   final String copy;
-  final String actionLabel;
   final VoidCallback onPressed;
 
   const _Step({
     required this.icon,
     required this.title,
     required this.copy,
-    required this.actionLabel,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SpCard(
-      child: Row(children: [
-        Container(
-          width: 46, height: 46,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: theme.colorScheme.primary),
+    return Semantics(
+      button: true,
+      child: SpCard(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+        onTap: onPressed,
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(Sp.radiusSmall),
+              ),
+              child: Icon(icon, size: 22, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(copy,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: theme.hintColor),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: theme.textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(copy, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          TextButton(
-            style: TextButton.styleFrom(padding: EdgeInsets.zero),
-            onPressed: onPressed,
-            child: Text(actionLabel),
-          ),
-        ])),
-      ]),
+      ),
     );
   }
 }

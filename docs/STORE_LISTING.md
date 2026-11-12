@@ -80,7 +80,17 @@ Not ready to buy? Watch a short video to unlock any Pro feature free for 24 hour
 Prices come from public market data and may be delayed. Stock Pulse is a tracking tool, not investment advice.
 ```
 
-## What's new in 1.6.0 (500 characters max)
+## What's new in 1.7.0 (500 characters max)
+
+```
+• A cleaner home screen: your balance and its chart in one card, far less scrolling
+• Holdings in compact lists by market, with sorting by size or today's movers
+• Holding pages rebuilt: price, chart, value, total gain and weight together
+• Simpler welcome screen, tidier News, Dividends and Settings
+• Faster start, smoother scrolling and lower battery use
+```
+
+## What's new in 1.6.0
 
 ```
 • Advanced charts: candles, volume, moving averages, Bollinger bands, RSI and MACD for any stock

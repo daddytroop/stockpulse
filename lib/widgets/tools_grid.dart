@@ -9,6 +9,7 @@ import '../screens/recap_screen.dart';
 import '../screens/snowball_screen.dart';
 import '../screens/watchlist_screen.dart';
 import '../services/pro_service.dart';
+import '../theme/tokens.dart';
 import 'ui/page_transitions.dart';
 
 /// The portfolio screen's tools: the Pro features and the free recap.
@@ -69,24 +70,30 @@ class ToolsGrid extends StatelessWidget {
       ),
     ];
 
+    // One row: side by side when there is room, swiped on a phone. A grid
+    // here pushed the holdings a full screen further down.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 640 ? 4 : 2;
-        const gap = 10.0;
-        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (var i = 0; i < tools.length; i++)
-              SizedBox(
-                // An odd tile out spans the row instead of leaving a gap.
-                width: i == tools.length - 1 && tools.length % columns != 0
-                    ? constraints.maxWidth
-                    : width,
-                child: tools[i],
-              ),
-          ],
+        if (constraints.maxWidth >= 720) {
+          return Row(
+            children: [
+              for (var i = 0; i < tools.length; i++) ...[
+                if (i > 0) const SizedBox(width: Sp.gapSmall),
+                Expanded(child: tools[i]),
+              ],
+            ],
+          );
+        }
+        return SizedBox(
+          height: _Tool.height,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            // Tiles slide out past the page margin instead of being cut at it.
+            clipBehavior: Clip.none,
+            itemCount: tools.length,
+            separatorBuilder: (_, __) => const SizedBox(width: Sp.gapSmall),
+            itemBuilder: (_, i) => SizedBox(width: 148, child: tools[i]),
+          ),
         );
       },
     );
@@ -100,6 +107,8 @@ class _Tool extends StatelessWidget {
   final List<Color> colors;
   final bool locked;
   final VoidCallback onTap;
+
+  static const double height = 108;
 
   const _Tool({
     required this.icon,
@@ -116,26 +125,19 @@ class _Tool extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     return Material(
       color: theme.colorScheme.surface,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(Sp.radius - 2),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
+          height: height,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(Sp.radius - 2),
             border: Border.all(
               color: isDark
-                  ? colors.first.withValues(alpha: .22)
-                  : theme.colorScheme.outline.withValues(alpha: .1),
-            ),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.first.withValues(alpha: isDark ? .12 : .08),
-                colors.last.withValues(alpha: isDark ? .03 : .02),
-              ],
+                  ? Colors.white.withValues(alpha: .07)
+                  : theme.colorScheme.outlineVariant,
             ),
           ),
           child: Column(
@@ -144,26 +146,27 @@ class _Tool extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(colors: colors),
-                      boxShadow: [
-                        BoxShadow(color: colors.first.withValues(alpha: .35), blurRadius: 12),
-                      ],
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: colors,
+                      ),
                     ),
-                    child: Icon(icon, size: 20, color: const Color(0xFF060912)),
+                    child: Icon(icon, size: 18, color: const Color(0xFF060912)),
                   ),
                   const Spacer(),
                   if (locked) const ProBadge(locked: true),
                 ],
               ),
-              const SizedBox(height: 12),
+              const Spacer(),
               Text(title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
               const SizedBox(height: 2),
               Text(subtitle,
                   maxLines: 1,
