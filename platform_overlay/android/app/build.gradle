@@ -42,6 +42,14 @@ android {
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode
         versionName flutter.versionName
+
+        // A test build can install next to the real app: CI sets a suffix
+        // and a different name for the Pro test APK (see build.yml).
+        def idSuffix = System.getenv("APP_ID_SUFFIX")
+        if (idSuffix) {
+            applicationIdSuffix idSuffix
+        }
+        manifestPlaceholders += [appLabel: System.getenv("APP_LABEL") ?: "Stock Pulse"]
     }
 
     signingConfigs {

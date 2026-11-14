@@ -88,6 +88,25 @@ jobs:
           name: StockPulse-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+      # A second APK for testing Pro on a phone: every Pro feature is
+      # unlocked, and it has its own app ID and name so it installs next to
+      # the normal app instead of replacing it. Pull requests only; a
+      # tagged release never builds it.
+      - name: Build the Pro test APK (installs side by side)
+        if: github.event_name == 'pull_request'
+        env:
+          APP_ID_SUFFIX: .protest
+          APP_LABEL: Stock Pulse Pro Test
+        run: |
+          flutter build apk --release --dart-define=DEV_TOOLS=true --dart-define=PRO_INCLUDED=true
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/stockpulse-pro-test.apk
+      - name: Upload the Pro test APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockPulse-android-pro-test-apk
+          path: build/app/outputs/flutter-apk/stockpulse-pro-test.apk
+          if-no-files-found: error
 
   build-aab:
     name: Android App Bundle (Play)
