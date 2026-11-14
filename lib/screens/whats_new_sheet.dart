@@ -19,24 +19,24 @@ class _WhatsNew extends StatelessWidget {
 
   static const _items = [
     (
-      Icons.candlestick_chart_outlined,
-      'Advanced charts',
-      'Candles, volume, moving averages, Bollinger bands, RSI and MACD for any stock. Pinch to zoom, drag to read.',
+      Icons.dashboard_customize_outlined,
+      'A cleaner home screen',
+      'Your balance and its chart now share one card, and the rest fits in half the scrolling.',
     ),
     (
-      Icons.public_rounded,
-      'A new Markets tab',
-      'The S&P 500, Nasdaq, Bitcoin, gold and the most popular stocks at a glance.',
+      Icons.view_agenda_outlined,
+      'Tidier holdings',
+      "Holdings sit in compact lists by market. Sort by size or by today's movers.",
     ),
     (
-      Icons.palette_outlined,
-      'Themes, rebuilt',
-      'Every theme has its own look now, gains are always green, and Follow system finally follows your phone.',
+      Icons.show_chart_rounded,
+      'Holding pages, rebuilt',
+      'Price, chart, value, total gain and weight together at the top.',
     ),
     (
-      Icons.auto_awesome_rounded,
-      'Smoother everything',
-      'New motion throughout, a cleaner home screen, and widgets that load and refresh properly.',
+      Icons.bolt_rounded,
+      'Faster and lighter',
+      'The app opens quicker, scrolls smoother and uses less battery.',
     ),
   ];
 
@@ -59,7 +59,7 @@ class _WhatsNew extends StatelessWidget {
               ),
             ).animate().fadeIn(duration: 400.ms).slideX(begin: -.05, end: 0),
             const SizedBox(height: 4),
-            Text('Stock Pulse 1.6',
+            Text('Stock Pulse 1.7',
                 style: theme.textTheme.labelLarge?.copyWith(color: theme.hintColor)),
             const SizedBox(height: 18),
             for (final (i, item) in _items.indexed)

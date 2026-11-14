@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../theme/app_colors.dart';
+import '../../theme/tokens.dart';
 import 'animated_number.dart';
 
 /// A headline metric tile.
@@ -53,7 +53,6 @@ class KpiTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final colors = AppColors.of(context);
     final isDark = scheme.brightness == Brightness.dark;
     final hero = emphasis == KpiEmphasis.hero;
 
@@ -62,45 +61,26 @@ class KpiTile extends StatelessWidget {
 
     Widget content = Stack(
       children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  accent.withValues(alpha: isDark ? 0.16 : 0.10),
-                  accent.withValues(alpha: isDark ? 0.04 : 0.02),
-                ],
-              ),
-            ),
-          ),
-        ),
         Padding(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, hero ? 16 : 14),
+          padding: EdgeInsets.fromLTRB(14, 12, 14, hero ? 14 : 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 15, color: accent),
-                    const SizedBox(width: 6),
-                  ],
                   Expanded(
                     child: Text(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
+                      style: theme.textTheme.labelMedium?.copyWith(
                         color: theme.hintColor,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
+                  if (icon != null)
+                    Icon(icon, size: 15, color: accent.withValues(alpha: .8)),
                 ],
               ),
               SizedBox(height: hero ? 6 : 4),
@@ -122,9 +102,9 @@ class KpiTile extends StatelessWidget {
                             ? theme.textTheme.displaySmall
                             : theme.textTheme.titleLarge)
                         ?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: valueColor,
-                      letterSpacing: -0.5,
+                      letterSpacing: -0.4,
                     ),
                   ),
                 ],
@@ -133,7 +113,7 @@ class KpiTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   sub!,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.hintColor,
@@ -150,20 +130,12 @@ class KpiTile extends StatelessWidget {
     content = Container(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(Sp.radius - 2),
         border: Border.all(
           color: isDark
-              ? accent.withValues(alpha: 0.16)
-              : scheme.outline.withValues(alpha: 0.08),
+              ? Colors.white.withValues(alpha: 0.07)
+              : scheme.outlineVariant,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: (isDark ? Colors.black : colors.shimmerBase)
-                .withValues(alpha: isDark ? 0.24 : 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: content,
@@ -281,7 +253,7 @@ class KpiRow extends StatelessWidget {
   final List<KpiTile> tiles;
   final double spacing;
 
-  const KpiRow({super.key, required this.tiles, this.spacing = 10});
+  const KpiRow({super.key, required this.tiles, this.spacing = Sp.gapSmall});
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +263,7 @@ class KpiRow extends StatelessWidget {
         final width = constraints.maxWidth;
         // Two columns on a phone, more when there is room.
         final columns = width >= 760 ? 4 : (width >= 420 ? 3 : 2);
-        const gap = 10.0;
+        const gap = Sp.gapSmall;
         final tileWidth = (width - gap * (columns - 1)) / columns;
         return Wrap(
           spacing: gap,

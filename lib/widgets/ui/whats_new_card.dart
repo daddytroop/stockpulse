@@ -50,7 +50,7 @@ class WhatsNewCard extends StatelessWidget {
               Icon(Icons.auto_awesome, size: 16, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
               Text(
-                "What's new",
+                'Highlights',
                 style: theme.textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),

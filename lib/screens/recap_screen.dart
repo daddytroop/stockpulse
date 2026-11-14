@@ -96,7 +96,7 @@ class _RecapScreenState extends State<RecapScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Share your recap')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           Center(
             child: SegmentedButton<String>(

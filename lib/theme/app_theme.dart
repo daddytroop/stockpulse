@@ -2,6 +2,7 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'tokens.dart';
 
 /// Visual themes for Stock Pulse. Every theme is a hand-tuned palette, not
 /// a generated one, so each looks clearly different from the others.
@@ -348,15 +349,23 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: scheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        // The same hairline edge as SpCard, so plain cards match.
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Sp.radius),
+          side: BorderSide(
+            color: isDark ? Colors.white.withValues(alpha: .07) : scheme.outlineVariant,
+          ),
+        ),
         margin: EdgeInsets.zero,
       ),
       chipTheme: ChipThemeData(
         backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: neon ? .5 : .72),
         selectedColor: neon ? scheme.primary.withValues(alpha: .16) : scheme.primaryContainer,
         checkmarkColor: scheme.primary,
-        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: scheme.onSurface),
-        secondaryLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: scheme.primary),
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        showCheckmark: false,
+        secondaryLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: scheme.primary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         side: neon
             ? WidgetStateBorderSide.resolveWith((states) => BorderSide(
@@ -373,14 +382,16 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          side: BorderSide(color: scheme.outlineVariant),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -392,30 +403,34 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surfaceContainerHighest.withValues(alpha: .58),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: scheme.outline.withValues(alpha: .22)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: .7)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        hintStyle: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+        prefixIconColor: scheme.onSurfaceVariant,
       ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,
         backgroundColor: base.withValues(alpha: isDark ? .92 : .82),
-        titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: scheme.onSurface),
+        titleSpacing: Sp.page,
+        titleTextStyle: TextStyle(
+            fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.3, color: scheme.onSurface),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 68,
+        height: 62,
         elevation: 0,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         indicatorColor: scheme.primary.withValues(alpha: isDark ? .16 : .14),
-        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
               color: states.contains(WidgetState.selected)
@@ -425,8 +440,8 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
               fontSize: 11,
               fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w800
-                  : FontWeight.w600,
+                  ? FontWeight.w700
+                  : FontWeight.w500,
               color: states.contains(WidgetState.selected)
                   ? scheme.primary
                   : scheme.onSurfaceVariant,
@@ -443,7 +458,7 @@ class AppTheme {
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerHigh,
@@ -464,7 +479,7 @@ class AppTheme {
         // button: every theme gets a solid one in its accent instead.
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         extendedTextStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
       dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: .55), space: 1),
@@ -490,21 +505,21 @@ class AppTheme {
     // Tabular figures keep animated numbers from wobbling as digits change.
     const tabular = [FontFeature.tabularFigures()];
     const base = TextTheme(
-      displayLarge: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, letterSpacing: -1.3, fontFeatures: tabular),
-      displayMedium: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.9, fontFeatures: tabular),
-      displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.7, fontFeatures: tabular),
-      headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-      headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.35),
-      headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-      titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-      titleSmall: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
-      bodyMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
-      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.45),
+      displayLarge: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.4, height: 1.05, fontFeatures: tabular),
+      displayMedium: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1.0, height: 1.1, fontFeatures: tabular),
+      displaySmall: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.7, height: 1.15, fontFeatures: tabular),
+      headlineLarge: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.6),
+      headlineMedium: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+      headlineSmall: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+      titleLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.1),
+      titleSmall: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, height: 1.4),
+      bodyMedium: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, height: 1.4),
+      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.4),
       labelLarge: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-      labelMedium: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: .45),
+      labelMedium: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+      labelSmall: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: .2),
     );
     return base.apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
   }

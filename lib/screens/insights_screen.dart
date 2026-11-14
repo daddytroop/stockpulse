@@ -48,11 +48,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
               SpCard(
                 glow: scoreColor,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 22),
                 child: Column(
                   children: [
                     SizedBox(

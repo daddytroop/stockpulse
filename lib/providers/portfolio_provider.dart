@@ -183,7 +183,7 @@ class PortfolioProvider extends ChangeNotifier {
   bool get showsOnboarding => _onboardingComplete;
 
   /// The release whose highlights the What's new sheet shows.
-  static const whatsNewVersion = '1.6.0';
+  static const whatsNewVersion = '1.7.0';
   String _seenWhatsNew = '';
 
   /// Whether to show the What's new sheet: once per release, to people

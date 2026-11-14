@@ -58,6 +58,11 @@ enum ProFeature {
 /// `--dart-define=PRO_LOCKED=true`.
 const bool kProLocked = bool.fromEnvironment('PRO_LOCKED');
 
+/// Makes Pro part of the build on Android too, for the side-by-side test
+/// app CI builds on pull requests: `--dart-define=PRO_INCLUDED=true`.
+/// Store and tagged-release builds are never made with it.
+const bool kProIncluded = bool.fromEnvironment('PRO_INCLUDED');
+
 /// Whether this build carries the "See the app as a Pro user" switch.
 ///
 /// Only debug builds and test builds made with `--dart-define=DEV_TOOLS=true`
@@ -119,7 +124,9 @@ class ProService extends ChangeNotifier {
 
   /// Pro is part of builds that cannot sell it.
   bool get _includedHere =>
-      _sellsOverride != null ? !_sellsOverride : (!isAndroidPlatform && !kProLocked);
+      _sellsOverride != null
+          ? !_sellsOverride
+          : (kProIncluded || (!isAndroidPlatform && !kProLocked));
 
   /// Whether the user has Pro for good.
   bool get isPro => _owned || devPro || _includedHere;
